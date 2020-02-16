@@ -1,0 +1,7 @@
+name = "Brutus"
+uuid = "44ccd279-0a44-4492-af09-0e34b2907bcc"
+authors = ["Valentin Churavy <v.churavy@gmail.com>", "Leon Shen <leon@yhls.org>"]
+version = "0.1.0"
+
+[compat]
+julia = "1.3"
