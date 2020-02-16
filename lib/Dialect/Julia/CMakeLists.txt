@@ -1,7 +1,6 @@
-file(GLOB globbed *.c *.cpp)
 add_llvm_library(MLIRJulia
-  ${globbed}
-
+  Ops.cpp
+  CallOp.cpp
   ADDITIONAL_HEADER_DIRS
   ${BRUTUS_INCLUDE_DIR}/JuliaOps
   )
