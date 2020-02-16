@@ -4,10 +4,7 @@
 #define BRUTUS_JL_INTERNAL_H
 
 #ifdef __cplusplus
-#include <cstdint>
 extern "C" {
-#else
-#include <stdint.h>
 #endif
 
 /*****

@@ -4,12 +4,10 @@
 #include "julia.h"
 
 #ifdef __cplusplus
-#include <cstdint>
 extern "C" {
-#else
-#include <stdint.h>
 #endif
 
+void brutus_init();
 void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int optimize);
 
 #ifdef __cplusplus

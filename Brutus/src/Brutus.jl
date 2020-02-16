@@ -1,5 +1,9 @@
 module Brutus
 
+function __init__()
+    ccall((:brutus_init, "libbrutus"), Cvoid, ())
+end
+
 # Emit MLIR IR to stdout
 function emit(f, tt...; optimize=0)
     name = (typeof(f) <: Function) ? nameof(f) : nameof(typeof(f))

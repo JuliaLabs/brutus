@@ -1,4 +1,5 @@
 #include "brutus/brutus.h"
+#include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
 
 #include "mlir/Analysis/Verifier.h"
@@ -131,8 +132,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
     // } else if (head == gc_preserve_end_sym) {
     // }
 
-    // FIXME: invoke_sym & call_sym are in julia_internals.h
-    if (0 /*head == invoke_sym*/) {
+    if (head == invoke_sym) {
         // first argument is the `MethodInstance`, second argument is the function
         assert(jl_is_method_instance(args[0]));
         jl_method_instance_t *mi = (jl_method_instance_t*)args[0];
@@ -146,7 +146,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
         InvokeOp op = ctx.builder.create<InvokeOp>(loc, mi, arguments);
         return op.getResult();
 
-    } else if (0 /*head == call_sym*/) {
+    } else if (head == call_sym) {
         mlir::Value callee = emit_value(ctx, loc, args[0]);
         std::vector<mlir::Value> arguments;
         for (unsigned i = 1; i < nargs; ++i) {
