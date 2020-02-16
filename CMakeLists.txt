@@ -66,6 +66,7 @@ include_directories(${MLIR_BIN_INCLUDE_DIR})
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
+add_subdirectory(tools)
 
 if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
   install(DIRECTORY include

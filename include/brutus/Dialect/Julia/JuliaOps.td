@@ -127,7 +127,7 @@ def CallOp : JLIR_Op<"call"> {
                   "jl_datatype_t *type, Value callee, ArrayRef<Value> arguments">
     ];
 
-    let hasCanonicalizer = 1;
+    // let hasCanonicalizer = 1;
 }
 
 def InvokeOp : JLIR_Op<"invoke"> {

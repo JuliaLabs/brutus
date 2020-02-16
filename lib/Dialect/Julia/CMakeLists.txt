@@ -14,3 +14,4 @@ target_link_libraries(MLIRJulia
   MLIRIR
   LLVMSupport
 )
+set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS MLIRJulia)
