@@ -35,7 +35,7 @@ jobs:
                 -DCMAKE_BUILD_TYPE=Release
 
       - name: Build library
-        run: cmake --build build --target brutus --parallel
+        run: cmake --build build --target brutus --parallel `nproc`
 
       - name: Precompile library
         run: |
@@ -43,5 +43,5 @@ jobs:
           julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 
       - name: Test brutus
-        run: cmake --build build --target check-brutus --parallel
+        run: cmake --build build --target check-brutus --parallel `nproc`
 
