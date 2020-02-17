@@ -45,14 +45,16 @@ add_custom_target(brutus-doc)
 set(MLIR_MAIN_SRC_DIR ${LLVM_EXTERNAL_MLIR_SOURCE_DIR})
 set(MLIR_INCLUDE_DIR ${MLIR_MAIN_SRC_DIR}/include)
 set(MLIR_BIN_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/../../tools/mlir/include)
+set(BRUTUS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
+set(BRUTUS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${BRUTUS_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_EXTERNAL_MLIR_SOURCE_DIR}/cmake/modules")
 include(AddMLIR)
 include(AddDialect)
 include(FindJulia)
 
-set(BRUTUS_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/include)
+set(BRUTUS_INCLUDE_DIR ${BRUTUS_BINARY_DIR}/include)
 
 find_package(Julia REQUIRED)
 # TODO: Check that Julia_LLVM_VERSION and this LLVM_VERSION match
