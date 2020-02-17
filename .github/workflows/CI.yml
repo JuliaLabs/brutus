@@ -8,13 +8,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        julia-version: [1.3.1, 1.4.0-rc2]
+        julia-version: [1.3.1]
         os: [ubuntu-18.04]
     
     steps:
-      - uses: actions/checkout@v1
+      - uses: actions/checkout@v2
+      - name: Checkout submodule
+        shell: bash
+        run: |
+          auth_header="$(git config --local --get http.https://github.com/.extraheader)"
+          git submodule sync --recursive
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
       - name: "Set up Julia"
-        uses: julia-actions/setup-julia@v0.2
+        uses: julia-actions/setup-julia@v1
         with:
           version: ${{ matrix.julia-version }}
-      - run: julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
+      - run: |
+          cmake -S llvm-project/llvm -B build -DLLVM_ENABLE_PROJECTS="mlir" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
+                -DLLVM_EXTERNAL_PROJECTS="brutus" -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR="." \
+                -DCMAKE_BUILD_TYPE=Release
+      - run: cmake --build build --target brutus --parallel
+      - run: |
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`/build/lib
+          julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
+
+      - run: cmake --build build --target check-brutus --parallel
+

@@ -35,7 +35,7 @@ if(BRUTUS_BUILD_EXTERNAL)
 
 endif()
 
-find_program(MLIR_TABLEGEN_EXE "mlir-tblgen" ${LLVM_TOOLS_BINARY_DIR} NO_DEFAULT_PATH)
+set(MLIR_TABLEGEN_EXE mlir-tblgen)
 
 add_custom_target(brutus-headers)
 set_target_properties(brutus-headers PROPERTIES FOLDER "Misc")
@@ -48,9 +48,10 @@ set(MLIR_BIN_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/../../tools/mlir/include)
 set(BRUTUS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(BRUTUS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-list(APPEND CMAKE_MODULE_PATH "${BRUTUS_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_EXTERNAL_MLIR_SOURCE_DIR}/cmake/modules")
 include(AddMLIR)
+
+list(APPEND CMAKE_MODULE_PATH "${BRUTUS_SOURCE_DIR}/cmake/modules")
 include(AddDialect)
 include(FindJulia)
 
