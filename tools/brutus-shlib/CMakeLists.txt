@@ -24,7 +24,6 @@ whole_archive_link(brutus ${brutus_libs} ${FULL_LIBS})
 target_link_libraries(brutus
                       PRIVATE
                       ${Julia_LIBRARY}
-                      LLVM
                       ${brutus_libs}
                       ${FULL_LIBS}
                       ${LIBS})
