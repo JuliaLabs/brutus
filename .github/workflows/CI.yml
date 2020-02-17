@@ -11,12 +11,6 @@ jobs:
         julia-version: [1.3.1]
         os: [ubuntu-18.04]
 
-    env:
-      CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
-      CCACHE_COMPRESS: true
-      CCACHE_COMPRESSLEVEL: 6
-      CCACHE_MAXSIZE: 400M
-    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v2
@@ -33,28 +27,9 @@ jobs:
         with:
           version: ${{ matrix.julia-version }}
 
-      - name: Setup build tolls
-        run: sudo apt-get install ccache
-
-      - name: Prepare ccache timestamp
-        id: ccache_cache_timestamp
-        shell: cmake -P {0}
-        run: |
-          string(TIMESTAMP current_date "%Y-%m-%d-%H;%M;%S" UTC)
-          message("::set-output name=timestamp::${current_date}")
-
-      - name: ccache cache files
-        uses: actions/cache@v1
-        with:
-          path: .ccache
-          key: ${ { matrix.config.name } }-ccache-${ { steps.ccache_cache_timestamp.outputs.timestamp } }
-          restore-keys: |
-            ${ { matrix.config.name } }-ccache-
-
       - name: Configure build
         run: |
           cmake -S llvm-project/llvm -B build \
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                 -DLLVM_ENABLE_PROJECTS="mlir" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
                 -DLLVM_EXTERNAL_PROJECTS="brutus" -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR="." \
                 -DCMAKE_BUILD_TYPE=Release
