@@ -32,6 +32,8 @@ function code_ircode(mi::Core.Compiler.MethodInstance;
     end
     ccall(:jl_typeinf_end, Cvoid, ())
     frame.inferred || return nothing
+    # TODO(yhls): Fix this upstream
+    resize!(ir.argtypes, opt.nargs)
     return ir => Core.Compiler.widenconst(result.result)
 end
 
