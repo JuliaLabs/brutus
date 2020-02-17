@@ -5,10 +5,10 @@ function __init__()
 end
 
 # Emit MLIR IR to stdout
-function emit(f, tt...; optimize=0)
+function emit(f, tt...; optimize=0, lower_to_llvm=0)
     name = (typeof(f) <: Function) ? nameof(f) : nameof(typeof(f))
     IR, rt = code_ircode(f, Tuple{tt...})[1]
-    ccall((:brutus_codegen, "libbrutus"), Cvoid, (Any,Any,Cstring,Cint), IR, rt, name, optimize)
+    ccall((:brutus_codegen, "libbrutus"), Cvoid, (Any,Any,Cstring,Cint,Cint), IR, rt, name, optimize, lower_to_llvm)
 end
 
 function code_ircode(@nospecialize(f), @nospecialize(types=Tuple);

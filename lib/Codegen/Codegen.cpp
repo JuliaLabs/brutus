@@ -1,6 +1,7 @@
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
+#include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
 
 #include "mlir/Analysis/Verifier.h"
 #include "mlir/IR/Attributes.h"
@@ -163,7 +164,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
 }
 
 extern "C" {
-void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int optimize) {
+void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int optimize, int lower_to_llvm) {
     mlir::MLIRContext context;
     jl_mlirctx_t ctx(&context);
 
@@ -409,11 +410,13 @@ void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int o
     // FIXME: The next line currently seqfaults
     // applyPassManagerCLOptions(pm);
 
-    // Now that there is only one function, we can infer the shapes of each of
-    // the operations.
     mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
     optPM.addPass(mlir::createCanonicalizerPass());
     optPM.addPass(mlir::createCSEPass());
+
+    if (lower_to_llvm) {
+        pm.addPass(createJLIRToLLVMLoweringPass());
+    }
 
     if (mlir::failed(pm.run(module))) {
         module.emitError("module optimization failed error");

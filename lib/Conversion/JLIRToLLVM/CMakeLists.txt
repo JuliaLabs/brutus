@@ -1,0 +1,12 @@
+add_llvm_library(BRUTUSJLIRToLLVM
+  JLIRToLLVM.cpp
+
+  ADDITIONAL_HEADER_DIRS
+  ${BRUTUS_INCLUDE_DIR}/JuliaOps
+  )
+add_dependencies(BRUTUSJLIRToLLVM
+    MLIRJulia
+)
+target_link_libraries(BRUTUSJLIRToLLVM
+)
+set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS BRUTUSJLIRToLLVM)

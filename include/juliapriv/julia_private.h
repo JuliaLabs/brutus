@@ -3,6 +3,8 @@
 #ifndef BRUTUS_JL_INTERNAL_H
 #define BRUTUS_JL_INTERNAL_H
 
+#include "julia.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -13,6 +15,8 @@ extern "C" {
 
 const char *jl_intrinsic_name(int f);
 unsigned jl_intrinsic_nargs(int f);
+
+#define jl_is_concrete_immutable(t) (jl_is_datatype(t) && (!((jl_datatype_t*)t)->mutabl) && ((jl_datatype_t*)t)->layout)
 
 #ifdef __cplusplus
 } // end extern "C"
