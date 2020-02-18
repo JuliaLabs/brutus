@@ -18,7 +18,6 @@ jobs:
       - name: Update submodules
         run: |
           git -C llvm-project pull
-            - name: Create Pull Request
       - name: Create pull-request
         uses: peter-evans/create-pull-request@v2
         with:
