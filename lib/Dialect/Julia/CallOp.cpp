@@ -2,11 +2,14 @@
 #include "mlir/IR/PatternMatch.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
 
+#include "julia.h"
 #include "juliapriv/julia_private.h"
 
 namespace JL_I {
 #include "juliapriv/intrinsics.h"
 }
+
+#include "juliapriv/builtin_proto.h"
 
 using namespace mlir;
 using namespace jlir;
@@ -48,11 +51,38 @@ struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
     }
 };
 
+/// Builtin rewriter
+struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
+    public:
+        using OpRewritePattern<CallOp>::OpRewritePattern;
+
+    PatternMatchResult match(CallOp op) const override {
+        Value callee = op.callee();
+        Operation *definingOp = callee.getDefiningOp();
+        if (!definingOp) {
+            // Value is block-argument.
+            return matchFailure();
+        }
+        if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
+            jl_value_t* value = constant.value();
+            if (jl_typeis(value, jl_builtin_type)) {
+                return matchSuccess();
+            }
+        }
+        return matchFailure();
+    }
+
+    void rewrite(CallOp op, PatternRewriter &rewriter) const override {
+        ConstantOp defining = dyn_cast<ConstantOp>(op.callee().getDefiningOp());
+    }
+};
+
 /// Register our patterns as "canonicalization" patterns on the CallOp so
 /// that they can be picked up by the Canonicalization framework.
 void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                          MLIRContext *context) {
     results.insert<LowerIntrinsicCallPattern>(context);
+    results.insert<LowerBuiltinCallPattern>(context);
 }
 
 
