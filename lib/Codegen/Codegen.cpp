@@ -320,13 +320,20 @@ void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int o
         bool is_terminator = false;
 
         if (jl_isa(stmt, return_node_type)) {
-            // if type of return value is a subtype of expected return type,
-            // use PiOp to widen the value
-            mlir::Value val = maybe_widen_type(
-                ctx, loc,
-                emit_value(ctx, loc, jl_get_field(stmt, "val")),
-                (jl_datatype_t*)ret_type);
-            ctx.builder.create<ReturnOp>(loc, val);
+            jl_value_t *ret_val = jl_get_field(stmt, "val");
+            Value value;
+            if (ret_val) {
+                // if type of return value is a subtype of expected return type,
+                // use PiOp to widen the value
+                value = maybe_widen_type(
+                    ctx, loc,
+                    emit_value(ctx, loc, ret_val),
+                    (jl_datatype_t*)ret_type);
+            } else {
+                // unreachable terminator, so return undef
+                value = ctx.builder.create<UndefOp>(loc, ret);
+            }
+            ctx.builder.create<ReturnOp>(loc, value);
             is_terminator = true;
 
         } else if (jl_is_gotonode(stmt)) {

@@ -214,3 +214,25 @@ emit(haspi, Union{Int64, Float64})
 # CHECK:    %8 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK:    %9 = "jlir.pi"(%8) : (!jlir.Nothing) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:    "jlir.return"(%9) : (!jlir<"Union{Nothing, Int64}">) -> ()
+
+# has the terminator unreachable
+hasunreachable(x::Float64) = sqrt(x)
+emit(hasunreachable, Float64)
+# CHECK:  func @hasunreachable(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.hasunreachable)(), actual=false)">, %arg1: !jlir.Float64) -> !jlir.Float64
+# CHECK:    "jlir.goto"()[^bb1] : () -> ()
+# CHECK:  ^bb1:
+# CHECK:    %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction
+# CHECK:    %1 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Float64
+# CHECK:    %2 = "jlir.call"(%0, %arg1, %1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64, !jlir.Float64) -> !jlir.Bool
+# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:  ^bb2:	// pred: ^bb1
+# CHECK:    %3 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
+# CHECK:    %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir.Any
+# CHECK:    %5 = "jlir.undef"() : () -> !jlir.Float64
+# CHECK:    "jlir.return"(%5) : (!jlir.Float64) -> ()
+# CHECK:  ^bb3:	// pred: ^bb1
+# CHECK:    %6 = "jlir.constant"() {value = #jlir<"#<intrinsic #78 sqrt_llvm>">} : () -> !jlir.Core.IntrinsicFunction
+# CHECK:    %7 = "jlir.call"(%6, %arg1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64) -> !jlir.Float64
+# CHECK:    "jlir.goto"()[^bb4] : () -> ()
+# CHECK:  ^bb4:	// pred: ^bb3
+# CHECK:    "jlir.return"(%7) : (!jlir.Float64) -> ()
