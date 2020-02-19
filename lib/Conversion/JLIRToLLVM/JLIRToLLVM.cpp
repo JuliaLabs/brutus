@@ -80,11 +80,17 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
 };
 
 template <typename SourceOp>
-struct ToUndefPattern : public OpConversionPattern<SourceOp> {
+struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
     JLIRToLLVMTypeConverter &lowering;
 
-    ToUndefPattern(MLIRContext *ctx, JLIRToLLVMTypeConverter &lowering)
+    OpAndTypeConversionPattern(MLIRContext *ctx,
+                               JLIRToLLVMTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
+};
+
+template <typename SourceOp, typename LLVMOp>
+struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
     PatternMatchResult matchAndRewrite(SourceOp op,
                                        ArrayRef<Value> operands,
@@ -92,17 +98,51 @@ struct ToUndefPattern : public OpConversionPattern<SourceOp> {
         static_assert(
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
-        rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
-            op, lowering.convertToLLVMType(op.getType()));
+        rewriter.replaceOpWithNewOp<LLVMOp>(
+            op, this->lowering.convertToLLVMType(op.getType()), operands);
         return this->matchSuccess();
     }
 };
 
-struct FuncOpConversion : public OpConversionPattern<FuncOp> {
-    JLIRToLLVMTypeConverter &lowering;
+template <typename SourceOp>
+struct ToUndefOpPattern : public ToLLVMOpPattern<SourceOp, LLVM::UndefOp> {
+    using ToLLVMOpPattern<SourceOp, LLVM::UndefOp>::ToLLVMOpPattern;
+};
 
-    FuncOpConversion(MLIRContext *ctx, JLIRToLLVMTypeConverter &lowering)
-        : OpConversionPattern(ctx), lowering(lowering) {}
+template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
+struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(SourceOp op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        assert(operands.size() == 2);
+        CmpOp cmp = rewriter.create<CmpOp>(
+            op.getLoc(), predicate, operands[0], operands[1]);
+        rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(
+            op,
+            this->lowering.convertToLLVMType(op.getResult().getType()),
+            cmp.getResult());
+        return this->matchSuccess();
+    }
+};
+
+template <typename SourceOp, LLVM::ICmpPredicate predicate>
+struct ToICmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
+                                               LLVM::ICmpPredicate, predicate> {
+    using ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
+                         LLVM::ICmpPredicate, predicate>::ToCmpOpPattern;
+};
+
+template <typename SourceOp, LLVM::FCmpPredicate predicate>
+struct ToFCmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
+                                               LLVM::FCmpPredicate, predicate> {
+    using ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
+                         LLVM::FCmpPredicate, predicate>::ToCmpOpPattern;
+};
+
+struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
+    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
     PatternMatchResult matchAndRewrite(FuncOp op,
                                        ArrayRef<Value> operands,
@@ -112,7 +152,7 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
         // convert return type
         assert(type.getNumResults() == 1);
         LLVM::LLVMType new_return_type =
-            lowering.convertToLLVMType(type.getResults().front());
+            this->lowering.convertToLLVMType(type.getResults().front());
         assert(new_return_type && "failed to convert return type");
 
         // convert argument types
@@ -120,7 +160,8 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
         SmallVector<LLVM::LLVMType, 8> new_arg_types;
         new_arg_types.reserve(op.getNumArguments());
         for (auto &en : llvm::enumerate(type.getInputs())) {
-            LLVM::LLVMType converted = lowering.convertToLLVMType(en.value());
+            LLVM::LLVMType converted =
+                this->lowering.convertToLLVMType(en.value());
             assert(converted && "failed to convert argument type");
             result.addInputs(en.index(), converted);
             new_arg_types.push_back(converted);
@@ -141,27 +182,19 @@ struct FuncOpConversion : public OpConversionPattern<FuncOp> {
     }
 };
 
-struct UnimplementedOpLowering : public ToUndefPattern<UnimplementedOp> {
-    using ToUndefPattern<UnimplementedOp>::ToUndefPattern;
-};
-
-struct UndefOpLowering : public ToUndefPattern<UndefOp> {
-    using ToUndefPattern<UndefOp>::ToUndefPattern;
-};
-
-struct ConstantOpLowering : public ToUndefPattern<ConstantOp> {
+struct ConstantOpLowering : public ToUndefOpPattern<ConstantOp> {
     // TODO
-    using ToUndefPattern<ConstantOp>::ToUndefPattern;
+    using ToUndefOpPattern<ConstantOp>::ToUndefOpPattern;
 };
 
-struct CallOpLowering : public ToUndefPattern<CallOp> {
+struct CallOpLowering : public ToUndefOpPattern<CallOp> {
     // TODO
-    using ToUndefPattern<CallOp>::ToUndefPattern;
+    using ToUndefOpPattern<CallOp>::ToUndefOpPattern;
 };
 
-struct InvokeOpLowering : public ToUndefPattern<InvokeOp> {
+struct InvokeOpLowering : public ToUndefOpPattern<InvokeOp> {
     // TODO
-    using ToUndefPattern<InvokeOp>::ToUndefPattern;
+    using ToUndefOpPattern<InvokeOp>::ToUndefOpPattern;
 };
 
 struct GotoOpLowering : public OpConversionPattern<GotoOp> {
@@ -208,9 +241,9 @@ struct ReturnOpLowering : public OpConversionPattern<ReturnOp> {
     }
 };
 
-struct PiOpLowering : public ToUndefPattern<PiOp> {
+struct PiOpLowering : public ToUndefOpPattern<PiOp> {
     // TODO
-    using ToUndefPattern<PiOp>::ToUndefPattern;
+    using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
 };
 
 struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
@@ -222,12 +255,94 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
         JLIRToLLVMTypeConverter converter(&getContext());
         patterns.insert<
             FuncOpConversion,
-            UnimplementedOpLowering,
-            UndefOpLowering,
+            ToUndefOpPattern<UnimplementedOp>,
+            ToUndefOpPattern<UndefOp>,
             ConstantOpLowering,
             CallOpLowering,
             InvokeOpLowering,
-            PiOpLowering
+            PiOpLowering,
+            // bitcast
+            // neg_int
+            ToLLVMOpPattern<add_int, LLVM::AddOp>,
+            ToLLVMOpPattern<sub_int, LLVM::SubOp>,
+            ToLLVMOpPattern<mul_int, LLVM::MulOp>,
+            ToLLVMOpPattern<sdiv_int, LLVM::SDivOp>,
+            ToLLVMOpPattern<udiv_int, LLVM::UDivOp>,
+            ToLLVMOpPattern<srem_int, LLVM::SRemOp>,
+            ToLLVMOpPattern<urem_int, LLVM::URemOp>,
+            // add_ptr
+            // sub_ptr
+            ToLLVMOpPattern<neg_float, LLVM::FNegOp>,
+            ToLLVMOpPattern<add_float, LLVM::FAddOp>,
+            ToLLVMOpPattern<sub_float, LLVM::FSubOp>,
+            ToLLVMOpPattern<mul_float, LLVM::FMulOp>,
+            ToLLVMOpPattern<div_float, LLVM::FDivOp>,
+            ToLLVMOpPattern<rem_float, LLVM::FRemOp>,
+            ToLLVMOpPattern<fma_float, LLVM::FMAOp>,
+            // muladd_float
+            // neg_float_fast
+            // add_float_fast
+            // sub_float_fast
+            // mul_float_fast
+            // div_float_fast
+            // rem_float_fast
+            ToICmpOpPattern<eq_int, LLVM::ICmpPredicate::eq>,
+            ToICmpOpPattern<ne_int, LLVM::ICmpPredicate::ne>,
+            ToICmpOpPattern<slt_int, LLVM::ICmpPredicate::slt>,
+            ToICmpOpPattern<ult_int, LLVM::ICmpPredicate::ult>,
+            ToICmpOpPattern<sle_int, LLVM::ICmpPredicate::sle>,
+            ToICmpOpPattern<ule_int, LLVM::ICmpPredicate::ule>,
+            ToFCmpOpPattern<eq_float, LLVM::FCmpPredicate::oeq>,
+            ToFCmpOpPattern<ne_float, LLVM::FCmpPredicate::une>,
+            ToFCmpOpPattern<lt_float, LLVM::FCmpPredicate::olt>,
+            ToFCmpOpPattern<le_float, LLVM::FCmpPredicate::ole>,
+            // fpiseq
+            // fpislt
+            ToLLVMOpPattern<and_int, LLVM::AndOp>,
+            ToLLVMOpPattern<or_int, LLVM::OrOp>,
+            ToLLVMOpPattern<xor_int, LLVM::XOrOp>,
+            // not_int
+            // shl_int
+            // lshr_int
+            // ashr_int
+            // bswap_int
+            // ctpop_int
+            // ctlz_int
+            // cttz_int
+            // sext_int
+            // zext_int
+            // trunc_int
+            // fptoui
+            // fptosi
+            // uitofp
+            // sitofp
+            // fptrunc
+            // fpext
+            // checked_sadd_int
+            // checked_uadd_int
+            // checked_ssub_int
+            // checked_usub_int
+            // checked_smul_int
+            // checked_umul_int
+            // checked_sdiv_int
+            // checked_udiv_int
+            // checked_srem_int
+            // checked_urem_int
+            ToLLVMOpPattern<abs_float, LLVM::FAbsOp>,
+            // copysign_float
+            // flipsign_int
+            ToLLVMOpPattern<ceil_llvm, LLVM::FCeilOp>,
+            // floor_llvm
+            // trunc_llvm
+            // rint_llvm
+            ToLLVMOpPattern<sqrt_llvm, LLVM::SqrtOp>
+            // sqrt_llvm_fast
+            // pointerref
+            // pointerset
+            // cglobal
+            // llvmcall
+            // arraylen
+            // cglobal_auto
             >(&getContext(), converter);
         patterns.insert<
             GotoOpLowering,

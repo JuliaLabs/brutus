@@ -244,9 +244,9 @@ def JLIR_urem_int  : JLIR_ArithmeticOp<"urem_int">;
 def JLIR_add_ptr   : JLIR_ArithmeticOp<"add_ptr">;
 def JLIR_sub_ptr   : JLIR_ArithmeticOp<"sub_ptr">; 
 def JLIR_neg_float : JLIR_UnaryArithmeticOp<"neg_float">;
-def JLIR_add_float : JLIR_ArithmeticOp<"add_float">; // ??? Commutative
+def JLIR_add_float : JLIR_ArithmeticOp<"add_float">;
 def JLIR_sub_float : JLIR_ArithmeticOp<"sub_float">; 
-def JLIR_mul_float : JLIR_ArithmeticOp<"mul_float">; // ??? Commutative
+def JLIR_mul_float : JLIR_ArithmeticOp<"mul_float">;
 def JLIR_div_float : JLIR_ArithmeticOp<"div_float">;
 def JLIR_rem_float : JLIR_ArithmeticOp<"rem_float">;
 // 3-ary arithmetic ops
