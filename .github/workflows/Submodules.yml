@@ -14,10 +14,7 @@ jobs:
         run: |
           auth_header="$(git config --local --get http.https://github.com/.extraheader)"
           git submodule sync --recursive
-          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --init --force --recursive --depth=1
-      - name: Update submodules
-        run: |
-          git -C llvm-project pull
+          git -c "http.extraheader=$auth_header" -c protocol.version=2 submodule update --remote --init --force --recursive --depth=1
       - name: Create pull-request
         uses: peter-evans/create-pull-request@v2
         with:
