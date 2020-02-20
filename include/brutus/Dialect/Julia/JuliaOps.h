@@ -5,6 +5,7 @@
 #include "mlir/IR/Function.h"
 
 #include "julia.h"
+#include "brutus/brutus_internal.h"
 
 namespace mlir {
 namespace jlir {
@@ -78,6 +79,12 @@ public:
     static bool kindof(unsigned kind) { return kind == JLIRTypes::JuliaType; }
 
     static JuliaType get(mlir::MLIRContext *context, jl_datatype_t *datatype) {
+        // unwrap Core.Compiler.Const
+        if (jl_isa((jl_value_t*)datatype, const_type)) {
+            datatype = (jl_datatype_t*)jl_typeof(
+                jl_get_field((jl_value_t*)datatype, "val"));
+        }
+
         return Base::get(context, JLIRTypes::JuliaType, datatype);
     }
 
