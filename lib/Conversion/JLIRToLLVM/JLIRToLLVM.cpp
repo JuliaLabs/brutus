@@ -2,6 +2,7 @@
 #include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/IR/StandardTypes.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
@@ -26,7 +27,7 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         assert(llvm_dialect && "LLVM IR dialect is not registered");
     }
 
-    LLVM::LLVMType bitstype_to_llvm(jl_value_t *bt) {
+    LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
         assert(jl_is_primitivetype(bt));
         if (bt == (jl_value_t*)jl_bool_type)
             return LLVM::LLVMType::getInt8Ty(llvm_dialect);
@@ -44,32 +45,42 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         return LLVM::LLVMType::getIntNTy(llvm_dialect, nb * 8);
     }
 
-    LLVM::LLVMType struct_to_llvm(jl_value_t *jt) {
+    LLVM::LLVMType julia_struct_to_llvm(jl_value_t *jt) {
         // this function converts a Julia Type into the equivalent LLVM struct
         // use this where C-compatible (unboxed) structs are desired
-        // use type_to_llvm directly when you want to preserve Julia's type
-        // semantics
+        // use julia_type_to_llvm directly when you want to preserve Julia's
+        // type semantics
         if (jt == (jl_value_t*)jl_bottom_type)
             return void_type;
         if (jl_is_primitivetype(jt))
-            return bitstype_to_llvm(jt);
-        // TODO: actually handle structs
+            return julia_bitstype_to_llvm(jt);
+        jl_datatype_t *jst = (jl_datatype_t*)jt;
+        if (jl_is_structtype(jt)
+            && !(jst->layout && jl_is_layout_opaque(jst->layout))) {
+            // bool is_tuple = jl_is_tuple_type(jt);
+            jl_svec_t *ftypes = jl_get_fieldtypes(jst);
+            size_t ntypes = jl_svec_len(ftypes);
+            if (ntypes == 0 || (jst->layout && jl_datatype_nbits(jst) == 0))
+                return void_type;
+
+            // TODO: actually handle structs
+        }
 
         return pjlvalue; // prjlvalue?
     }
 
-    LLVM::LLVMType type_to_llvm(jl_value_t *jt) {
+    LLVM::LLVMType julia_type_to_llvm(jl_value_t *jt) {
         // this function converts a Julia Type into the equivalent LLVM type
 
         // TODO: something special needs to happen for functions, which right
         //       now will just get turned into `void_type`
 
-        if (jt == jl_bottom_type)
+        if (jt == jl_bottom_type || jt == (jl_value_t*)jl_void_type)
             return void_type;
         if (jl_is_concrete_immutable(jt)) {
             if (jl_datatype_nbits(jt) == 0)
                 return void_type;
-            return struct_to_llvm(jt);
+            return julia_struct_to_llvm(jt);
         }
 
         return pjlvalue; // prjlvalue?
@@ -77,7 +88,7 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
 
     Type convertType(Type t) final {
         JuliaType jt = t.cast<JuliaType>();
-        return type_to_llvm((jl_value_t*)jt.getDatatype());
+        return julia_type_to_llvm((jl_value_t*)jt.getDatatype());
     }
 
     LLVM::LLVMType convertToLLVMType(Type t) {
@@ -169,7 +180,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         // convert return type
         assert(type.getNumResults() == 1);
         LLVM::LLVMType new_return_type =
-            this->lowering.convertToLLVMType(type.getResults().front());
+            lowering.convertToLLVMType(type.getResults().front());
         assert(new_return_type && "failed to convert return type");
 
         // convert argument types
@@ -179,7 +190,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         TypeConverter::SignatureConversion result(op.getNumArguments());
         for (auto &en : llvm::enumerate(type.getInputs())) {
             LLVM::LLVMType converted =
-                this->lowering.convertToLLVMType(en.value());
+                lowering.convertToLLVMType(en.value());
             assert(converted && "failed to convert argument type");
 
             // drop argument if it converts to void type
@@ -225,9 +236,43 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     }
 };
 
-struct ConstantOpLowering : public ToUndefOpPattern<ConstantOp> {
-    // TODO
-    using ToUndefOpPattern<ConstantOp>::ToUndefOpPattern;
+struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
+    using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(ConstantOp op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        jl_value_t *julia_type = (jl_value_t*)op.getType().cast<JuliaType>().getDatatype();
+        LLVM::LLVMType new_type = lowering.convertToLLVMType(op.getType());
+
+        if (new_type == lowering.void_type) {
+            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, new_type);
+            return matchSuccess();
+
+        } else if (jl_is_primitivetype(julia_type)) {
+            // TODO
+
+        } else if (jl_is_structtype(julia_type)) {
+            // TODO
+        }
+
+        if (new_type == lowering.pjlvalue) {
+            LLVM::LLVMType int64 = LLVM::LLVMType::getInt64Ty(
+                lowering.llvm_dialect);
+            LLVM::ConstantOp address_op = rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(), int64, rewriter.getIntegerAttr(
+                    rewriter.getIntegerType(64), (int64_t)op.value()));
+            rewriter.replaceOpWithNewOp<LLVM::IntToPtrOp>(
+                op, lowering.pjlvalue, address_op.getResult());
+            // rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
+            //     op, lowering.pjlvalue,
+            //     rewriter.getIntegerAttr(rewriter.getIntegerType(64),
+            //                             (int64_t)op.value()));
+            return matchSuccess();
+        }
+
+        return matchFailure();
+    }
 };
 
 struct CallOpLowering : public ToUndefOpPattern<CallOp> {
