@@ -105,8 +105,19 @@ struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
 };
 
 template <typename SourceOp>
-struct ToUndefOpPattern : public ToLLVMOpPattern<SourceOp, LLVM::UndefOp> {
-    using ToLLVMOpPattern<SourceOp, LLVM::UndefOp>::ToLLVMOpPattern;
+struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(SourceOp op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        static_assert(
+            std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
+            "expected single result op");
+        rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
+            op, this->lowering.convertToLLVMType(op.getType()));
+        return this->matchSuccess();
+    }
 };
 
 template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
