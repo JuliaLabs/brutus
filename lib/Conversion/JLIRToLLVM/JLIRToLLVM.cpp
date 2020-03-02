@@ -24,7 +24,11 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
           jlvalue(LLVM::LLVMType::createStructTy(
                       llvm_dialect, Optional<StringRef>("jl_value_t"))),
           pjlvalue(jlvalue.getPointerTo()) {
+
         assert(llvm_dialect && "LLVM IR dialect is not registered");
+        addConversion(
+            [&](JuliaType jt) {
+                return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
     }
 
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -86,11 +90,6 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         return pjlvalue; // prjlvalue?
     }
 
-    Type convertType(Type t) final {
-        JuliaType jt = t.cast<JuliaType>();
-        return julia_type_to_llvm((jl_value_t*)jt.getDatatype());
-    }
-
     LLVM::LLVMType convertToLLVMType(Type t) {
         return convertType(t).dyn_cast_or_null<LLVM::LLVMType>();
     }
@@ -105,6 +104,9 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
 };
 
+// is there some template magic that would allow us to combine
+// `ToLLVMOpPattern`, `ToUnaryLLVMOpPattern`, and `ToTernaryLLVMOpPattern`?
+
 template <typename SourceOp, typename LLVMOp>
 struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
@@ -117,6 +119,43 @@ struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             "expected single result op");
         rewriter.replaceOpWithNewOp<LLVMOp>(
             op, this->lowering.convertToLLVMType(op.getType()), operands);
+        return this->matchSuccess();
+    }
+};
+
+template <typename SourceOp, typename LLVMOp>
+struct ToUnaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(SourceOp op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        static_assert(
+            std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
+            "expected single result op");
+        assert(operands.size() == 1 && "expected unary operation");
+        rewriter.replaceOpWithNewOp<LLVMOp>(
+            op, this->lowering.convertToLLVMType(op.getType()), operands.front());
+        return this->matchSuccess();
+    }
+};
+
+template <typename SourceOp, typename LLVMOp>
+struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(SourceOp op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        static_assert(
+            std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
+            "expected single result op");
+        assert(operands.size() == 3 && "expected ternary operation");
+        rewriter.replaceOpWithNewOp<LLVMOp>(
+            op, this->lowering.convertToLLVMType(op.getType()),
+            operands[0],
+            operands[1],
+            operands[2]);
         return this->matchSuccess();
     }
 };
@@ -372,7 +411,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             ToLLVMOpPattern<mul_float, LLVM::FMulOp>,
             ToLLVMOpPattern<div_float, LLVM::FDivOp>,
             ToLLVMOpPattern<rem_float, LLVM::FRemOp>,
-            ToLLVMOpPattern<fma_float, LLVM::FMAOp>,
+            ToTernaryLLVMOpPattern<fma_float, LLVM::FMAOp>,
             // muladd_float
             // neg_float_fast
             // add_float_fast
@@ -422,14 +461,14 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // checked_udiv_int
             // checked_srem_int
             // checked_urem_int
-            ToLLVMOpPattern<abs_float, LLVM::FAbsOp>,
+            ToUnaryLLVMOpPattern<abs_float, LLVM::FAbsOp>,
             // copysign_float
             // flipsign_int
-            ToLLVMOpPattern<ceil_llvm, LLVM::FCeilOp>,
+            ToUnaryLLVMOpPattern<ceil_llvm, LLVM::FCeilOp>,
             // floor_llvm
-            // trunc_llvm
+            ToUnaryLLVMOpPattern<trunc_llvm, LLVM::TruncOp>,
             // rint_llvm
-            ToLLVMOpPattern<sqrt_llvm, LLVM::SqrtOp>
+            ToUnaryLLVMOpPattern<sqrt_llvm, LLVM::SqrtOp>
             // sqrt_llvm_fast
             // pointerref
             // pointerset

@@ -154,6 +154,7 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
     }];
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$operands);
+    let successors = (successor AnySuccessor:$dest);
 
     let builders = [
         OpBuilder<"Builder *builder, OperationState &state, Block *dest,"
@@ -169,6 +170,7 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [Terminator]> {
     }];
 
     let arguments = (ins JLIR_JuliaType:$condition, Variadic<JLIR_JuliaType>:$operands);
+    let successors = (successor AnySuccessor:$falseDest, AnySuccessor:$trueDest);
 
     let builders = [
         OpBuilder<"Builder *builder, OperationState &state, Value condition,"
