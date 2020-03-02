@@ -31,24 +31,14 @@ public:
 
 mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
                         mlir::Value value, jl_datatype_t *expected_type) {
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(jl_main_module, jl_symbol("Core"));
-    jl_module_t *compiler_module = (jl_module_t*)jl_get_global(core_module, jl_symbol("Compiler"));
-    jl_value_t *const_type = jl_get_global(compiler_module, jl_symbol("Const"));
-
     // widen the type of the value with a PiOp if its type is a subtype of the
     // expected type
     jl_value_t *value_type =
         (jl_value_t*)value.getType().cast<JuliaType>().getDatatype();
-    if (!jl_egal(value_type, (jl_value_t*)expected_type)) {
-        // unwrap Core.Compiler.Const
-        if (jl_isa(value_type, const_type)) {
-            value_type = jl_typeof(jl_get_field(value_type, "val"));
-        }
-        if (jl_subtype(value_type, (jl_value_t*)expected_type)) {
-            auto op = ctx.builder.create<PiOp>(loc, value, expected_type);
-            return op.getResult();
-        }
-
+    if (!jl_egal(value_type, (jl_value_t*)expected_type)
+        && jl_subtype(value_type, (jl_value_t*)expected_type)) {
+        auto op = ctx.builder.create<PiOp>(loc, value, expected_type);
+        return op.getResult();
     }
 
     // value was already of expected type, or its type is not a subtype of what
@@ -320,13 +310,20 @@ void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int o
         bool is_terminator = false;
 
         if (jl_isa(stmt, return_node_type)) {
-            // if type of return value is a subtype of expected return type,
-            // use PiOp to widen the value
-            mlir::Value val = maybe_widen_type(
-                ctx, loc,
-                emit_value(ctx, loc, jl_get_field(stmt, "val")),
-                (jl_datatype_t*)ret_type);
-            ctx.builder.create<ReturnOp>(loc, val);
+            jl_value_t *ret_val = jl_get_field(stmt, "val");
+            Value value;
+            if (ret_val) {
+                // if type of return value is a subtype of expected return type,
+                // use PiOp to widen the value
+                value = maybe_widen_type(
+                    ctx, loc,
+                    emit_value(ctx, loc, ret_val),
+                    (jl_datatype_t*)ret_type);
+            } else {
+                // unreachable terminator, so return undef
+                value = ctx.builder.create<UndefOp>(loc, ret);
+            }
+            ctx.builder.create<ReturnOp>(loc, value);
             is_terminator = true;
 
         } else if (jl_is_gotonode(stmt)) {

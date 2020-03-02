@@ -11,7 +11,9 @@
 extern "C" {
 #endif
 
-extern jl_sym_t *call_sym;    extern jl_sym_t *invoke_sym;
+extern jl_sym_t *call_sym;
+extern jl_sym_t *invoke_sym;
+extern jl_value_t *const_type;
 
 #ifdef __cplusplus
 } // end extern "C"

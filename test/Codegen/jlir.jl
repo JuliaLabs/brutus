@@ -3,14 +3,14 @@ import Brutus: emit
 
 f(x) = x
 emit(f, Int64)
-# CHECK: func @f(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.f)(), actual=false)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.return"(%arg1) : (!jlir.Int64) -> ()
 
 f() = nothing
 emit(f)
-# CHECK: func @f(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.f)(), actual=false)">) -> !jlir.Nothing
+# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -18,7 +18,7 @@ emit(f)
 
 f() = return
 emit(f)
-# CHECK: func @f(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.f)(), actual=false)">) -> !jlir.Nothing
+# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -26,7 +26,7 @@ emit(f)
 
 f() = return 2
 emit(f)
-# CHECK: func @f(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.f)(), actual=false)">) -> !jlir.Int64 {
+# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
@@ -50,7 +50,7 @@ end
 # 7 4 ─      return %3
 ###
 emit(labels, Int64)
-# CHECK: func @labels(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.labels)(), actual=false)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.goto"()[^bb2(%arg1 : !jlir.Int64)] : () -> ()
@@ -75,7 +75,7 @@ function branches(c)
     end
 end
 emit(branches, Bool)
-# CHECK:  func @branches(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.branches)(), actual=false)">, %arg1: !jlir.Bool) -> !jlir.Bool
+# CHECK:  func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
 # CHECK:    "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] : (!jlir.Bool) -> ()
@@ -94,7 +94,7 @@ function loop(N)
     return acc
 end
 emit(loop, Int64)
-# CHECK:  func @loop(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.loop)(), actual=false)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK:  func @loop(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
 # CHECK:    %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir.Core.IntrinsicFunction
@@ -154,19 +154,19 @@ function calls()
     return f(1, 1)
 end
 emit(calls)
-# CHECK:  func @calls(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.calls)(), actual=false)">) -> !jlir.Any
+# CHECK:  func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
 # CHECK:    %0 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
 # CHECK:    %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Any
 # CHECK:    "jlir.gotoifnot"(%1)[^bb3, ^bb2] : (!jlir.Any) -> ()
 # CHECK:  ^bb2:
-# CHECK:    %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"Core.Compiler.Const(val=typeof(Base.:(+))(), actual=false)">
-# CHECK:    %3 = "jlir.pi"(%2) : (!jlir<"Core.Compiler.Const(val=typeof(Base.:(+))(), actual=false)">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
+# CHECK:    %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
+# CHECK:    %3 = "jlir.pi"(%2) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
 # CHECK:    "jlir.goto"()[^bb4(%3 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
 # CHECK:  ^bb3:
-# CHECK:    %4 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"Core.Compiler.Const(val=typeof(Base.:(-))(), actual=false)">
-# CHECK:    %5 = "jlir.pi"(%4) : (!jlir<"Core.Compiler.Const(val=typeof(Base.:(-))(), actual=false)">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
+# CHECK:    %4 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
+# CHECK:    %5 = "jlir.pi"(%4) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
 # CHECK:    "jlir.goto"()[^bb4(%5 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
 # CHECK:  ^bb4(%6: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):
 # CHECK:    %7 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -196,7 +196,7 @@ function haspi(x::Union{Int64, Float64})
     end
 end
 emit(haspi, Union{Int64, Float64})
-# CHECK:  func @haspi(%arg0: !jlir<"Core.Compiler.Const(val=typeof(Main.haspi)(), actual=false)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
+# CHECK:  func @haspi(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
 # CHECK:    %0 = "jlir.constant"() {value = #jlir<"typeof(isa)()">} : () -> !jlir<"typeof(isa)">
@@ -214,3 +214,25 @@ emit(haspi, Union{Int64, Float64})
 # CHECK:    %8 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK:    %9 = "jlir.pi"(%8) : (!jlir.Nothing) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:    "jlir.return"(%9) : (!jlir<"Union{Nothing, Int64}">) -> ()
+
+# has the terminator unreachable
+hasunreachable(x::Float64) = sqrt(x)
+emit(hasunreachable, Float64)
+# CHECK:  func @hasunreachable(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64
+# CHECK:    "jlir.goto"()[^bb1] : () -> ()
+# CHECK:  ^bb1:
+# CHECK:    %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction
+# CHECK:    %1 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Float64
+# CHECK:    %2 = "jlir.call"(%0, %arg1, %1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64, !jlir.Float64) -> !jlir.Bool
+# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:  ^bb2:	// pred: ^bb1
+# CHECK:    %3 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
+# CHECK:    %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir.Any
+# CHECK:    %5 = "jlir.undef"() : () -> !jlir.Float64
+# CHECK:    "jlir.return"(%5) : (!jlir.Float64) -> ()
+# CHECK:  ^bb3:	// pred: ^bb1
+# CHECK:    %6 = "jlir.constant"() {value = #jlir<"#<intrinsic #78 sqrt_llvm>">} : () -> !jlir.Core.IntrinsicFunction
+# CHECK:    %7 = "jlir.call"(%6, %arg1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64) -> !jlir.Float64
+# CHECK:    "jlir.goto"()[^bb4] : () -> ()
+# CHECK:  ^bb4:	// pred: ^bb3
+# CHECK:    "jlir.return"(%7) : (!jlir.Float64) -> ()
