@@ -7,6 +7,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "llvm/Support/SwapByteOrder.h"
+
 #include "juliapriv/julia_private.h"
 
 using namespace mlir;
@@ -289,6 +291,19 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             return matchSuccess();
 
         } else if (jl_is_primitivetype(julia_type)) {
+            int nb = jl_datatype_size(julia_type);
+            APInt val(8 * nb, 0);
+            void *bits = const_cast<uint64_t*>(val.getRawData());
+            assert(llvm::sys::IsLittleEndianHost);
+            memcpy(bits, op.value(), nb);
+
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
+                op, new_type, rewriter.getIntegerAttr(
+                    rewriter.getIntegerType(nb*8), val));
+            return matchSuccess();
+
+            // see julia_const_to_llvm
+
             // TODO
 
         } else if (jl_is_structtype(julia_type)) {
@@ -310,7 +325,9 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             return matchSuccess();
         }
 
-        return matchFailure();
+        rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
+            op, lowering.convertToLLVMType(op.getType()));
+        return matchSuccess();
     }
 };
 
