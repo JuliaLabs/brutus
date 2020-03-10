@@ -53,10 +53,6 @@ mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
 
 mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
                        jl_value_t *value, jl_datatype_t *type = nullptr) {
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(jl_main_module, jl_symbol("Core"));
-    jl_module_t *compiler_module = (jl_module_t*)jl_get_global(core_module, jl_symbol("Compiler"));
-    jl_value_t *argument_type = jl_get_global(compiler_module, jl_symbol("Argument"));
-
     // check if we have a const globalref
     if (jl_is_globalref(value)) {
         jl_sym_t *s = jl_globalref_name(value);
@@ -248,13 +244,6 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     for (int i = 1; i <= nblocks; i++) {
         bbs[i] = function.addBlock();
     }
-
-    // FIXME: These types definitions need to move from Julia to C
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(jl_main_module, jl_symbol("Core"));
-    jl_module_t *compiler_module = (jl_module_t*)jl_get_global(core_module, jl_symbol("Compiler"));
-    jl_value_t *return_node_type = jl_get_global(compiler_module, jl_symbol("ReturnNode"));
-    jl_value_t *gotoifnot_type = jl_get_global(compiler_module, jl_symbol("GotoIfNot"));
-    assert(return_node_type);
 
     // 4. Setup conversion
     jl_array_t *stmts = (jl_array_t*)jl_get_field(ir_code, "stmts");

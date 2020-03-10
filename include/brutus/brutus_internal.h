@@ -13,7 +13,10 @@ extern "C" {
 
 extern jl_sym_t *call_sym;
 extern jl_sym_t *invoke_sym;
+extern jl_value_t *argument_type;
 extern jl_value_t *const_type;
+extern jl_value_t *gotoifnot_type;
+extern jl_value_t *return_node_type;
 
 #ifdef __cplusplus
 } // end extern "C"
