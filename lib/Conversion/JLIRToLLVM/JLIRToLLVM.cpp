@@ -340,18 +340,27 @@ struct GotoOpLowering : public OpConversionPattern<GotoOp> {
     }
 };
 
-struct GotoIfNotOpLowering : public OpConversionPattern<GotoIfNotOp> {
-    using OpConversionPattern<GotoIfNotOp>::OpConversionPattern;
+struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
+    using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
     PatternMatchResult matchAndRewrite(GotoIfNotOp op,
                                        ArrayRef<Value> proper_operands,
                                        ArrayRef<Block *> destinations,
                                        ArrayRef<ArrayRef<Value>> operands,
                                        ConversionPatternRewriter &rewriter) const override {
+        assert(proper_operands.size() == 1);
         assert(destinations.size() == 2 && operands.size() == 2);
+
+        // truncate operand from i8 to i1
+        LLVM::TruncOp truncated =
+            rewriter.create<LLVM::TruncOp>(
+                op.getLoc(),
+                LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect),
+                proper_operands.front());
+
         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-            op, proper_operands, destinations,
-            llvm::makeArrayRef({ValueRange(operands.front()),
+            op, truncated.getResult(), destinations,
+            llvm::makeArrayRef({ValueRange(operands[0]),
                                 ValueRange(operands[1])}));
         return matchSuccess();
     }
@@ -392,8 +401,9 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             ConstantOpLowering,
             CallOpLowering,
             InvokeOpLowering,
-            PiOpLowering,
+            GotoIfNotOpLowering,
             ReturnOpLowering,
+            PiOpLowering,
             // bitcast
             // neg_int
             ToLLVMOpPattern<add_int, LLVM::AddOp>,
@@ -478,8 +488,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // cglobal_auto
             >(&getContext(), converter);
         patterns.insert<
-            GotoOpLowering,
-            GotoIfNotOpLowering
+            GotoOpLowering
             >(&getContext());
 
         if (failed(applyPartialConversion(
