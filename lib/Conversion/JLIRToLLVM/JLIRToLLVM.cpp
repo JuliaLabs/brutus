@@ -404,6 +404,34 @@ struct PiOpLowering : public ToUndefOpPattern<PiOp> {
     using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
 };
 
+struct NotIntOpLowering : public OpAndTypeConversionPattern<not_int> {
+    using OpAndTypeConversionPattern<not_int>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(not_int op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t* operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+        bool is_bool = operand_type == jl_bool_type;
+        uint64_t mask_value = is_bool ? 1 : -1;
+        unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
+
+        LLVM::ConstantOp mask_constant =
+            rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(), operands.front().getType(),
+                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+                                        // need APInt to do sign extension of mask
+                                        APInt(num_bits, mask_value,
+                                              /*isSigned=*/true)));
+
+        rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
+            op, operands.front().getType(),
+            operands.front(), mask_constant.getResult());
+
+        return matchSuccess();
+    }
+};
+
 struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
     void runOnFunction() final {
         ConversionTarget target(getContext());
@@ -461,7 +489,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             ToLLVMOpPattern<and_int, LLVM::AndOp>,
             ToLLVMOpPattern<or_int, LLVM::OrOp>,
             ToLLVMOpPattern<xor_int, LLVM::XOrOp>,
-            // not_int
+            NotIntOpLowering, // not_int
             // shl_int
             // lshr_int
             // ashr_int
