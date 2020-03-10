@@ -7,7 +7,11 @@ add_llvm_library(BRUTUSCodegen
   )
 add_dependencies(BRUTUSCodegen
     MLIRJulia
+    MLIRTargetLLVMIR
+    LLVMBitWriter
 )
 target_link_libraries(BRUTUSCodegen
+    MLIRTargetLLVMIR
+    LLVMBitWriter
 )
 set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS BRUTUSCodegen)

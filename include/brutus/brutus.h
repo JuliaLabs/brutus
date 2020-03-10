@@ -3,12 +3,16 @@
 
 #include "julia.h"
 
+#include "llvm-c/Types.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void brutus_init();
-void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int optimize, int lower_to_llvm);
+LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
+                                   char *name, char emit_llvm, char optimize,
+                                   char dump_flags);
 
 #ifdef __cplusplus
 } // end extern "C"

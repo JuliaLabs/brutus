@@ -1,15 +1,21 @@
 # RUN: julia --startup-file=no %s 2>&1 | FileCheck %s
-import Brutus: emit
+
+import Brutus
+
+emit_translated(f, tt...) =
+    Brutus.emit(typeof(f), tt,
+                emit_llvm=false,
+                dump_options=[Brutus.DumpTranslated])
 
 f(x) = x
-emit(f, Int64)
+emit_translated(f, Int64)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.return"(%arg1) : (!jlir.Int64) -> ()
 
 f() = nothing
-emit(f)
+emit_translated(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -17,7 +23,7 @@ emit(f)
 # CHECK:   "jlir.return"(%0) : (!jlir.Nothing) -> ()
 
 f() = return
-emit(f)
+emit_translated(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -25,7 +31,7 @@ emit(f)
 # CHECK:   "jlir.return"(%0) : (!jlir.Nothing) -> ()
 
 f() = return 2
-emit(f)
+emit_translated(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -49,7 +55,7 @@ end
 # 5 3 ─      goto #2
 # 7 4 ─      return %3
 ###
-emit(labels, Int64)
+emit_translated(labels, Int64)
 # CHECK: func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -74,7 +80,7 @@ function branches(c)
         return !c
     end
 end
-emit(branches, Bool)
+emit_translated(branches, Bool)
 # CHECK:  func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -93,7 +99,7 @@ function loop(N)
     end
     return acc
 end
-emit(loop, Int64)
+emit_translated(loop, Int64)
 # CHECK:  func @loop(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -153,7 +159,7 @@ function calls()
     f = rand(Bool) ? (+) : (-)
     return f(1, 1)
 end
-emit(calls)
+emit_translated(calls)
 # CHECK:  func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -179,7 +185,7 @@ struct A
 end
 (a::A)(y) = a.x + y
 a = A(10)
-emit(a, Int64)
+emit_translated(a, Int64)
 # CHECK:  func @A(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -195,7 +201,7 @@ function haspi(x::Union{Int64, Float64})
         return x + 1
     end
 end
-emit(haspi, Union{Int64, Float64})
+emit_translated(haspi, Union{Int64, Float64})
 # CHECK:  func @haspi(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -217,7 +223,7 @@ emit(haspi, Union{Int64, Float64})
 
 # has the terminator unreachable
 hasunreachable(x::Float64) = sqrt(x)
-emit(hasunreachable, Float64)
+emit_translated(hasunreachable, Float64)
 # CHECK:  func @hasunreachable(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:

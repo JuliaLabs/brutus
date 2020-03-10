@@ -1,8 +1,14 @@
 # RUN: julia --startup-file=no %s 2>&1 | FileCheck %s
-import Brutus: emit
+
+import Brutus
+
+emit_optimized(f, tt...) =
+    Brutus.emit(typeof(f), tt,
+                emit_llvm=false,
+                dump_options=[Brutus.DumpOptimized])
 
 f(x) = x
-emit(f, Int64, optimize=1)
+emit_optimized(f, Int64)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -10,7 +16,7 @@ emit(f, Int64, optimize=1)
 
 
 f() = nothing
-emit(f, optimize=1)
+emit_optimized(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -18,7 +24,7 @@ emit(f, optimize=1)
 # CHECK:   "jlir.return"(%0) : (!jlir.Nothing) -> ()
 
 f() = return
-emit(f, optimize=1)
+emit_optimized(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -26,7 +32,7 @@ emit(f, optimize=1)
 # CHECK:   "jlir.return"(%0) : (!jlir.Nothing) -> ()
 
 f() = return 2
-emit(f, optimize=1)
+emit_optimized(f)
 # CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
@@ -50,7 +56,7 @@ end
 # 5 3 ─      goto #2
 # 7 4 ─      return %3
 ###
-emit(labels, Int64, optimize=1)
+emit_optimized(labels, Int64)
 # CHECK:  func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64 {
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1: 
@@ -73,7 +79,7 @@ function branches(c)
         return !c
     end
 end
-emit(branches, Bool, optimize=1)
+emit_optimized(branches, Bool)
 # CHECK:  func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -91,7 +97,7 @@ function loop(N)
     end
     return acc
 end
-emit(loop, Int64, optimize=1)
+emit_optimized(loop, Int64)
 # CHECK:  func @loop(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64 {
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1: 
@@ -139,7 +145,7 @@ function calls()
     f = rand(Bool) ? (+) : (-)
     return f(1, 1)
 end
-emit(calls, optimize=1)
+emit_optimized(calls)
 # CHECK:  func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -164,7 +170,7 @@ struct A
 end
 (a::A)(y) = a.x + y
 a = A(10)
-emit(a, Int64, optimize=1)
+emit_optimized(a, Int64)
 # CHECK:  func @A(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
@@ -180,7 +186,7 @@ function haspi(x::Union{Int64, Float64})
         return x + 1
     end
 end
-emit(haspi, Union{Int64, Float64}, optimize=1)
+emit_optimized(haspi, Union{Int64, Float64})
 # CHECK:  func @haspi(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}"> {
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1: 
