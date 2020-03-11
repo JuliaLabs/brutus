@@ -8,7 +8,11 @@ jobs:
   Submodules:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
+      - uses: webfactory/ssh-agent@v0.2.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+      - name: Checkout via SSH
+        run: git clone git@github.com:JuliaLabs/brutus.git .
       - name: Checkout submodule
         shell: bash
         run: |
