@@ -283,11 +283,12 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     PatternMatchResult matchAndRewrite(ConstantOp op,
                                        ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        jl_value_t *julia_type = (jl_value_t*)op.getType().cast<JuliaType>().getDatatype();
-        LLVM::LLVMType new_type = lowering.convertToLLVMType(op.getType());
+        jl_value_t *value = op.value();
+        jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
+        LLVM::LLVMType llvm_type = lowering.convertToLLVMType(op.getType());
 
-        if (new_type == lowering.void_type) {
-            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, new_type);
+        if (llvm_type == lowering.void_type) {
+            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, llvm_type);
             return matchSuccess();
 
         } else if (jl_is_primitivetype(julia_type)) {
@@ -295,22 +296,35 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             APInt val(8 * nb, 0);
             void *bits = const_cast<uint64_t*>(val.getRawData());
             assert(llvm::sys::IsLittleEndianHost);
-            memcpy(bits, op.value(), nb);
+            memcpy(bits, value, nb);
+
+            Attribute value_attribute;
+            llvm::Type *underlying_llvm_type = llvm_type.getUnderlyingType();
+            if (underlying_llvm_type->isFloatingPointTy()) {
+                APFloat fval(underlying_llvm_type->getFltSemantics(), val);
+                if (julia_type == jl_float32_type) {
+                    value_attribute = rewriter.getFloatAttr(
+                        rewriter.getF32Type(), fval);
+                } else if (julia_type == jl_float64_type) {
+                    value_attribute = rewriter.getFloatAttr(
+                        rewriter.getF64Type(), fval);
+                } else {
+                    assert(false && "not implemented");
+                }
+            } else {
+                value_attribute = rewriter.getIntegerAttr(
+                    rewriter.getIntegerType(nb*8), val);
+            }
 
             rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
-                op, new_type, rewriter.getIntegerAttr(
-                    rewriter.getIntegerType(nb*8), val));
+                op, llvm_type, value_attribute);
             return matchSuccess();
-
-            // see julia_const_to_llvm
-
-            // TODO
 
         } else if (jl_is_structtype(julia_type)) {
             // TODO
         }
 
-        if (new_type == lowering.pjlvalue) {
+        if (llvm_type == lowering.pjlvalue) {
             LLVM::LLVMType int64 = LLVM::LLVMType::getInt64Ty(
                 lowering.llvm_dialect);
             LLVM::ConstantOp address_op = rewriter.create<LLVM::ConstantOp>(

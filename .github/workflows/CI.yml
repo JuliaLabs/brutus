@@ -23,6 +23,7 @@ jobs:
       LLVM_DEBUG: 0
       LLVM_GIT_VER: ${{ matrix.llvm-commit }}
       JULIA_CPU_TARGET: "generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
+      JULIA_BIN: ${GITHUB_WORKSPACE}/julia/usr/bin/julia
 
     steps:
       # must checkout Brutus first, lest everything in ${GITHUB_WORKSPACE} be
@@ -66,7 +67,7 @@ jobs:
           make -j `nproc`
 
       - name: Check Julia version
-        run: ${GITHUB_WORKSPACE}/julia/usr/bin/julia -e "using InteractiveUtils; versioninfo()"
+        run: ${JULIA_BIN} -e "using InteractiveUtils; versioninfo()"
 
       - name: Install build tools
         run: sudo apt-get update && sudo apt-get install ccache
@@ -88,7 +89,7 @@ jobs:
                 -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
                 -DLLVM_ENABLE_PROJECTS="mlir" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
                 -DLLVM_EXTERNAL_PROJECTS="brutus" -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR="." \
-                -DCMAKE_BUILD_TYPE=Release -DJulia_EXECUTABLE="${GITHUB_WORKSPACE}/julia/usr/bin/julia"
+                -DCMAKE_BUILD_TYPE=Release -DJulia_EXECUTABLE="${JULIA_BIN}"
 
       - name: Build library
         run: cmake --build build --target brutus --parallel `nproc`
@@ -96,7 +97,9 @@ jobs:
       - name: Precompile library
         run: |
           export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
-          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
+          ${JULIA_BIN} --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 
       - name: Test Brutus
-        run: cmake --build build --target check-brutus --parallel `nproc`
+        run: |
+          cmake --build build --target check-brutus --parallel `nproc`
+          ${JULIA_BIN} --project=Brutus -e 'using Pkg; pkg"test"'
