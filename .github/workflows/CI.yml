@@ -9,8 +9,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04]
-        julia-commit: [b55dc7a83983d03aabb032c6ff5f01aa0ea021f8]
-        llvm-commit: [e252293d0629066225228596a9ef9d397513eb99]
+        julia-commit: [4368941821d8940ceed7ad5a8db5020d768a6358]
+        llvm-commit: [19840a307e6d98017b68b14725c53d1ad89d98f9]
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
