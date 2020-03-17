@@ -59,7 +59,7 @@ emit_translated(labels, Int64)
 # CHECK: func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
-# CHECK:   "jlir.goto"()[^bb2(%arg1 : !jlir.Int64)] : () -> ()
+# CHECK:   "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
 # CHECK: ^bb2(%0: !jlir.Int64):
 # CHECK:   %1 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:   %2 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -67,9 +67,9 @@ emit_translated(labels, Int64)
 # CHECK:   %4 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:   %5 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
 # CHECK:   %6 = "jlir.call"(%4, %3, %5) : (!jlir.Core.IntrinsicFunction, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:   "jlir.gotoifnot"(%6)[^bb4, ^bb3] : (!jlir.Bool) -> ()
+# CHECK:   "jlir.gotoifnot"(%6)[^bb4, ^bb3] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK: ^bb3:
-# CHECK:   "jlir.goto"()[^bb2(%3 : !jlir.Int64)] : () -> ()
+# CHECK:   "jlir.goto"(%3)[^bb2] : (!jlir.Int64) -> ()
 # CHECK: ^bb4:
 # CHECK:   "jlir.return"(%3) : (!jlir.Int64) -> ()
 
@@ -84,7 +84,7 @@ emit_translated(branches, Bool)
 # CHECK:  func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
-# CHECK:    "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2:
 # CHECK:    "jlir.return"(%arg1) : (!jlir.Bool) -> ()
 # CHECK:  ^bb3:
@@ -112,46 +112,46 @@ emit_translated(loop, Int64)
 # CHECK:    %6 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %7 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %8 = "jlir.call"(%6, %5, %7) : (!jlir.Core.IntrinsicFunction, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%8)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%8)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2:
 # CHECK:    %9 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
 # CHECK:    %10 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %11 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:    "jlir.goto"()[^bb4(%9, %10, %11 : !jlir.Bool, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%9, %10, %11)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb3:
 # CHECK:    %12 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK:    %13 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %14 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:    "jlir.goto"()[^bb4(%12, %13, %14 : !jlir.Bool, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%12, %13, %14)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb4(%15: !jlir.Bool, %16: !jlir.Int64, %17: !jlir.Int64):
 # CHECK:    %18 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %19 = "jlir.call"(%18, %15) : (!jlir.Core.IntrinsicFunction, !jlir.Bool) -> !jlir.Bool
 # CHECK:    %20 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %21 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:    "jlir.gotoifnot"(%19)[^bb10(%21 : !jlir.Int64), ^bb5(%20, %16, %17 : !jlir.Int64, !jlir.Int64, !jlir.Int64)] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%19, %21, %20, %16, %17)[^bb10, ^bb5] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb5(%22: !jlir.Int64, %23: !jlir.Int64, %24: !jlir.Int64):
 # CHECK:    %25 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %26 = "jlir.call"(%25, %22, %23) : (!jlir.Core.IntrinsicFunction, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %27 = "jlir.constant"() {value = #jlir<"typeof(===)()">} : () -> !jlir<"typeof(===)">
 # CHECK:    %28 = "jlir.call"(%27, %24, %5) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%28)[^bb7, ^bb6] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%28)[^bb7, ^bb6] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb6:
 # CHECK:    %29 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %30 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %31 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK:    "jlir.goto"()[^bb8(%29, %30, %31 : !jlir.Int64, !jlir.Int64, !jlir.Bool)] : () -> ()
+# CHECK:    "jlir.goto"(%29, %30, %31)[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
 # CHECK:  ^bb7:
 # CHECK:    %32 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %33 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %34 = "jlir.call"(%32, %24, %33) : (!jlir.Core.IntrinsicFunction, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %35 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK:    "jlir.goto"()[^bb8(%34, %34, %35 : !jlir.Int64, !jlir.Int64, !jlir.Bool)] : () -> ()
+# CHECK:    "jlir.goto"(%34, %34, %35)[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
 # CHECK:  ^bb8(%36: !jlir.Int64, %37: !jlir.Int64, %38: !jlir.Bool):
 # CHECK:    %39 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %40 = "jlir.call"(%39, %38) : (!jlir.Core.IntrinsicFunction, !jlir.Bool) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%40)[^bb10(%26 : !jlir.Int64), ^bb9] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%40, %26)[^bb10, ^bb9] {operand_segment_sizes = dense<[1, 1, 0]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64) -> ()
 # CHECK:  ^bb9:
-# CHECK:    "jlir.goto"()[^bb5(%26, %36, %37 : !jlir.Int64, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%26, %36, %37)[^bb5] : (!jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb10(%41: !jlir.Int64):
 # CHECK:    "jlir.return"(%41) : (!jlir.Int64) -> ()
 
@@ -165,15 +165,15 @@ emit_translated(calls)
 # CHECK:  ^bb1:
 # CHECK:    %0 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
 # CHECK:    %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Any
-# CHECK:    "jlir.gotoifnot"(%1)[^bb3, ^bb2] : (!jlir.Any) -> ()
+# CHECK:    "jlir.gotoifnot"(%1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Any) -> ()
 # CHECK:  ^bb2:
 # CHECK:    %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
 # CHECK:    %3 = "jlir.pi"(%2) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:    "jlir.goto"()[^bb4(%3 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
+# CHECK:    "jlir.goto"(%3)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK:  ^bb3:
 # CHECK:    %4 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
 # CHECK:    %5 = "jlir.pi"(%4) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:    "jlir.goto"()[^bb4(%5 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
+# CHECK:    "jlir.goto"(%5)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK:  ^bb4(%6: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):
 # CHECK:    %7 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %8 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -208,7 +208,7 @@ emit_translated(haspi, Union{Int64, Float64})
 # CHECK:    %0 = "jlir.constant"() {value = #jlir<"typeof(isa)()">} : () -> !jlir<"typeof(isa)">
 # CHECK:    %1 = "jlir.constant"() {value = #jlir.Int64} : () -> !jlir.DataType
 # CHECK:    %2 = "jlir.call"(%0, %arg1, %1) : (!jlir<"typeof(isa)">, !jlir<"Union{Float64, Int64}">
-# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2:
 # CHECK:    %3 = "jlir.pi"(%arg1) : (!jlir<"Union{Float64, Int64}">) -> !jlir.Int64
 # CHECK:    %4 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir.Core.IntrinsicFunction
@@ -230,7 +230,7 @@ emit_translated(hasunreachable, Float64)
 # CHECK:    %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:    %1 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Float64
 # CHECK:    %2 = "jlir.call"(%0, %arg1, %1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64, !jlir.Float64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2:	// pred: ^bb1
 # CHECK:    %3 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
 # CHECK:    %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir.Any

@@ -15,7 +15,6 @@
 #include "mlir/Transforms/Passes.h"
 
 #include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/IR/Module.h"
 #include "llvm/Support/MemoryBuffer.h"
 
 #include "julia.h"
@@ -394,7 +393,7 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
 
     // Lastly verify module
     if (failed(mlir::verify(module))) {
-        module.emitError("module verification error");
+        module.emitError("module verification failed");
         return nullptr;
     }
 
@@ -420,7 +419,7 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
         }
 
         if (mlir::failed(result)) {
-            module.emitError("module optimization failed error");
+            module.emitError("module optimization failed");
             return nullptr;
         }
     }
@@ -434,13 +433,13 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     }
 
     if (mlir::failed(loweringResult)) {
-        module.emitError("module lowering failed error");
+        module.emitError("module lowering failed");
         return nullptr;
     }
 
     // Lastly verify module
     if (failed(mlir::verify(module))) {
-        module.emitError("module verification error");
+        module.emitError("module verification failed");
         return nullptr;
     }
 
@@ -451,7 +450,7 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     // Translate to LLVM IR and return bitcode in MemoryBuffer
     std::unique_ptr<llvm::Module> llvm_module = translateModuleToLLVMIR(module);
     if (dump_flags & DUMP_LLVM_IR) {
-        llvm_module->dump();
+        llvm_module->print(llvm::dbgs(), nullptr);
     }
     std::string data;
     llvm::raw_string_ostream os(data);

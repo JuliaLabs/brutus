@@ -31,6 +31,15 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         addConversion(
             [&](JuliaType jt) {
                 return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
+        // TODO: try this later
+        //     [&](JuliaType jt, SmallVectorImpl<Type> &results) {
+        //         LLVM::LLVMType converted =
+        //             julia_type_to_llvm((jl_value_t*)jt.getDatatype());
+        //         // drop value if it converts to void type
+        //         if (converted != void_type) {
+        //             results.push_back(converted);
+        //         }
+        //         return success(); });
     }
 
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -359,14 +368,10 @@ struct GotoOpLowering : public OpConversionPattern<GotoOp> {
     using OpConversionPattern<GotoOp>::OpConversionPattern;
 
     PatternMatchResult matchAndRewrite(GotoOp op,
-                                       ArrayRef<Value> proper_operands,
-                                       ArrayRef<Block *> destinations,
-                                       ArrayRef<ArrayRef<Value>> operands,
+                                       ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        assert(destinations.size() == 1 && operands.size() == 1);
         rewriter.replaceOpWithNewOp<LLVM::BrOp>(
-            op, proper_operands, destinations,
-            llvm::makeArrayRef(ValueRange(operands.front())));
+            op, operands, op.getSuccessor());
         return matchSuccess();
     }
 };
@@ -375,24 +380,24 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
     PatternMatchResult matchAndRewrite(GotoIfNotOp op,
-                                       ArrayRef<Value> proper_operands,
-                                       ArrayRef<Block *> destinations,
-                                       ArrayRef<ArrayRef<Value>> operands,
+                                       ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        assert(proper_operands.size() == 1);
-        assert(destinations.size() == 2 && operands.size() == 2);
+        assert(operands.size() >= 1);
 
         // truncate operand from i8 to i1
         LLVM::TruncOp truncated =
             rewriter.create<LLVM::TruncOp>(
                 op.getLoc(),
                 LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect),
-                proper_operands.front());
+                operands.front());
+
+        SmallVector<Value, 4> new_operands;
+        std::copy(operands.begin(), operands.end(),
+                  std::back_inserter(new_operands));
+        new_operands.front() = truncated.getResult();
 
         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-            op, truncated.getResult(), destinations,
-            llvm::makeArrayRef({ValueRange(operands[0]),
-                                ValueRange(operands[1])}));
+            op, new_operands, op.getSuccessors(), op.getAttrs());
         return matchSuccess();
     }
 };

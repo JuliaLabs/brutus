@@ -60,15 +60,15 @@ emit_optimized(labels, Int64)
 # CHECK:  func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64 {
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1: 
-# CHECK:    "jlir.goto"()[^bb2(%arg1 : !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
 # CHECK:  ^bb2(%0: !jlir.Int64):        // 2 preds: ^bb1, ^bb3
 # CHECK:    %1 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %2 = "jlir.add_int"(%0, %1) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %3 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
 # CHECK:    %4 = "jlir.slt_int"(%2, %3) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%4)[^bb4, ^bb3] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%4)[^bb4, ^bb3] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb3: 
-# CHECK:    "jlir.goto"()[^bb2(%2 : !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%2)[^bb2] : (!jlir.Int64) -> ()
 # CHECK:  ^bb4: 
 # CHECK:    "jlir.return"(%2) : (!jlir.Int64) -> ()
 
@@ -83,7 +83,7 @@ emit_optimized(branches, Bool)
 # CHECK:  func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:    "jlir.goto"()[^bb1] : () -> ()
 # CHECK:  ^bb1:
-# CHECK:    "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2:
 # CHECK:    "jlir.return"(%arg1) : (!jlir.Bool) -> ()
 # CHECK:  ^bb3:
@@ -107,37 +107,37 @@ emit_optimized(loop, Int64)
 # CHECK:    %3 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
 # CHECK:    %4 = "jlir.call"(%2, %1, %arg1, %3) : (!jlir<"typeof(ifelse)">, !jlir.Bool, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %5 = "jlir.slt_int"(%4, %0) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%5)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%5)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2: 
 # CHECK:    %6 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
 # CHECK:    %7 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %8 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:    "jlir.goto"()[^bb4(%6, %7, %8 : !jlir.Bool, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%6, %7, %8)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb3: 
 # CHECK:    %9 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK:    "jlir.goto"()[^bb4(%9, %0, %0 : !jlir.Bool, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%9, %0, %0)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb4(%10: !jlir.Bool, %11: !jlir.Int64, %12: !jlir.Int64):    // 2 preds: ^bb2, ^bb3
 # CHECK:    %13 = "jlir.not_int"(%10) : (!jlir.Bool) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%13)[^bb10(%0 : !jlir.Int64), ^bb5(%0, %11, %12 : !jlir.Int64, !jlir.Int64, !jlir.Int64)] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%13, %0, %0, %11, %12)[^bb10, ^bb5] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb5(%14: !jlir.Int64, %15: !jlir.Int64, %16: !jlir.Int64):   // 2 preds: ^bb4, ^bb9
 # CHECK:    %17 = "jlir.add_int"(%14, %15) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %18 = "jlir.constant"() {value = #jlir<"typeof(===)()">} : () -> !jlir<"typeof(===)">
 # CHECK:    %19 = "jlir.call"(%18, %16, %4) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%19)[^bb7, ^bb6] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%19)[^bb7, ^bb6] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb6: 
 # CHECK:    %20 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %21 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK:    %22 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK:    "jlir.goto"()[^bb8(%20, %21, %22 : !jlir.Int64, !jlir.Int64, !jlir.Bool)] : () -> ()
+# CHECK:    "jlir.goto"(%20, %21, %22)[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
 # CHECK:  ^bb7: 
 # CHECK:    %23 = "jlir.add_int"(%16, %0) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
 # CHECK:    %24 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK:    "jlir.goto"()[^bb8(%23, %23, %24 : !jlir.Int64, !jlir.Int64, !jlir.Bool)] : () -> ()
+# CHECK:    "jlir.goto"(%23, %23, %24)[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
 # CHECK:  ^bb8(%25: !jlir.Int64, %26: !jlir.Int64, %27: !jlir.Bool):    // 2 preds: ^bb6, ^bb7
 # CHECK:    %28 = "jlir.not_int"(%27) : (!jlir.Bool) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%28)[^bb10(%17 : !jlir.Int64), ^bb9] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%28, %17)[^bb10, ^bb9] {operand_segment_sizes = dense<[1, 1, 0]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64) -> ()
 # CHECK:  ^bb9: 
-# CHECK:    "jlir.goto"()[^bb5(%17, %25, %26 : !jlir.Int64, !jlir.Int64, !jlir.Int64)] : () -> ()
+# CHECK:    "jlir.goto"(%17, %25, %26)[^bb5] : (!jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK:  ^bb10(%29: !jlir.Int64):      // 2 preds: ^bb4, ^bb8
 # CHECK:    "jlir.return"(%29) : (!jlir.Int64) -> ()
 
@@ -151,15 +151,15 @@ emit_optimized(calls)
 # CHECK:  ^bb1:
 # CHECK:    %0 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
 # CHECK:    %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Any
-# CHECK:    "jlir.gotoifnot"(%1)[^bb3, ^bb2] : (!jlir.Any) -> ()
+# CHECK:    "jlir.gotoifnot"(%1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Any) -> ()
 # CHECK:  ^bb2:
 # CHECK:    %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
 # CHECK:    %3 = "jlir.pi"(%2) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:    "jlir.goto"()[^bb4(%3 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
+# CHECK:    "jlir.goto"(%3)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK:  ^bb3:
 # CHECK:    %4 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
 # CHECK:    %5 = "jlir.pi"(%4) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:    "jlir.goto"()[^bb4(%5 : !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">)] : () -> ()
+# CHECK:    "jlir.goto"(%5)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK:  ^bb4(%6: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):
 # CHECK:    %7 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK:    %8 = "jlir.call"(%6, %7, %7) : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">, !jlir.Int64, !jlir.Int64) -> !jlir.Any
@@ -193,7 +193,7 @@ emit_optimized(haspi, Union{Int64, Float64})
 # CHECK:    %0 = "jlir.constant"() {value = #jlir<"typeof(isa)()">} : () -> !jlir<"typeof(isa)">
 # CHECK:    %1 = "jlir.constant"() {value = #jlir.Int64} : () -> !jlir.DataType
 # CHECK:    %2 = "jlir.call"(%0, %arg1, %1) : (!jlir<"typeof(isa)">, !jlir<"Union{Float64, Int64}">, !jlir.DataType) -> !jlir.Bool
-# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] : (!jlir.Bool) -> ()
+# CHECK:    "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK:  ^bb2: 
 # CHECK:    %3 = "jlir.pi"(%arg1) : (!jlir<"Union{Float64, Int64}">) -> !jlir.Int64
 # CHECK:    %4 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
