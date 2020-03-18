@@ -40,6 +40,7 @@ struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
         JL_I::intrinsic f = (JL_I::intrinsic)*(uint32_t*)jl_data_ptr(defining.value());
         assert(f < JL_I::num_intrinsics);
         StringRef name = "jlir." + std::string(jl_intrinsic_name(f));
+
         // The IntrinsicOps are defined by their name, so we can lookup the name
         // from Julia and construct a generic Operation based on an OperationState
         OperationState state = OperationState(op.getLoc(), name);
@@ -65,7 +66,7 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
         }
         if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
-            if (jl_typeis(value, jl_builtin_type)) {
+            if (jl_isa(value, (jl_value_t*)jl_builtin_type)) {
                 return matchSuccess();
             }
         }
@@ -74,6 +75,17 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
 
     void rewrite(CallOp op, PatternRewriter &rewriter) const override {
         ConstantOp defining = dyn_cast<ConstantOp>(op.callee().getDefiningOp());
+        assert(jl_isa(defining.value(), (jl_value_t*)jl_builtin_type));
+        jl_datatype_t* typeof_builtin = (jl_datatype_t*)jl_typeof(defining.value());
+        StringRef name = "jlir." + std::string(jl_symbol_name(typeof_builtin->name->mt->name));
+
+        // TODO: factor out
+        OperationState state = OperationState(op.getLoc(), name);
+        state.addOperands(op.arguments());
+        state.addTypes(op.getType());
+        Operation *newOp = rewriter.createOperation(state);
+        // Replace the value of the old Op with the Result of the new op
+        rewriter.replaceOp(op, newOp->getResult(0));
     }
 };
 
