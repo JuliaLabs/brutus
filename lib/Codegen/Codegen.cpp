@@ -11,7 +11,11 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
+#include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
+
+#include "llvm/Bitcode/BitcodeWriter.h"
+#include "llvm/Support/MemoryBuffer.h"
 
 #include "julia.h"
 
@@ -48,10 +52,6 @@ mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
 
 mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
                        jl_value_t *value, jl_datatype_t *type = nullptr) {
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(jl_main_module, jl_symbol("Core"));
-    jl_module_t *compiler_module = (jl_module_t*)jl_get_global(core_module, jl_symbol("Compiler"));
-    jl_value_t *argument_type = jl_get_global(compiler_module, jl_symbol("Argument"));
-
     // check if we have a const globalref
     if (jl_is_globalref(value)) {
         jl_sym_t *s = jl_globalref_name(value);
@@ -154,7 +154,17 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
 }
 
 extern "C" {
-void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int optimize, int lower_to_llvm) {
+
+enum DumpOption {
+    DUMP_TRANSLATED = 1,
+    DUMP_OPTIMIZED  = 2,
+    DUMP_LOWERED    = 4,
+    DUMP_LLVM_IR    = 8
+};
+
+LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
+                                   char *name, char emit_llvm, char optimize,
+                                   char dump_flags) {
     mlir::MLIRContext context;
     jl_mlirctx_t ctx(&context);
 
@@ -233,13 +243,6 @@ void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int o
     for (int i = 1; i <= nblocks; i++) {
         bbs[i] = function.addBlock();
     }
-
-    // FIXME: These types definitions need to move from Julia to C
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(jl_main_module, jl_symbol("Core"));
-    jl_module_t *compiler_module = (jl_module_t*)jl_get_global(core_module, jl_symbol("Compiler"));
-    jl_value_t *return_node_type = jl_get_global(compiler_module, jl_symbol("ReturnNode"));
-    jl_value_t *gotoifnot_type = jl_get_global(compiler_module, jl_symbol("GotoIfNot"));
-    assert(return_node_type);
 
     // 4. Setup conversion
     jl_array_t *stmts = (jl_array_t*)jl_get_field(ir_code, "stmts");
@@ -388,46 +391,71 @@ void brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type, char *name, int o
 
     module.push_back(function);
 
-    if (optimize == 0) {
+    // Lastly verify module
+    if (failed(mlir::verify(module))) {
+        module.emitError("module verification failed");
+        return nullptr;
+    }
+
+    if (dump_flags & DUMP_TRANSLATED) {
         module.dump();
     }
 
+    if (optimize) {
+        mlir::PassManager pm(&context);
+        // Apply any generic pass manager command line options and run the
+        // pipeline.
+        // FIXME: The next line currently seqfaults
+        // applyPassManagerCLOptions(pm);
+
+        mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
+        optPM.addPass(mlir::createCanonicalizerPass());
+        optPM.addPass(mlir::createCSEPass());
+
+        LogicalResult result = pm.run(module);;
+
+        if (dump_flags & DUMP_OPTIMIZED) {
+            module.dump();
+        }
+
+        if (mlir::failed(result)) {
+            module.emitError("module optimization failed");
+            return nullptr;
+        }
+    }
+
+    mlir::PassManager loweringPM(&context);
+    loweringPM.addPass(createJLIRToLLVMLoweringPass());
+    LogicalResult loweringResult = loweringPM.run(module);
+
+    if (dump_flags & DUMP_LOWERED) {
+        module.dump();
+    }
+
+    if (mlir::failed(loweringResult)) {
+        module.emitError("module lowering failed");
+        return nullptr;
+    }
+
     // Lastly verify module
     if (failed(mlir::verify(module))) {
-        module.emitError("module verification error");
-        return;
+        module.emitError("module verification failed");
+        return nullptr;
     }
 
-    if (optimize == 0) {
-        return;
+    if (!emit_llvm) {
+        return nullptr;
     }
 
-    mlir::PassManager pm(&context);
-    // Apply any generic pass manager command line options and run the pipeline.
-    // FIXME: The next line currently seqfaults
-    // applyPassManagerCLOptions(pm);
-
-    mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
-    optPM.addPass(mlir::createCanonicalizerPass());
-    optPM.addPass(mlir::createCSEPass());
-
-    if (lower_to_llvm) {
-        pm.addPass(createJLIRToLLVMLoweringPass());
+    // Translate to LLVM IR and return bitcode in MemoryBuffer
+    std::unique_ptr<llvm::Module> llvm_module = translateModuleToLLVMIR(module);
+    if (dump_flags & DUMP_LLVM_IR) {
+        llvm_module->print(llvm::dbgs(), nullptr);
     }
-
-    if (mlir::failed(pm.run(module))) {
-        module.emitError("module optimization failed error");
-        return;
-    }
-
-    // Lastly verify module
-    if (failed(mlir::verify(module))) {
-        module.emitError("module verification error");
-        return;
-    }
-
-    // Output module
-    module.dump();
+    std::string data;
+    llvm::raw_string_ostream os(data);
+    WriteBitcodeToFile(*llvm_module, os);
+    return wrap(llvm::MemoryBuffer::getMemBufferCopy(os.str()).release());
 }
 
 } // extern "C"

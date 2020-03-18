@@ -8,6 +8,7 @@
 #define JULIA_MLIR_JLIR_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/SideEffects.td"
 
 // Provide a definition of the 'JLIR' dialect in the ODS framework so that we
 // can define our operations.
@@ -159,17 +160,19 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
     let builders = [
         OpBuilder<"Builder *builder, OperationState &state, Block *dest,"
                   "ValueRange operands = {}",
-                  [{ state.addSuccessor(dest, operands); }]>
+                  [{ build(builder, state, operands, dest); }]>
     ];
 }
 
-def GotoIfNotOp : JLIR_Op<"gotoifnot", [Terminator]> {
+def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let summary = "goto if not operation";
     let description = [{
         TODO
     }];
 
-    let arguments = (ins JLIR_JuliaType:$condition, Variadic<JLIR_JuliaType>:$operands);
+    let arguments = (ins JLIR_JuliaType:$condition,
+                     Variadic<JLIR_JuliaType>:$branchOperands,
+                     Variadic<JLIR_JuliaType>:$fallthroughOperands);
     let successors = (successor AnySuccessor:$falseDest, AnySuccessor:$trueDest);
 
     let builders = [
@@ -177,9 +180,9 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [Terminator]> {
                   "Block *branchDest, ValueRange branchOperands,"
                   "Block *fallthroughDest, ValueRange fallthroughOperands",
                   [{
-                      state.addOperands(condition);
-                      state.addSuccessor(branchDest, branchOperands);
-                      state.addSuccessor(fallthroughDest, fallthroughOperands);
+                      build(builder, state, condition,
+                            branchOperands, fallthroughOperands,
+                            branchDest, fallthroughDest);
                   }]>
     ];
 }

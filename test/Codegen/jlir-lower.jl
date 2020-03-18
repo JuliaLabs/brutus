@@ -1,20 +1,26 @@
 # RUN: julia --startup-file=no %s 2>&1 | FileCheck %s
-import Brutus: emit
 
-emit(identity, Bool, optimize=1, lower_to_llvm=1)
+import Brutus
+
+emit_lowered(f, tt...) =
+    Brutus.emit(typeof(f), tt,
+                emit_llvm=false, # TODO: change to true when ready
+                dump_options=[Brutus.DumpLowered])
+
+emit_lowered(identity, Bool)
 # CHECK: llvm.func @identity(%arg0: !llvm.i8) -> !llvm.i8
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
 # CHECK: ^bb1:
 # CHECK:   llvm.return %arg0 : !llvm.i8
-emit(identity, Nothing, optimize=1, lower_to_llvm=1)
+emit_lowered(identity, Nothing)
 # CHECK: llvm.func @identity()
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   %1 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
 # CHECK: ^bb1:
 # CHECK:   llvm.return
-emit(identity, Any, optimize=1, lower_to_llvm=1)
+emit_lowered(identity, Any)
 # CHECK: llvm.func @identity(%arg0: !llvm<"%jl_value_t*">) -> !llvm<"%jl_value_t*">
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
@@ -22,14 +28,14 @@ emit(identity, Any, optimize=1, lower_to_llvm=1)
 # CHECK:   llvm.return %arg0 : !llvm<"%jl_value_t*">
 
 add(x, y) = x + y
-emit(add, Int64, Int64, optimize=1, lower_to_llvm=1)
+emit_lowered(add, Int64, Int64)
 # CHECK: llvm.func @add(%arg0: !llvm.i64, %arg1: !llvm.i64) -> !llvm.i64
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
 # CHECK: ^bb1:
 # CHECK:   %1 = llvm.add %arg0, %arg1 : !llvm.i64
 # CHECK:   llvm.return %1 : !llvm.i64
-emit(add, Float64, Float64, optimize=1, lower_to_llvm=1)
+emit_lowered(add, Float64, Float64)
 # CHECK: llvm.func @add(%arg0: !llvm.double, %arg1: !llvm.double) -> !llvm.double
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
@@ -38,7 +44,7 @@ emit(add, Float64, Float64, optimize=1, lower_to_llvm=1)
 # CHECK:   llvm.return %1 : !llvm.double
 
 sle_int(x, y) = Base.sle_int(x, y)
-emit(sle_int, Int64, Int64, optimize=1, lower_to_llvm=1)
+emit_lowered(sle_int, Int64, Int64)
 # CHECK: llvm.func @sle_int(%arg0: !llvm.i64, %arg1: !llvm.i64) -> !llvm.i8
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
@@ -48,7 +54,7 @@ emit(sle_int, Int64, Int64, optimize=1, lower_to_llvm=1)
 # CHECK:   llvm.return %2 : !llvm.i8
 
 ne(x, y) = x != y
-emit(ne, Float64, Float64, optimize=1, lower_to_llvm=1)
+emit_lowered(ne, Float64, Float64)
 # CHECK: llvm.func @ne(%arg0: !llvm.double, %arg1: !llvm.double) -> !llvm.i8
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1
@@ -58,7 +64,7 @@ emit(ne, Float64, Float64, optimize=1, lower_to_llvm=1)
 # CHECK:   llvm.return %2 : !llvm.i8
 
 symbol() = :testing
-emit(symbol, optimize=1, lower_to_llvm=1)
+emit_lowered(symbol)
 # CHECK: llvm.func @symbol() -> !llvm<"%jl_value_t*">
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
 # CHECK:   llvm.br ^bb1

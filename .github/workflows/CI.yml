@@ -9,20 +9,14 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04]
-        julia-commit: [4368941821d8940ceed7ad5a8db5020d768a6358]
-        llvm-commit: [19840a307e6d98017b68b14725c53d1ad89d98f9]
+        julia-commit: [4c543ccfca20c3c8776ddb9f9981430b19385ae1]
+        llvm-commit: [b9f1b8be1cb02f6159c27856e33996a7edb2bd18]
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
       CCACHE_COMPRESS: true
       CCACHE_COMPRESSLEVEL: 6
       CCACHE_MAXSIZE: 400M
-
-      USE_BINARYBUILDER_LLVM: 0
-      LLVM_VER: svn
-      LLVM_DEBUG: 0
-      LLVM_GIT_VER: ${{ matrix.llvm-commit }}
-      JULIA_CPU_TARGET: "generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
     steps:
       # must checkout Brutus first, lest everything in ${GITHUB_WORKSPACE} be
@@ -63,7 +57,12 @@ jobs:
         if: steps.cache-julia.outputs.cache-hit != 'true'
         run: |
           cd julia
-          make -j `nproc`
+          make -j `nproc` \
+            USE_BINARYBUILDER_LLVM=0 \
+            LLVM_VER=svn \
+            LLVM_DEBUG=0 \
+            LLVM_GIT_VER=${{ matrix.llvm-commit }} \
+            JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
       - name: Check Julia version
         run: ${GITHUB_WORKSPACE}/julia/usr/bin/julia -e "using InteractiveUtils; versioninfo()"
@@ -89,7 +88,6 @@ jobs:
                 -DLLVM_ENABLE_PROJECTS="mlir" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
                 -DLLVM_EXTERNAL_PROJECTS="brutus" -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR="." \
                 -DCMAKE_BUILD_TYPE=Release -DJulia_EXECUTABLE="${GITHUB_WORKSPACE}/julia/usr/bin/julia"
-
       - name: Build library
         run: cmake --build build --target brutus --parallel `nproc`
 
@@ -99,4 +97,7 @@ jobs:
           ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 
       - name: Test Brutus
-        run: cmake --build build --target check-brutus --parallel `nproc`
+        run: |
+          cmake --build build --target check-brutus --parallel `nproc`
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
+          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"test"'

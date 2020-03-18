@@ -102,4 +102,3 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
                              COMPONENT brutus-headers)
   endif()
 endif()
-

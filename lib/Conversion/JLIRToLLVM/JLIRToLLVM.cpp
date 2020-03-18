@@ -7,6 +7,8 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "mlir/Transforms/Passes.h"
 
+#include "llvm/Support/SwapByteOrder.h"
+
 #include "juliapriv/julia_private.h"
 
 using namespace mlir;
@@ -29,6 +31,15 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         addConversion(
             [&](JuliaType jt) {
                 return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
+        // TODO: try this later
+        //     [&](JuliaType jt, SmallVectorImpl<Type> &results) {
+        //         LLVM::LLVMType converted =
+        //             julia_type_to_llvm((jl_value_t*)jt.getDatatype());
+        //         // drop value if it converts to void type
+        //         if (converted != void_type) {
+        //             results.push_back(converted);
+        //         }
+        //         return success(); });
     }
 
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -281,21 +292,48 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     PatternMatchResult matchAndRewrite(ConstantOp op,
                                        ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        jl_value_t *julia_type = (jl_value_t*)op.getType().cast<JuliaType>().getDatatype();
-        LLVM::LLVMType new_type = lowering.convertToLLVMType(op.getType());
+        jl_value_t *value = op.value();
+        jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
+        LLVM::LLVMType llvm_type = lowering.convertToLLVMType(op.getType());
 
-        if (new_type == lowering.void_type) {
-            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, new_type);
+        if (llvm_type == lowering.void_type) {
+            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, llvm_type);
             return matchSuccess();
 
         } else if (jl_is_primitivetype(julia_type)) {
-            // TODO
+            int nb = jl_datatype_size(julia_type);
+            APInt val(8 * nb, 0);
+            void *bits = const_cast<uint64_t*>(val.getRawData());
+            assert(llvm::sys::IsLittleEndianHost);
+            memcpy(bits, value, nb);
+
+            Attribute value_attribute;
+            llvm::Type *underlying_llvm_type = llvm_type.getUnderlyingType();
+            if (underlying_llvm_type->isFloatingPointTy()) {
+                APFloat fval(underlying_llvm_type->getFltSemantics(), val);
+                if (julia_type == jl_float32_type) {
+                    value_attribute = rewriter.getFloatAttr(
+                        rewriter.getF32Type(), fval);
+                } else if (julia_type == jl_float64_type) {
+                    value_attribute = rewriter.getFloatAttr(
+                        rewriter.getF64Type(), fval);
+                } else {
+                    assert(false && "not implemented");
+                }
+            } else {
+                value_attribute = rewriter.getIntegerAttr(
+                    rewriter.getIntegerType(nb*8), val);
+            }
+
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
+                op, llvm_type, value_attribute);
+            return matchSuccess();
 
         } else if (jl_is_structtype(julia_type)) {
             // TODO
         }
 
-        if (new_type == lowering.pjlvalue) {
+        if (llvm_type == lowering.pjlvalue) {
             LLVM::LLVMType int64 = LLVM::LLVMType::getInt64Ty(
                 lowering.llvm_dialect);
             LLVM::ConstantOp address_op = rewriter.create<LLVM::ConstantOp>(
@@ -310,7 +348,9 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             return matchSuccess();
         }
 
-        return matchFailure();
+        rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
+            op, lowering.convertToLLVMType(op.getType()));
+        return matchSuccess();
     }
 };
 
@@ -328,31 +368,36 @@ struct GotoOpLowering : public OpConversionPattern<GotoOp> {
     using OpConversionPattern<GotoOp>::OpConversionPattern;
 
     PatternMatchResult matchAndRewrite(GotoOp op,
-                                       ArrayRef<Value> proper_operands,
-                                       ArrayRef<Block *> destinations,
-                                       ArrayRef<ArrayRef<Value>> operands,
+                                       ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        assert(destinations.size() == 1 && operands.size() == 1);
         rewriter.replaceOpWithNewOp<LLVM::BrOp>(
-            op, proper_operands, destinations,
-            llvm::makeArrayRef(ValueRange(operands.front())));
+            op, operands, op.getSuccessor());
         return matchSuccess();
     }
 };
 
-struct GotoIfNotOpLowering : public OpConversionPattern<GotoIfNotOp> {
-    using OpConversionPattern<GotoIfNotOp>::OpConversionPattern;
+struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
+    using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
     PatternMatchResult matchAndRewrite(GotoIfNotOp op,
-                                       ArrayRef<Value> proper_operands,
-                                       ArrayRef<Block *> destinations,
-                                       ArrayRef<ArrayRef<Value>> operands,
+                                       ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
-        assert(destinations.size() == 2 && operands.size() == 2);
+        assert(operands.size() >= 1);
+
+        // truncate operand from i8 to i1
+        LLVM::TruncOp truncated =
+            rewriter.create<LLVM::TruncOp>(
+                op.getLoc(),
+                LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect),
+                operands.front());
+
+        SmallVector<Value, 4> new_operands;
+        std::copy(operands.begin(), operands.end(),
+                  std::back_inserter(new_operands));
+        new_operands.front() = truncated.getResult();
+
         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-            op, proper_operands, destinations,
-            llvm::makeArrayRef({ValueRange(operands.front()),
-                                ValueRange(operands[1])}));
+            op, new_operands, op.getSuccessors(), op.getAttrs());
         return matchSuccess();
     }
 };
@@ -378,6 +423,34 @@ struct PiOpLowering : public ToUndefOpPattern<PiOp> {
     using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
 };
 
+struct NotIntOpLowering : public OpAndTypeConversionPattern<not_int> {
+    using OpAndTypeConversionPattern<not_int>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(not_int op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t* operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+        bool is_bool = operand_type == jl_bool_type;
+        uint64_t mask_value = is_bool ? 1 : -1;
+        unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
+
+        LLVM::ConstantOp mask_constant =
+            rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(), operands.front().getType(),
+                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+                                        // need APInt to do sign extension of mask
+                                        APInt(num_bits, mask_value,
+                                              /*isSigned=*/true)));
+
+        rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
+            op, operands.front().getType(),
+            operands.front(), mask_constant.getResult());
+
+        return matchSuccess();
+    }
+};
+
 struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
     void runOnFunction() final {
         ConversionTarget target(getContext());
@@ -392,8 +465,9 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             ConstantOpLowering,
             CallOpLowering,
             InvokeOpLowering,
-            PiOpLowering,
+            GotoIfNotOpLowering,
             ReturnOpLowering,
+            PiOpLowering,
             // bitcast
             // neg_int
             ToLLVMOpPattern<add_int, LLVM::AddOp>,
@@ -434,7 +508,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             ToLLVMOpPattern<and_int, LLVM::AndOp>,
             ToLLVMOpPattern<or_int, LLVM::OrOp>,
             ToLLVMOpPattern<xor_int, LLVM::XOrOp>,
-            // not_int
+            NotIntOpLowering, // not_int
             // shl_int
             // lshr_int
             // ashr_int
@@ -478,8 +552,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // cglobal_auto
             >(&getContext(), converter);
         patterns.insert<
-            GotoOpLowering,
-            GotoIfNotOpLowering
+            GotoOpLowering
             >(&getContext());
 
         if (failed(applyPartialConversion(

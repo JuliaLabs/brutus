@@ -1,6 +1,7 @@
 #ifndef JL_DIALECT_JLIR_H
 #define JL_DIALECT_JLIR_H
 
+#include "mlir/Interfaces/SideEffects.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
 

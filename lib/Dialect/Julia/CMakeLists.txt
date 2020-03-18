@@ -7,10 +7,12 @@ add_llvm_library(MLIRJulia
 add_dependencies(MLIRJulia
   MLIRIR
   MLIRJuliaOpsIncGen
+  MLIRSideEffects
   LLVMSupport
 )
 target_link_libraries(MLIRJulia
   MLIRIR
+  MLIRSideEffects
   LLVMSupport
 )
 set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS MLIRJulia)
