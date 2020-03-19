@@ -337,7 +337,7 @@ def JLIR_Intrinsic_arraylen : JLIR_IntrinsicBuiltinOp<"arraylen">; //  1
 
 /* builtins */
 def JLIR_Builtin_throw : JLIR_IntrinsicBuiltinOp<"throw">;
-def JLIR_Builtin_is : JLIR_IntrinsicBuiltinOp<"is">;
+def JLIR_Builtin_is : JLIR_IntrinsicBuiltinOp<"===">;
 def JLIR_Builtin_typeof : JLIR_IntrinsicBuiltinOp<"typeof">;
 def JLIR_Builtin_sizeof : JLIR_IntrinsicBuiltinOp<"sizeof">;
 def JLIR_Builtin_issubtype : JLIR_IntrinsicBuiltinOp<"issubtype">;

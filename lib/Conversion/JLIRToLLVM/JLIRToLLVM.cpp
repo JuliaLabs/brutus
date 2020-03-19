@@ -104,6 +104,29 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
     LLVM::LLVMType convertToLLVMType(Type t) {
         return convertType(t).dyn_cast_or_null<LLVM::LLVMType>();
     }
+
+    // convert an LLVM type to same-sized int type
+    LLVM::LLVMType INTT(LLVM::LLVMType t) {
+        if (t.isIntegerTy()) {
+            return t;
+        } else if (t.isPointerTy()) {
+            if (sizeof(size_t) == 8) {
+                return LLVM::LLVMType::getInt64Ty(llvm_dialect);
+            } else {
+                return LLVM::LLVMType::getInt32Ty(llvm_dialect);
+            }
+        } else if (t.isDoubleTy()) {
+            return LLVM::LLVMType::getInt64Ty(llvm_dialect);
+        } else if (t.isFloatTy()) {
+            return LLVM::LLVMType::getInt32Ty(llvm_dialect);
+        } else if (t.isHalfTy()) {
+            return LLVM::LLVMType::getInt16Ty(llvm_dialect);
+        }
+
+        unsigned nbits = t.getUnderlyingType()->getPrimitiveSizeInBits();
+        assert(t != void_type && nbits > 0);
+        return LLVM::LLVMType::getIntNTy(llvm_dialect, nbits);
+    }
 };
 
 template <typename SourceOp>
@@ -113,6 +136,42 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
     OpAndTypeConversionPattern(MLIRContext *ctx,
                                JLIRToLLVMTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
+
+    // truncate a Bool (i8) to an i1
+    Value truncateBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
+        LLVM::TruncOp truncated = rewriter.create<LLVM::TruncOp>(
+            loc, LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect), b);
+        return truncated.getResult();
+    }
+
+    // zero extend an i1 to a Bool (i8)
+    Value extendBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
+        LLVM::ZExtOp extended = rewriter.create<LLVM::ZExtOp>(
+            loc, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect), b);
+        return extended.getResult();
+    }
+
+    Value compareBits(Location loc, Value a, Value b, ConversionPatternRewriter &rewriter) const {
+        assert(a.getType() == b.getType());
+        LLVM::LLVMType t = a.getType().dyn_cast<LLVM::LLVMType>();
+
+        if (t.isIntegerTy() || t.isPointerTy()
+            || t.getUnderlyingType()->isFloatingPointTy()) {
+
+            LLVM::LLVMType t_int = lowering.INTT(t);
+            if (t != t_int) {
+                a = rewriter.create<LLVM::BitcastOp>(loc, t_int, a).getResult();
+                b = rewriter.create<LLVM::BitcastOp>(loc, t_int, b).getResult();
+            }
+            Value result = rewriter.create<LLVM::ICmpOp>(
+                loc, LLVM::ICmpPredicate::eq, a, b).getResult();
+            // do I really need to extend back to i8?
+            return extendBool(loc, result, rewriter);
+        }
+
+        // TODO
+        assert(false && "unimplemented");
+    }
 };
 
 // is there some template magic that would allow us to combine
@@ -197,10 +256,9 @@ struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
         assert(operands.size() == 2);
         CmpOp cmp = rewriter.create<CmpOp>(
             op.getLoc(), predicate, operands[0], operands[1]);
-        rewriter.replaceOpWithNewOp<LLVM::ZExtOp>(
-            op,
-            this->lowering.convertToLLVMType(op.getResult().getType()),
-            cmp.getResult());
+        // assumes a Bool (i8) is to be returned
+        rewriter.replaceOp(
+            op, this->extendBool(op.getLoc(), cmp.getResult(), rewriter));
         return this->matchSuccess();
     }
 };
@@ -384,17 +442,12 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
                                        ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() >= 1);
 
-        // truncate operand from i8 to i1
-        LLVM::TruncOp truncated =
-            rewriter.create<LLVM::TruncOp>(
-                op.getLoc(),
-                LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect),
-                operands.front());
-
+        // truncate condition from i8 to i1
         SmallVector<Value, 4> new_operands;
         std::copy(operands.begin(), operands.end(),
                   std::back_inserter(new_operands));
-        new_operands.front() = truncated.getResult();
+        new_operands.front() = truncateBool(
+            op.getLoc(), operands.front(), rewriter);
 
         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
             op, new_operands, op.getSuccessors(), op.getAttrs());
@@ -447,6 +500,70 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
             op, operands.front().getType(),
             operands.front(), mask_constant.getResult());
 
+        return matchSuccess();
+    }
+};
+
+struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
+    using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(Builtin_is op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        // should result be an i1 or i8? `emit_f_is` uses i1 but Bool is i8
+
+        assert(operands.size() == 2);
+        jl_value_t *t1 = (jl_value_t*)op.getOperand(0).getType()
+            .dyn_cast<JuliaType>().getDatatype();
+        jl_value_t *t2 = (jl_value_t*)op.getOperand(1).getType()
+            .dyn_cast<JuliaType>().getDatatype();
+        if (jl_is_concrete_type(t1) && jl_is_concrete_type(t2)
+            && !jl_is_kind(t1) && !jl_is_kind(t2) && t1 != t2) {
+            // disjoint concrete leaf types are never equal
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
+                op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
+                rewriter.getI8IntegerAttr(0));
+            return matchSuccess();
+        }
+
+        // TODO: ghosts, see `emit_f_is`
+
+        if (jl_type_intersection(t1, t2) == (jl_value_t*)jl_bottom_type) {
+            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
+                op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
+                rewriter.getI8IntegerAttr(0));
+            return matchSuccess();
+        }
+
+        bool justbits1 = jl_is_concrete_immutable(t1);
+        bool justbits2 = jl_is_concrete_immutable(t2);
+        if (justbits1 || justbits2) {
+            if (t1 == t2) {
+                rewriter.replaceOp(
+                    op, compareBits(
+                        op.getLoc(), operands[0], operands[1], rewriter));
+                return matchSuccess();
+            }
+
+            // TODO
+        }
+
+        // TODO: `emit_box_compare`
+
+        return matchFailure();
+    }
+};
+
+struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
+    using OpAndTypeConversionPattern<Builtin_ifelse>::OpAndTypeConversionPattern;
+
+    PatternMatchResult matchAndRewrite(Builtin_ifelse op,
+                                       ArrayRef<Value> operands,
+                                       ConversionPatternRewriter &rewriter) const override {
+        assert(operands.size() == 3);
+        Value condition = truncateBool(op.getLoc(), operands.front(), rewriter);
+        rewriter.replaceOpWithNewOp<LLVM::SelectOp>(
+            op, condition, operands[1], operands[2]);
         return matchSuccess();
     }
 };
@@ -542,7 +659,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // Intrinsic_floor_llvm
             ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
             // Intrinsic_rint_llvm
-            ToUnaryLLVMOpPattern<Intrinsic_sqrt_llvm, LLVM::SqrtOp>
+            ToUnaryLLVMOpPattern<Intrinsic_sqrt_llvm, LLVM::SqrtOp>,
             // Intrinsic_sqrt_llvm_fast
             // Intrinsic_pointerref
             // Intrinsic_pointerset
@@ -551,11 +668,11 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // Intrinsic_arraylen
             // Intrinsic_cglobal_auto
             // Builtin_throw
-            // Builtin_is
+            IsOpLowering, // Builtin_is
             // Builtin_typeof
             // Builtin_sizeof
             // Builtin_issubtype
-            // Builtin_isa
+            ToUndefOpPattern<Builtin_isa>, // Builtin_isa
             // Builtin__apply
             // Builtin__apply_pure
             // Builtin__apply_latest
@@ -564,7 +681,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // Builtin_nfields
             // Builtin_tuple
             // Builtin_svec
-            // Builtin_getfield
+            ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
             // Builtin_setfield
             // Builtin_fieldtype
             // Builtin_arrayref
@@ -576,7 +693,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             // Builtin_invoke ?
             // Builtin__expr
             // Builtin_typeassert
-            // Builtin_ifelse
+            IfElseOpLowering // Builtin_ifelse
             // Builtin__typevar
             // invoke_kwsorter?
             >(&getContext(), converter);
@@ -584,7 +701,7 @@ struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
             GotoOpLowering
             >(&getContext());
 
-        if (failed(applyPartialConversion(
+        if (failed(applyFullConversion(
                        getFunction(), target, patterns, &converter)))
             signalPassFailure();
     }
