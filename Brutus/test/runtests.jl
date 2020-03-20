@@ -18,3 +18,13 @@ constant3() = pi
 @test Brutus.call(constant3) == constant3()
 constant4() = true
 @test Brutus.call(constant4) == constant4()
+
+function loop(N)
+    acc = 0
+    for i in 1:N
+        acc += i
+    end
+    return acc
+end
+@test Brutus.call(loop, 0) == loop(0) == 0
+@test Brutus.call(loop, 1000) == loop(1000) == 500500
