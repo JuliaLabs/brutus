@@ -19,20 +19,20 @@ struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
     public:
         using OpRewritePattern<CallOp>::OpRewritePattern;
 
-    PatternMatchResult match(CallOp op) const override {
+    LogicalResult match(CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
-            return matchFailure();
+            return failure();
         }
         if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_typeis(value, jl_intrinsic_type)) {
-                return matchSuccess();
+                return success();
             }
         }
-        return matchFailure();
+        return failure();
     }
 
     void rewrite(CallOp op, PatternRewriter &rewriter) const override {
@@ -57,20 +57,20 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
     public:
         using OpRewritePattern<CallOp>::OpRewritePattern;
 
-    PatternMatchResult match(CallOp op) const override {
+    LogicalResult match(CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
-            return matchFailure();
+            return failure();
         }
         if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_isa(value, (jl_value_t*)jl_builtin_type)) {
-                return matchSuccess();
+                return success();
             }
         }
-        return matchFailure();
+        return failure();
     }
 
     void rewrite(CallOp op, PatternRewriter &rewriter) const override {

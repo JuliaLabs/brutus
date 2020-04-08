@@ -181,15 +181,15 @@ template <typename SourceOp, typename LLVMOp>
 struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(SourceOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(SourceOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         static_assert(
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
         rewriter.replaceOpWithNewOp<LLVMOp>(
             op, this->lowering.convertToLLVMType(op.getType()), operands);
-        return this->matchSuccess();
+        return success();
     }
 };
 
@@ -197,16 +197,16 @@ template <typename SourceOp, typename LLVMOp>
 struct ToUnaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(SourceOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(SourceOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         static_assert(
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
         assert(operands.size() == 1 && "expected unary operation");
         rewriter.replaceOpWithNewOp<LLVMOp>(
             op, this->lowering.convertToLLVMType(op.getType()), operands.front());
-        return this->matchSuccess();
+        return success();
     }
 };
 
@@ -214,9 +214,9 @@ template <typename SourceOp, typename LLVMOp>
 struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(SourceOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(SourceOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         static_assert(
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
@@ -226,7 +226,7 @@ struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             operands[0],
             operands[1],
             operands[2]);
-        return this->matchSuccess();
+        return success();
     }
 };
 
@@ -234,15 +234,15 @@ template <typename SourceOp>
 struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(SourceOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(SourceOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         static_assert(
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
         rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
             op, this->lowering.convertToLLVMType(op.getType()));
-        return this->matchSuccess();
+        return success();
     }
 };
 
@@ -250,16 +250,16 @@ template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predi
 struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(SourceOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(SourceOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() == 2);
         CmpOp cmp = rewriter.create<CmpOp>(
             op.getLoc(), predicate, operands[0], operands[1]);
         // assumes a Bool (i8) is to be returned
         rewriter.replaceOp(
             op, this->extendBool(op.getLoc(), cmp.getResult(), rewriter));
-        return this->matchSuccess();
+        return success();
     }
 };
 
@@ -280,9 +280,9 @@ struct ToFCmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
 struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(FuncOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(FuncOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         FunctionType type = op.getType();
 
         // convert return type
@@ -340,14 +340,14 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
 
         rewriter.applySignatureConversion(&new_func.getBody(), result);
         rewriter.eraseOp(op);
-        return matchSuccess();
+        return success();
     }
 };
 
 struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(ConstantOp op,
+    LogicalResult matchAndRewrite(ConstantOp op,
                                        ArrayRef<Value> operands,
                                        ConversionPatternRewriter &rewriter) const override {
         jl_value_t *value = op.value();
@@ -356,7 +356,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
 
         if (llvm_type == lowering.void_type) {
             rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, llvm_type);
-            return matchSuccess();
+            return success();
 
         } else if (jl_is_primitivetype(julia_type)) {
             int nb = jl_datatype_size(julia_type);
@@ -385,7 +385,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
 
             rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
                 op, llvm_type, value_attribute);
-            return matchSuccess();
+            return success();
 
         } else if (jl_is_structtype(julia_type)) {
             // TODO
@@ -403,12 +403,12 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             //     op, lowering.pjlvalue,
             //     rewriter.getIntegerAttr(rewriter.getIntegerType(64),
             //                             (int64_t)op.value()));
-            return matchSuccess();
+            return success();
         }
 
         rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
             op, lowering.convertToLLVMType(op.getType()));
-        return matchSuccess();
+        return success();
     }
 };
 
@@ -425,21 +425,21 @@ struct InvokeOpLowering : public ToUndefOpPattern<InvokeOp> {
 struct GotoOpLowering : public OpConversionPattern<GotoOp> {
     using OpConversionPattern<GotoOp>::OpConversionPattern;
 
-    PatternMatchResult matchAndRewrite(GotoOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(GotoOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         rewriter.replaceOpWithNewOp<LLVM::BrOp>(
             op, operands, op.getSuccessor());
-        return matchSuccess();
+        return success();
     }
 };
 
 struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(GotoIfNotOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(GotoIfNotOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() >= 1);
 
         // truncate condition from i8 to i1
@@ -451,23 +451,23 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
 
         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
             op, new_operands, op.getSuccessors(), op.getAttrs());
-        return matchSuccess();
+        return success();
     }
 };
 
 struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
     using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(ReturnOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(ReturnOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         // drop operand if its type is the LLVM void type
         if (operands.size() == 1
             && operands.front().getType() == lowering.void_type) {
             operands = llvm::None;
         }
         rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
-        return matchSuccess();
+        return success();
     }
 };
 
@@ -479,9 +479,9 @@ struct PiOpLowering : public ToUndefOpPattern<PiOp> {
 struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(Intrinsic_not_int op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(Intrinsic_not_int op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         jl_datatype_t* operand_type =
             op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
         bool is_bool = operand_type == jl_bool_type;
@@ -500,16 +500,16 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
             op, operands.front().getType(),
             operands.front(), mask_constant.getResult());
 
-        return matchSuccess();
+        return success();
     }
 };
 
 struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(Builtin_is op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(Builtin_is op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         // should result be an i1 or i8? `emit_f_is` uses i1 but Bool is i8
 
         assert(operands.size() == 2);
@@ -523,7 +523,7 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
             rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
                 op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
                 rewriter.getI8IntegerAttr(0));
-            return matchSuccess();
+            return success();
         }
 
         // TODO: ghosts, see `emit_f_is`
@@ -532,7 +532,7 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
             rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
                 op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
                 rewriter.getI8IntegerAttr(0));
-            return matchSuccess();
+            return success();
         }
 
         bool justbits1 = jl_is_concrete_immutable(t1);
@@ -542,7 +542,7 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
                 rewriter.replaceOp(
                     op, compareBits(
                         op.getLoc(), operands[0], operands[1], rewriter));
-                return matchSuccess();
+                return success();
             }
 
             // TODO
@@ -550,25 +550,25 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
 
         // TODO: `emit_box_compare`
 
-        return matchFailure();
+        return failure();
     }
 };
 
 struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
     using OpAndTypeConversionPattern<Builtin_ifelse>::OpAndTypeConversionPattern;
 
-    PatternMatchResult matchAndRewrite(Builtin_ifelse op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+    LogicalResult matchAndRewrite(Builtin_ifelse op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() == 3);
         Value condition = truncateBool(op.getLoc(), operands.front(), rewriter);
         rewriter.replaceOpWithNewOp<LLVM::SelectOp>(
             op, condition, operands[1], operands[2]);
-        return matchSuccess();
+        return success();
     }
 };
 
-struct JLIRToLLVMLoweringPass : public FunctionPass<JLIRToLLVMLoweringPass> {
+struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
     void runOnFunction() final {
         ConversionTarget target(getContext());
         target.addLegalDialect<LLVM::LLVMDialect>();
