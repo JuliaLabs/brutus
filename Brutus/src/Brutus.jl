@@ -7,10 +7,11 @@ function __init__()
 end
 
 @enum DumpOption::UInt8 begin
-    DumpTranslated = 1
-    DumpOptimized  = 2
-    DumpLowered    = 4 # after lowering to LLVM dialect
-    DumpLLVMIR     = 8
+    DumpTranslated    = 1
+    DumpOptimized     = 2
+    DumpLoweredToStd  = 4
+    DumpLoweredToLLVM = 8
+    DumpLLVMIR        = 16
 end
 
 # Emit MLIR IR to stdout
