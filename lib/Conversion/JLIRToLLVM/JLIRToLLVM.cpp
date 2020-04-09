@@ -3,9 +3,7 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/StandardTypes.h"
-#include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/DialectConversion.h"
-#include "mlir/Transforms/Passes.h"
 
 #include "llvm/Support/SwapByteOrder.h"
 
@@ -128,6 +126,8 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         return LLVM::LLVMType::getIntNTy(llvm_dialect, nbits);
     }
 };
+
+namespace {
 
 template <typename SourceOp>
 struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
@@ -348,8 +348,8 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(ConstantOp op,
-                                       ArrayRef<Value> operands,
-                                       ConversionPatternRewriter &rewriter) const override {
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
         jl_value_t *value = op.value();
         jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
         LLVM::LLVMType llvm_type = lowering.convertToLLVMType(op.getType());
@@ -568,6 +568,8 @@ struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
     }
 };
 
+} // namespace
+
 struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
     void runOnFunction() final {
         ConversionTarget target(getContext());
@@ -576,130 +578,130 @@ struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, Funct
         OwningRewritePatternList patterns;
         JLIRToLLVMTypeConverter converter(&getContext());
         patterns.insert<
-            FuncOpConversion,
+        //     FuncOpConversion,
             ToUndefOpPattern<UnimplementedOp>,
-            ToUndefOpPattern<UndefOp>,
-            ConstantOpLowering,
-            CallOpLowering,
-            InvokeOpLowering,
-            GotoIfNotOpLowering,
-            ReturnOpLowering,
-            PiOpLowering,
-            // Intrinsic_bitcast
-            // Intrinsic_neg_int
-            ToLLVMOpPattern<Intrinsic_add_int, LLVM::AddOp>,
-            ToLLVMOpPattern<Intrinsic_sub_int, LLVM::SubOp>,
-            ToLLVMOpPattern<Intrinsic_mul_int, LLVM::MulOp>,
-            ToLLVMOpPattern<Intrinsic_sdiv_int, LLVM::SDivOp>,
-            ToLLVMOpPattern<Intrinsic_udiv_int, LLVM::UDivOp>,
-            ToLLVMOpPattern<Intrinsic_srem_int, LLVM::SRemOp>,
-            ToLLVMOpPattern<Intrinsic_urem_int, LLVM::URemOp>,
-            // Intrinsic_add_ptr
-            // Intrinsic_sub_ptr
-            ToLLVMOpPattern<Intrinsic_neg_float, LLVM::FNegOp>,
-            ToLLVMOpPattern<Intrinsic_add_float, LLVM::FAddOp>,
-            ToLLVMOpPattern<Intrinsic_sub_float, LLVM::FSubOp>,
-            ToLLVMOpPattern<Intrinsic_mul_float, LLVM::FMulOp>,
-            ToLLVMOpPattern<Intrinsic_div_float, LLVM::FDivOp>,
-            ToLLVMOpPattern<Intrinsic_rem_float, LLVM::FRemOp>,
-            ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
-            // Intrinsic_muladd_float
-            // Intrinsic_neg_float_fast
-            // Intrinsic_add_float_fast
-            // Intrinsic_sub_float_fast
-            // Intrinsic_mul_float_fast
-            // Intrinsic_div_float_fast
-            // Intrinsic_rem_float_fast
-            ToICmpOpPattern<Intrinsic_eq_int, LLVM::ICmpPredicate::eq>,
-            ToICmpOpPattern<Intrinsic_ne_int, LLVM::ICmpPredicate::ne>,
-            ToICmpOpPattern<Intrinsic_slt_int, LLVM::ICmpPredicate::slt>,
-            ToICmpOpPattern<Intrinsic_ult_int, LLVM::ICmpPredicate::ult>,
-            ToICmpOpPattern<Intrinsic_sle_int, LLVM::ICmpPredicate::sle>,
-            ToICmpOpPattern<Intrinsic_ule_int, LLVM::ICmpPredicate::ule>,
-            ToFCmpOpPattern<Intrinsic_eq_float, LLVM::FCmpPredicate::oeq>,
-            ToFCmpOpPattern<Intrinsic_ne_float, LLVM::FCmpPredicate::une>,
-            ToFCmpOpPattern<Intrinsic_lt_float, LLVM::FCmpPredicate::olt>,
-            ToFCmpOpPattern<Intrinsic_le_float, LLVM::FCmpPredicate::ole>,
-            // Intrinsic_fpiseq
-            // Intrinsic_fpislt
-            ToLLVMOpPattern<Intrinsic_and_int, LLVM::AndOp>,
-            ToLLVMOpPattern<Intrinsic_or_int, LLVM::OrOp>,
-            ToLLVMOpPattern<Intrinsic_xor_int, LLVM::XOrOp>,
-            NotIntOpLowering, // Intrinsic_not_int
-            // Intrinsic_shl_int
-            // Intrinsic_lshr_int
-            // Intrinsic_ashr_int
-            // Intrinsic_bswap_int
-            // Intrinsic_ctpop_int
-            // Intrinsic_ctlz_int
-            // Intrinsic_cttz_int
-            // Intrinsic_sext_int
-            // Intrinsic_zext_int
-            // Intrinsic_trunc_int
-            // Intrinsic_fptoui
-            // Intrinsic_fptosi
-            // Intrinsic_uitofp
-            // Intrinsic_sitofp
-            // Intrinsic_fptrunc
-            // Intrinsic_fpext
-            // Intrinsic_checked_sadd_int
-            // Intrinsic_checked_uadd_int
-            // Intrinsic_checked_ssub_int
-            // Intrinsic_checked_usub_int
-            // Intrinsic_checked_smul_int
-            // Intrinsic_checked_umul_int
-            // Intrinsic_checked_sdiv_int
-            // Intrinsic_checked_udiv_int
-            // Intrinsic_checked_srem_int
-            // Intrinsic_checked_urem_int
-            ToUnaryLLVMOpPattern<Intrinsic_abs_float, LLVM::FAbsOp>,
-            // Intrinsic_copysign_float
-            // Intrinsic_flipsign_int
-            ToUnaryLLVMOpPattern<Intrinsic_ceil_llvm, LLVM::FCeilOp>,
-            // Intrinsic_floor_llvm
-            ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
-            // Intrinsic_rint_llvm
-            ToUnaryLLVMOpPattern<Intrinsic_sqrt_llvm, LLVM::SqrtOp>,
-            // Intrinsic_sqrt_llvm_fast
-            // Intrinsic_pointerref
-            // Intrinsic_pointerset
-            // Intrinsic_cglobal
-            // Intrinsic_llvmcall
-            // Intrinsic_arraylen
-            // Intrinsic_cglobal_auto
-            // Builtin_throw
-            IsOpLowering, // Builtin_is
-            // Builtin_typeof
-            // Builtin_sizeof
-            // Builtin_issubtype
-            ToUndefOpPattern<Builtin_isa>, // Builtin_isa
-            // Builtin__apply
-            // Builtin__apply_pure
-            // Builtin__apply_latest
-            // Builtin__apply_iterate
-            // Builtin_isdefined
-            // Builtin_nfields
-            // Builtin_tuple
-            // Builtin_svec
-            ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
-            // Builtin_setfield
-            // Builtin_fieldtype
-            // Builtin_arrayref
-            // Builtin_const_arrayref
-            // Builtin_arrayset
-            // Builtin_arraysize
-            // Builtin_apply_type
-            // Builtin_applicable
-            // Builtin_invoke ?
-            // Builtin__expr
-            // Builtin_typeassert
-            IfElseOpLowering // Builtin_ifelse
-            // Builtin__typevar
-            // invoke_kwsorter?
+            ToUndefOpPattern<UndefOp>
+        //     ConstantOpLowering,
+        //     CallOpLowering,
+        //     InvokeOpLowering,
+        //     GotoIfNotOpLowering,
+        //     ReturnOpLowering,
+        //     PiOpLowering,
+        //     // Intrinsic_bitcast
+        //     // Intrinsic_neg_int
+        //     ToLLVMOpPattern<Intrinsic_add_int, LLVM::AddOp>,
+        //     ToLLVMOpPattern<Intrinsic_sub_int, LLVM::SubOp>,
+        //     ToLLVMOpPattern<Intrinsic_mul_int, LLVM::MulOp>,
+        //     ToLLVMOpPattern<Intrinsic_sdiv_int, LLVM::SDivOp>,
+        //     ToLLVMOpPattern<Intrinsic_udiv_int, LLVM::UDivOp>,
+        //     ToLLVMOpPattern<Intrinsic_srem_int, LLVM::SRemOp>,
+        //     ToLLVMOpPattern<Intrinsic_urem_int, LLVM::URemOp>,
+        //     // Intrinsic_add_ptr
+        //     // Intrinsic_sub_ptr
+        //     ToLLVMOpPattern<Intrinsic_neg_float, LLVM::FNegOp>,
+        //     ToLLVMOpPattern<Intrinsic_add_float, LLVM::FAddOp>,
+        //     ToLLVMOpPattern<Intrinsic_sub_float, LLVM::FSubOp>,
+        //     ToLLVMOpPattern<Intrinsic_mul_float, LLVM::FMulOp>,
+        //     ToLLVMOpPattern<Intrinsic_div_float, LLVM::FDivOp>,
+        //     ToLLVMOpPattern<Intrinsic_rem_float, LLVM::FRemOp>,
+        //     ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
+        //     // Intrinsic_muladd_float
+        //     // Intrinsic_neg_float_fast
+        //     // Intrinsic_add_float_fast
+        //     // Intrinsic_sub_float_fast
+        //     // Intrinsic_mul_float_fast
+        //     // Intrinsic_div_float_fast
+        //     // Intrinsic_rem_float_fast
+        //     ToICmpOpPattern<Intrinsic_eq_int, LLVM::ICmpPredicate::eq>,
+        //     ToICmpOpPattern<Intrinsic_ne_int, LLVM::ICmpPredicate::ne>,
+        //     ToICmpOpPattern<Intrinsic_slt_int, LLVM::ICmpPredicate::slt>,
+        //     ToICmpOpPattern<Intrinsic_ult_int, LLVM::ICmpPredicate::ult>,
+        //     ToICmpOpPattern<Intrinsic_sle_int, LLVM::ICmpPredicate::sle>,
+        //     ToICmpOpPattern<Intrinsic_ule_int, LLVM::ICmpPredicate::ule>,
+        //     ToFCmpOpPattern<Intrinsic_eq_float, LLVM::FCmpPredicate::oeq>,
+        //     ToFCmpOpPattern<Intrinsic_ne_float, LLVM::FCmpPredicate::une>,
+        //     ToFCmpOpPattern<Intrinsic_lt_float, LLVM::FCmpPredicate::olt>,
+        //     ToFCmpOpPattern<Intrinsic_le_float, LLVM::FCmpPredicate::ole>,
+        //     // Intrinsic_fpiseq
+        //     // Intrinsic_fpislt
+        //     ToLLVMOpPattern<Intrinsic_and_int, LLVM::AndOp>,
+        //     ToLLVMOpPattern<Intrinsic_or_int, LLVM::OrOp>,
+        //     ToLLVMOpPattern<Intrinsic_xor_int, LLVM::XOrOp>,
+        //     NotIntOpLowering, // Intrinsic_not_int
+        //     // Intrinsic_shl_int
+        //     // Intrinsic_lshr_int
+        //     // Intrinsic_ashr_int
+        //     // Intrinsic_bswap_int
+        //     // Intrinsic_ctpop_int
+        //     // Intrinsic_ctlz_int
+        //     // Intrinsic_cttz_int
+        //     // Intrinsic_sext_int
+        //     // Intrinsic_zext_int
+        //     // Intrinsic_trunc_int
+        //     // Intrinsic_fptoui
+        //     // Intrinsic_fptosi
+        //     // Intrinsic_uitofp
+        //     // Intrinsic_sitofp
+        //     // Intrinsic_fptrunc
+        //     // Intrinsic_fpext
+        //     // Intrinsic_checked_sadd_int
+        //     // Intrinsic_checked_uadd_int
+        //     // Intrinsic_checked_ssub_int
+        //     // Intrinsic_checked_usub_int
+        //     // Intrinsic_checked_smul_int
+        //     // Intrinsic_checked_umul_int
+        //     // Intrinsic_checked_sdiv_int
+        //     // Intrinsic_checked_udiv_int
+        //     // Intrinsic_checked_srem_int
+        //     // Intrinsic_checked_urem_int
+        //     ToUnaryLLVMOpPattern<Intrinsic_abs_float, LLVM::FAbsOp>,
+        //     // Intrinsic_copysign_float
+        //     // Intrinsic_flipsign_int
+        //     ToUnaryLLVMOpPattern<Intrinsic_ceil_llvm, LLVM::FCeilOp>,
+        //     // Intrinsic_floor_llvm
+        //     ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
+        //     // Intrinsic_rint_llvm
+        //     ToUnaryLLVMOpPattern<Intrinsic_sqrt_llvm, LLVM::SqrtOp>,
+        //     // Intrinsic_sqrt_llvm_fast
+        //     // Intrinsic_pointerref
+        //     // Intrinsic_pointerset
+        //     // Intrinsic_cglobal
+        //     // Intrinsic_llvmcall
+        //     // Intrinsic_arraylen
+        //     // Intrinsic_cglobal_auto
+        //     // Builtin_throw
+        //     IsOpLowering, // Builtin_is
+        //     // Builtin_typeof
+        //     // Builtin_sizeof
+        //     // Builtin_issubtype
+        //     ToUndefOpPattern<Builtin_isa>, // Builtin_isa
+        //     // Builtin__apply
+        //     // Builtin__apply_pure
+        //     // Builtin__apply_latest
+        //     // Builtin__apply_iterate
+        //     // Builtin_isdefined
+        //     // Builtin_nfields
+        //     // Builtin_tuple
+        //     // Builtin_svec
+        //     ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
+        //     // Builtin_setfield
+        //     // Builtin_fieldtype
+        //     // Builtin_arrayref
+        //     // Builtin_const_arrayref
+        //     // Builtin_arrayset
+        //     // Builtin_arraysize
+        //     // Builtin_apply_type
+        //     // Builtin_applicable
+        //     // Builtin_invoke ?
+        //     // Builtin__expr
+        //     // Builtin_typeassert
+        //     IfElseOpLowering // Builtin_ifelse
+        //     // Builtin__typevar
+        //     // invoke_kwsorter?
             >(&getContext(), converter);
-        patterns.insert<
-            GotoOpLowering
-            >(&getContext());
+        // patterns.insert<
+        //     GotoOpLowering
+        //     >(&getContext());
 
         if (failed(applyFullConversion(
                        getFunction(), target, patterns, &converter)))
@@ -708,5 +710,5 @@ struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, Funct
 };
 
 std::unique_ptr<Pass> mlir::jlir::createJLIRToLLVMLoweringPass() {
-  return std::make_unique<JLIRToLLVMLoweringPass>();
+    return std::make_unique<JLIRToLLVMLoweringPass>();
 }
