@@ -121,6 +121,9 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<jlir::ConstantOp> 
         jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
         Type converted_type = lowering.convertType(op.getType());
 
+        // if (!converted_type)
+        //     return failure();
+
         if (jl_is_primitivetype(julia_type)) {
             int nb = jl_datatype_size(julia_type);
             APInt val(8 * nb, 0);

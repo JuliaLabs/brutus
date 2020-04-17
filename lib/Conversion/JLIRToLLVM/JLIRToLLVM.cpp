@@ -32,15 +32,6 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
         addConversion(
             [&](JuliaType jt) {
                 return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
-            // [&](JuliaType jt, SmallVectorImpl<Type> &results) {
-            //     LLVM::LLVMType converted =
-            //         julia_type_to_llvm((jl_value_t*)jt.getDatatype());
-            //     // drop value if it converts to void type
-            //     if (converted != void_type) {
-            //         results.push_back(converted);
-            //     }
-            //     return success();
-            // });
     }
 
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -100,10 +91,6 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
         }
 
         return pjlvalue; // prjlvalue?
-    }
-
-    LLVM::LLVMType convertToLLVMType(Type t) {
-        return convertType(t).dyn_cast_or_null<LLVM::LLVMType>();
     }
 
     // convert an LLVM type to same-sized int type
@@ -191,7 +178,7 @@ struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
         rewriter.replaceOpWithNewOp<LLVMOp>(
-            op, this->lowering.convertToLLVMType(op.getType()), operands);
+            op, this->lowering.convertType(op.getType()), operands);
         return success();
     }
 };
@@ -208,7 +195,7 @@ struct ToUnaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             "expected single result op");
         assert(operands.size() == 1 && "expected unary operation");
         rewriter.replaceOpWithNewOp<LLVMOp>(
-            op, this->lowering.convertToLLVMType(op.getType()), operands.front());
+            op, this->lowering.convertType(op.getType()), operands.front());
         return success();
     }
 };
@@ -225,7 +212,7 @@ struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             "expected single result op");
         assert(operands.size() == 3 && "expected ternary operation");
         rewriter.replaceOpWithNewOp<LLVMOp>(
-            op, this->lowering.convertToLLVMType(op.getType()),
+            op, this->lowering.convertType(op.getType()),
             operands[0],
             operands[1],
             operands[2]);
@@ -244,7 +231,7 @@ struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
             std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
             "expected single result op");
         rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
-            op, this->lowering.convertToLLVMType(op.getType()));
+            op, this->lowering.convertType(op.getType()));
         return success();
     }
 };
@@ -291,7 +278,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         // convert return type
         assert(type.getNumResults() == 1);
         LLVM::LLVMType new_return_type =
-            lowering.convertToLLVMType(type.getResults().front());
+            lowering.convertType(type.getResults().front()).cast<LLVM::LLVMType>();
         assert(new_return_type && "failed to convert return type");
 
         // convert argument types
@@ -301,7 +288,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         TypeConverter::SignatureConversion result(op.getNumArguments());
         for (auto &en : llvm::enumerate(type.getInputs())) {
             LLVM::LLVMType converted =
-                lowering.convertToLLVMType(en.value());
+                lowering.convertType(en.value()).cast<LLVM::LLVMType>();
             assert(converted && "failed to convert argument type");
 
             // drop argument if it converts to void type
@@ -355,7 +342,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
                                   ConversionPatternRewriter &rewriter) const override {
         jl_value_t *value = op.value();
         jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
-        LLVM::LLVMType llvm_type = lowering.convertToLLVMType(op.getType());
+        LLVM::LLVMType llvm_type = lowering.convertType(op.getType()).cast<LLVM::LLVMType>();
 
         if (llvm_type == lowering.void_type) {
             rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, llvm_type);
@@ -410,7 +397,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
         }
 
         rewriter.replaceOpWithNewOp<LLVM::UndefOp>(
-            op, lowering.convertToLLVMType(op.getType()));
+            op, lowering.convertType(op.getType()));
         return success();
     }
 };
@@ -573,15 +560,19 @@ struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
 
 } // namespace
 
+// NOTE: maybe values that convert to void should not be removed--pass a
+//       pointer?
+//
+//       f(x::Bool) = x ? nothing : 100
+
 struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
     void runOnFunction() final {
         ConversionTarget target(getContext());
         target.addLegalDialect<LLVM::LLVMDialect>();
 
         OwningRewritePatternList patterns;
-        JLIRToLLVMTypeConverter jlirConverter(&getContext());
-        populateStdToLLVMConversionPatterns(jlirConverter, patterns);
-        // populateFuncOpTypeConversionPattern(patterns, &getContext(), jlirConverter);
+        JLIRToLLVMTypeConverter converter(&getContext());
+        populateStdToLLVMConversionPatterns(converter, patterns);
         patterns.insert<
             FuncOpConversion,
             ToUndefOpPattern<UnimplementedOp>,
@@ -703,13 +694,13 @@ struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, Funct
         //     IfElseOpLowering // Builtin_ifelse
         //     // Builtin__typevar
         //     // invoke_kwsorter?
-            >(&getContext(), jlirConverter);
+            >(&getContext(), converter);
         // patterns.insert<
         //     GotoOpLowering
         //     >(&getContext());
 
         if (failed(applyPartialConversion(
-                       getFunction(), target, patterns, &jlirConverter)))
+                       getFunction(), target, patterns, &converter)))
             signalPassFailure();
     }
 };
