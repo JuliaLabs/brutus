@@ -5,7 +5,6 @@
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
 #include "mlir/Analysis/Verifier.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
@@ -401,7 +400,9 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     }
 
     if (dump_flags & DUMP_TRANSLATED) {
+        llvm::outs() << "after translating to MLIR in JLIR dialect:";
         module.dump();
+        llvm::outs() << "\n\n";
     }
 
     if (optimize) {
@@ -418,7 +419,9 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
         LogicalResult result = pm.run(module);;
 
         if (dump_flags & DUMP_OPTIMIZED) {
+            llvm::outs() << "after optimizing:";
             module.dump();
+            llvm::outs() << "\n\n";
         }
 
         if (mlir::failed(result)) {
@@ -429,13 +432,16 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
 
     // lower to Standard dialect
 
-    // llvm::DebugFlag = true;
+    llvm::DebugFlag = true;
     mlir::PassManager loweringToStdPM(&context);
     loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
     LogicalResult loweringToStdResult = loweringToStdPM.run(module);
 
-    if (dump_flags & DUMP_LOWERED_TO_STD)
+    if (dump_flags & DUMP_LOWERED_TO_STD) {
+        llvm::outs() << "after lowering to Standard dialect:";
         module.dump();
+        llvm::outs() << "\n\n";
+    }
 
     if (mlir::failed(loweringToStdResult)) {
         module.emitError("lowering to Standard dialect failed");
@@ -445,12 +451,13 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     // lower to LLVM dialect
 
     mlir::PassManager loweringToLLVMPM(&context);
-    loweringToLLVMPM.addPass(createLowerToLLVMPass());
-    // loweringToLLVMPM.addPass(createJLIRToLLVMLoweringPass());
+    loweringToLLVMPM.addPass(createJLIRToLLVMLoweringPass());
     LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_LLVM) {
+        llvm::outs() << "after lowering to LLVM dialect:";
         module.dump();
+        llvm::outs() << "\n\n";
     }
 
     if (mlir::failed(loweringToLLVMResult)) {
@@ -471,7 +478,9 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     // Translate to LLVM IR and return bitcode in MemoryBuffer
     std::unique_ptr<llvm::Module> llvm_module = translateModuleToLLVMIR(module);
     if (dump_flags & DUMP_LLVM_IR) {
+        llvm::outs() << "after translating to LLVM IR:";
         llvm_module->print(llvm::dbgs(), nullptr);
+        llvm::outs() << "\n\n";
     }
     std::string data;
     llvm::raw_string_ostream os(data);

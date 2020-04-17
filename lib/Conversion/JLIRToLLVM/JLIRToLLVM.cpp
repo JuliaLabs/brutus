@@ -1,6 +1,8 @@
 #include "brutus/Dialect/Julia/JuliaOps.h"
 #include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
 
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/IR/StandardTypes.h"
 #include "mlir/Transforms/DialectConversion.h"
@@ -12,14 +14,15 @@
 using namespace mlir;
 using namespace jlir;
 
-struct JLIRToLLVMTypeConverter : public TypeConverter {
+struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
     LLVM::LLVMDialect *llvm_dialect;
     LLVM::LLVMType void_type;
     LLVM::LLVMType jlvalue;
     LLVM::LLVMType pjlvalue;
 
     JLIRToLLVMTypeConverter(MLIRContext *ctx)
-        : llvm_dialect(ctx->getRegisteredDialect<LLVM::LLVMDialect>()),
+        : LLVMTypeConverter(ctx),
+          llvm_dialect(ctx->getRegisteredDialect<LLVM::LLVMDialect>()),
           void_type(LLVM::LLVMType::getVoidTy(llvm_dialect)),
           jlvalue(LLVM::LLVMType::createStructTy(
                       llvm_dialect, Optional<StringRef>("jl_value_t"))),
@@ -29,15 +32,15 @@ struct JLIRToLLVMTypeConverter : public TypeConverter {
         addConversion(
             [&](JuliaType jt) {
                 return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
-        // TODO: try this later
-        //     [&](JuliaType jt, SmallVectorImpl<Type> &results) {
-        //         LLVM::LLVMType converted =
-        //             julia_type_to_llvm((jl_value_t*)jt.getDatatype());
-        //         // drop value if it converts to void type
-        //         if (converted != void_type) {
-        //             results.push_back(converted);
-        //         }
-        //         return success(); });
+            // [&](JuliaType jt, SmallVectorImpl<Type> &results) {
+            //     LLVM::LLVMType converted =
+            //         julia_type_to_llvm((jl_value_t*)jt.getDatatype());
+            //     // drop value if it converts to void type
+            //     if (converted != void_type) {
+            //         results.push_back(converted);
+            //     }
+            //     return success();
+            // });
     }
 
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -576,12 +579,14 @@ struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, Funct
         target.addLegalDialect<LLVM::LLVMDialect>();
 
         OwningRewritePatternList patterns;
-        JLIRToLLVMTypeConverter converter(&getContext());
+        JLIRToLLVMTypeConverter jlirConverter(&getContext());
+        populateStdToLLVMConversionPatterns(jlirConverter, patterns);
+        // populateFuncOpTypeConversionPattern(patterns, &getContext(), jlirConverter);
         patterns.insert<
-        //     FuncOpConversion,
+            FuncOpConversion,
             ToUndefOpPattern<UnimplementedOp>,
-            ToUndefOpPattern<UndefOp>
-        //     ConstantOpLowering,
+            ToUndefOpPattern<UndefOp>,
+            ConstantOpLowering
         //     CallOpLowering,
         //     InvokeOpLowering,
         //     GotoIfNotOpLowering,
@@ -698,13 +703,13 @@ struct JLIRToLLVMLoweringPass : public PassWrapper<JLIRToLLVMLoweringPass, Funct
         //     IfElseOpLowering // Builtin_ifelse
         //     // Builtin__typevar
         //     // invoke_kwsorter?
-            >(&getContext(), converter);
+            >(&getContext(), jlirConverter);
         // patterns.insert<
         //     GotoOpLowering
         //     >(&getContext());
 
-        if (failed(applyFullConversion(
-                       getFunction(), target, patterns, &converter)))
+        if (failed(applyPartialConversion(
+                       getFunction(), target, patterns, &jlirConverter)))
             signalPassFailure();
     }
 };
