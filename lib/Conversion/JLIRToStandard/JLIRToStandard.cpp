@@ -14,27 +14,33 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
     JLIRToStandardTypeConverter(MLIRContext *ctx) : ctx(ctx) {
         addConversion(
             [&](JuliaType t, SmallVectorImpl<Type> &results) {
-                jl_datatype_t *jdt = t.getDatatype();
-                if ((jl_value_t*)jdt == jl_bottom_type) {
-
-                } else if (jl_is_primitivetype(jdt)) {
-                    results.push_back(convert_bitstype(jdt));
-                } else if (jl_is_structtype(jdt)
-                           && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
-                    // bool is_tuple = jl_is_tuple_type(jt);
-                    jl_svec_t *ftypes = jl_get_fieldtypes(jdt);
-                    size_t ntypes = jl_svec_len(ftypes);
-                    if (ntypes == 0 || (jdt->layout && jl_datatype_nbits(jdt) == 0)) {
-
-                    } else {
-                        // TODO: actually handle structs
-                        results.push_back(t); // don't convert for now
-                    }
-                } else {
-                    results.push_back(t); // don't convert other types
-                }
+                llvm::Optional<Type> converted = convert_JuliaType(t);
+                if (converted.hasValue())
+                    results.push_back(converted.getValue());
+                results.push_back(t); // always an option not to convert
                 return success();
             });
+    }
+
+    llvm::Optional<Type> convert_JuliaType(JuliaType t) {
+        jl_datatype_t *jdt = t.getDatatype();
+        if ((jl_value_t*)jdt == jl_bottom_type) {
+            return {};
+        } else if (jl_is_primitivetype(jdt)) {
+            return convert_bitstype(jdt);
+        // } else if (jl_is_structtype(jdt)
+        //            && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
+        //     // bool is_tuple = jl_is_tuple_type(jt);
+        //     jl_svec_t *ftypes = jl_get_fieldtypes(jdt);
+        //     size_t ntypes = jl_svec_len(ftypes);
+        //     if (ntypes == 0 || (jdt->layout && jl_datatype_nbits(jdt) == 0)) {
+
+        //     } else {
+        //         // TODO: actually handle structs
+        //         results.push_back(t); // don't convert for now
+        //     }
+        }
+        return {};
     }
 
     Type convert_bitstype(jl_datatype_t *jdt) {
@@ -176,6 +182,13 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t* operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+
+        // TODO: actually check if it can be converted to a std type
+        if (!jl_is_primitivetype(operand_type))
+            return failure();
+
         rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, operands);
         return success();
     }
@@ -242,124 +255,124 @@ struct JLIRToStandardLoweringPass
         // TODO: check that type conversion happens for block arguments
         populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
         patterns.insert<
-            ConstantOpLowering,
-            // CallOpLowering,
-            // InvokeOpLowering,
+            //    ConstantOpLowering,
+        //     // CallOpLowering,
+        //     // InvokeOpLowering,
             GotoOpLowering,
             GotoIfNotOpLowering,
-            ReturnOpLowering,
-            // PiOpLowering,
-            // Intrinsic_bitcast
-            // Intrinsic_neg_int
-            ToStdOpPattern<Intrinsic_add_int, AddIOp>,
-            ToStdOpPattern<Intrinsic_sub_int, SubIOp>,
-            ToStdOpPattern<Intrinsic_mul_int, MulIOp>,
-            ToStdOpPattern<Intrinsic_sdiv_int, SignedDivIOp>,
-            ToStdOpPattern<Intrinsic_udiv_int, UnsignedDivIOp>,
-            ToStdOpPattern<Intrinsic_srem_int, SignedRemIOp>,
-            ToStdOpPattern<Intrinsic_urem_int, UnsignedRemIOp>,
-            // Intrinsic_add_ptr
-            // Intrinsic_sub_ptr
-            ToStdOpPattern<Intrinsic_neg_float, NegFOp>,
-            ToStdOpPattern<Intrinsic_add_float, AddFOp>,
-            ToStdOpPattern<Intrinsic_sub_float, SubFOp>,
-            ToStdOpPattern<Intrinsic_mul_float, MulFOp>,
-            ToStdOpPattern<Intrinsic_div_float, DivFOp>,
-            ToStdOpPattern<Intrinsic_rem_float, RemFOp>,
-        //     ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
-            // Intrinsic_muladd_float
-            // Intrinsic_neg_float_fast
-            // Intrinsic_add_float_fast
-            // Intrinsic_sub_float_fast
-            // Intrinsic_mul_float_fast
-            // Intrinsic_div_float_fast
-            // Intrinsic_rem_float_fast
-            ToCmpIOpPattern<Intrinsic_eq_int, CmpIPredicate::eq>,
-            ToCmpIOpPattern<Intrinsic_ne_int, CmpIPredicate::ne>,
-            ToCmpIOpPattern<Intrinsic_slt_int, CmpIPredicate::slt>,
-            ToCmpIOpPattern<Intrinsic_ult_int, CmpIPredicate::ult>,
-            ToCmpIOpPattern<Intrinsic_sle_int, CmpIPredicate::sle>,
-            ToCmpIOpPattern<Intrinsic_ule_int, CmpIPredicate::ule>,
-            ToCmpFOpPattern<Intrinsic_eq_float, CmpFPredicate::OEQ>,
-            ToCmpFOpPattern<Intrinsic_ne_float, CmpFPredicate::UNE>,
-            ToCmpFOpPattern<Intrinsic_lt_float, CmpFPredicate::OLT>,
-            ToCmpFOpPattern<Intrinsic_le_float, CmpFPredicate::OLE>,
-            // Intrinsic_fpiseq
-            // Intrinsic_fpislt
-            ToStdOpPattern<Intrinsic_and_int, AndOp>,
-            ToStdOpPattern<Intrinsic_or_int, OrOp>,
-            ToStdOpPattern<Intrinsic_xor_int, XOrOp>,
-            NotIntOpLowering, // Intrinsic_not_int
-            ToStdOpPattern<Intrinsic_shl_int, ShiftLeftOp>,
-            ToStdOpPattern<Intrinsic_lshr_int, UnsignedShiftRightOp>,
-            ToStdOpPattern<Intrinsic_ashr_int, SignedShiftRightOp>,
-            // Intrinsic_bswap_int
-            // Intrinsic_ctpop_int
-            // Intrinsic_ctlz_int
-            // Intrinsic_cttz_int
-            ToStdOpPattern<Intrinsic_sext_int, SignExtendIOp>,
-            ToStdOpPattern<Intrinsic_zext_int, ZeroExtendIOp>,
-            ToStdOpPattern<Intrinsic_trunc_int, TruncateIOp>,
-            // Intrinsic_fptoui
-            // Intrinsic_fptosi
-            // Intrinsic_uitofp
-            ToStdOpPattern<Intrinsic_sitofp, SIToFPOp>,
-            ToStdOpPattern<Intrinsic_fptrunc, FPTruncOp>,
-            ToStdOpPattern<Intrinsic_fpext, FPExtOp>,
-            // Intrinsic_checked_sadd_int
-            // Intrinsic_checked_uadd_int
-            // Intrinsic_checked_ssub_int
-            // Intrinsic_checked_usub_int
-            // Intrinsic_checked_smul_int
-            // Intrinsic_checked_umul_int
-            // Intrinsic_checked_sdiv_int
-            // Intrinsic_checked_udiv_int
-            // Intrinsic_checked_srem_int
-            // Intrinsic_checked_urem_int
-            ToStdOpPattern<Intrinsic_abs_float, AbsFOp>,
-            ToStdOpPattern<Intrinsic_copysign_float, CopySignOp>,
-            // Intrinsic_flipsign_int
-            ToStdOpPattern<Intrinsic_ceil_llvm, CeilFOp>,
-            // Intrinsic_floor_llvm
-        //     ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
-            // Intrinsic_rint_llvm
-            ToStdOpPattern<Intrinsic_sqrt_llvm, SqrtOp>,
-            // Intrinsic_sqrt_llvm_fast
-            // Intrinsic_pointerref
-            // Intrinsic_pointerset
-            // Intrinsic_cglobal
-            // Intrinsic_llvmcall
-            // Intrinsic_arraylen
-            // Intrinsic_cglobal_auto
-            // Builtin_throw
-        //     IsOpLowering, // Builtin_is
-            // Builtin_typeof
-            // Builtin_sizeof
-            // Builtin_issubtype
-        //     ToUndefOpPattern<Builtin_isa>, // Builtin_isa
-            // Builtin__apply
-            // Builtin__apply_pure
-            // Builtin__apply_latest
-            // Builtin__apply_iterate
-            // Builtin_isdefined
-            // Builtin_nfields
-            // Builtin_tuple
-            // Builtin_svec
-        //     ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
-            // Builtin_setfield
-            // Builtin_fieldtype
-            // Builtin_arrayref
-            // Builtin_const_arrayref
-            // Builtin_arrayset
-            // Builtin_arraysize
-            // Builtin_apply_type
-            // Builtin_applicable
-            // Builtin_invoke ?
-            // Builtin__expr
-            // Builtin_typeassert
-            ToStdOpPattern<Builtin_ifelse, SelectOp>
-            // Builtin__typevar
-            // invoke_kwsorter?
+            ReturnOpLowering
+        //     // PiOpLowering,
+        //     // Intrinsic_bitcast
+        //     // Intrinsic_neg_int
+        //     ToStdOpPattern<Intrinsic_add_int, AddIOp>,
+        //     ToStdOpPattern<Intrinsic_sub_int, SubIOp>,
+        //     ToStdOpPattern<Intrinsic_mul_int, MulIOp>,
+        //     ToStdOpPattern<Intrinsic_sdiv_int, SignedDivIOp>,
+        //     ToStdOpPattern<Intrinsic_udiv_int, UnsignedDivIOp>,
+        //     ToStdOpPattern<Intrinsic_srem_int, SignedRemIOp>,
+        //     ToStdOpPattern<Intrinsic_urem_int, UnsignedRemIOp>,
+        //     // Intrinsic_add_ptr
+        //     // Intrinsic_sub_ptr
+        //     ToStdOpPattern<Intrinsic_neg_float, NegFOp>,
+        //     ToStdOpPattern<Intrinsic_add_float, AddFOp>,
+        //     ToStdOpPattern<Intrinsic_sub_float, SubFOp>,
+        //     ToStdOpPattern<Intrinsic_mul_float, MulFOp>,
+        //     ToStdOpPattern<Intrinsic_div_float, DivFOp>,
+        //     ToStdOpPattern<Intrinsic_rem_float, RemFOp>,
+        // //     ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
+        //     // Intrinsic_muladd_float
+        //     // Intrinsic_neg_float_fast
+        //     // Intrinsic_add_float_fast
+        //     // Intrinsic_sub_float_fast
+        //     // Intrinsic_mul_float_fast
+        //     // Intrinsic_div_float_fast
+        //     // Intrinsic_rem_float_fast
+        //     ToCmpIOpPattern<Intrinsic_eq_int, CmpIPredicate::eq>,
+        //     ToCmpIOpPattern<Intrinsic_ne_int, CmpIPredicate::ne>,
+        //     ToCmpIOpPattern<Intrinsic_slt_int, CmpIPredicate::slt>,
+        //     ToCmpIOpPattern<Intrinsic_ult_int, CmpIPredicate::ult>,
+        //     ToCmpIOpPattern<Intrinsic_sle_int, CmpIPredicate::sle>,
+        //     ToCmpIOpPattern<Intrinsic_ule_int, CmpIPredicate::ule>,
+        //     ToCmpFOpPattern<Intrinsic_eq_float, CmpFPredicate::OEQ>,
+        //     ToCmpFOpPattern<Intrinsic_ne_float, CmpFPredicate::UNE>,
+        //     ToCmpFOpPattern<Intrinsic_lt_float, CmpFPredicate::OLT>,
+        //     ToCmpFOpPattern<Intrinsic_le_float, CmpFPredicate::OLE>,
+        //     // Intrinsic_fpiseq
+        //     // Intrinsic_fpislt
+        //     ToStdOpPattern<Intrinsic_and_int, AndOp>,
+        //     ToStdOpPattern<Intrinsic_or_int, OrOp>,
+        //     ToStdOpPattern<Intrinsic_xor_int, XOrOp>,
+        //     NotIntOpLowering, // Intrinsic_not_int
+        //     ToStdOpPattern<Intrinsic_shl_int, ShiftLeftOp>,
+        //     ToStdOpPattern<Intrinsic_lshr_int, UnsignedShiftRightOp>,
+        //     ToStdOpPattern<Intrinsic_ashr_int, SignedShiftRightOp>,
+        //     // Intrinsic_bswap_int
+        //     // Intrinsic_ctpop_int
+        //     // Intrinsic_ctlz_int
+        //     // Intrinsic_cttz_int
+        //     ToStdOpPattern<Intrinsic_sext_int, SignExtendIOp>,
+        //     ToStdOpPattern<Intrinsic_zext_int, ZeroExtendIOp>,
+        //     ToStdOpPattern<Intrinsic_trunc_int, TruncateIOp>,
+        //     // Intrinsic_fptoui
+        //     // Intrinsic_fptosi
+        //     // Intrinsic_uitofp
+        //     ToStdOpPattern<Intrinsic_sitofp, SIToFPOp>,
+        //     ToStdOpPattern<Intrinsic_fptrunc, FPTruncOp>,
+        //     ToStdOpPattern<Intrinsic_fpext, FPExtOp>,
+        //     // Intrinsic_checked_sadd_int
+        //     // Intrinsic_checked_uadd_int
+        //     // Intrinsic_checked_ssub_int
+        //     // Intrinsic_checked_usub_int
+        //     // Intrinsic_checked_smul_int
+        //     // Intrinsic_checked_umul_int
+        //     // Intrinsic_checked_sdiv_int
+        //     // Intrinsic_checked_udiv_int
+        //     // Intrinsic_checked_srem_int
+        //     // Intrinsic_checked_urem_int
+        //     ToStdOpPattern<Intrinsic_abs_float, AbsFOp>,
+        //     ToStdOpPattern<Intrinsic_copysign_float, CopySignOp>,
+        //     // Intrinsic_flipsign_int
+        //     ToStdOpPattern<Intrinsic_ceil_llvm, CeilFOp>,
+        //     // Intrinsic_floor_llvm
+        // //     ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
+        //     // Intrinsic_rint_llvm
+        //     ToStdOpPattern<Intrinsic_sqrt_llvm, SqrtOp>,
+        //     // Intrinsic_sqrt_llvm_fast
+        //     // Intrinsic_pointerref
+        //     // Intrinsic_pointerset
+        //     // Intrinsic_cglobal
+        //     // Intrinsic_llvmcall
+        //     // Intrinsic_arraylen
+        //     // Intrinsic_cglobal_auto
+        //     // Builtin_throw
+        // //     IsOpLowering, // Builtin_is
+        //     // Builtin_typeof
+        //     // Builtin_sizeof
+        //     // Builtin_issubtype
+        // //     ToUndefOpPattern<Builtin_isa>, // Builtin_isa
+        //     // Builtin__apply
+        //     // Builtin__apply_pure
+        //     // Builtin__apply_latest
+        //     // Builtin__apply_iterate
+        //     // Builtin_isdefined
+        //     // Builtin_nfields
+        //     // Builtin_tuple
+        //     // Builtin_svec
+        // //     ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
+        //     // Builtin_setfield
+        //     // Builtin_fieldtype
+        //     // Builtin_arrayref
+        //     // Builtin_const_arrayref
+        //     // Builtin_arrayset
+        //     // Builtin_arraysize
+        //     // Builtin_apply_type
+        //     // Builtin_applicable
+        //     // Builtin_invoke ?
+        //     // Builtin__expr
+        //     // Builtin_typeassert
+        //     ToStdOpPattern<Builtin_ifelse, SelectOp>
+        //     // Builtin__typevar
+        //     // invoke_kwsorter?
             >(&getContext(), converter);
 
         if (failed(applyPartialConversion(
