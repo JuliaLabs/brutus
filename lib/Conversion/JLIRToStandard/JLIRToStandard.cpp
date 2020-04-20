@@ -121,12 +121,9 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<jlir::ConstantOp> 
         jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
         Type converted_type = lowering.convertType(op.getType());
 
-        // if (!converted_type)
-        //     return failure();
-
         if (jl_is_primitivetype(julia_type)) {
             int nb = jl_datatype_size(julia_type);
-            APInt val(8 * nb, 0);
+            APInt val((julia_type == jl_bool_type) ? 1 : (8 * nb), 0);
             void *bits = const_cast<uint64_t*>(val.getRawData());
             assert(llvm::sys::IsLittleEndianHost);
             memcpy(bits, value, nb);
@@ -180,6 +177,34 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, operands);
+        return success();
+    }
+};
+
+struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
+    using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(Intrinsic_not_int op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t* operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+        bool is_bool = operand_type == jl_bool_type;
+        uint64_t mask_value = is_bool ? 1 : -1;
+        // unsigned num_bits = 8 * (is_bool? 1 : jl_datatype_size(operand_type));
+        unsigned num_bits = is_bool? 1 : (8*jl_datatype_size(operand_type));
+
+        Value mask_constant =
+            rewriter.create<mlir::ConstantOp>(
+                op.getLoc(), operands.front().getType(),
+                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+                                        // need APInt for sign extension
+                                        APInt(num_bits, mask_value,
+                                              /*isSigned=*/true)))
+            .getResult();
+
+        rewriter.replaceOpWithNewOp<XOrOp>(
+            op, operands.front().getType(), operands.front(), mask_constant);
         return success();
     }
 };
@@ -264,7 +289,7 @@ struct JLIRToStandardLoweringPass
             ToStdOpPattern<Intrinsic_and_int, AndOp>,
             ToStdOpPattern<Intrinsic_or_int, OrOp>,
             ToStdOpPattern<Intrinsic_xor_int, XOrOp>,
-        //     NotIntOpLowering, // Intrinsic_not_int
+            NotIntOpLowering, // Intrinsic_not_int
             ToStdOpPattern<Intrinsic_shl_int, ShiftLeftOp>,
             ToStdOpPattern<Intrinsic_lshr_int, UnsignedShiftRightOp>,
             ToStdOpPattern<Intrinsic_ashr_int, SignedShiftRightOp>,

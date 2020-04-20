@@ -236,36 +236,36 @@ struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
-struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
-    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+// template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
+// struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+//     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(SourceOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        assert(operands.size() == 2);
-        CmpOp cmp = rewriter.create<CmpOp>(
-            op.getLoc(), predicate, operands[0], operands[1]);
-        // assumes a Bool (i8) is to be returned
-        rewriter.replaceOp(
-            op, this->extendBool(op.getLoc(), cmp.getResult(), rewriter));
-        return success();
-    }
-};
+//     LogicalResult matchAndRewrite(SourceOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         assert(operands.size() == 2);
+//         CmpOp cmp = rewriter.create<CmpOp>(
+//             op.getLoc(), predicate, operands[0], operands[1]);
+//         // assumes a Bool (i8) is to be returned
+//         rewriter.replaceOp(
+//             op, this->extendBool(op.getLoc(), cmp.getResult(), rewriter));
+//         return success();
+//     }
+// };
 
-template <typename SourceOp, LLVM::ICmpPredicate predicate>
-struct ToICmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
-                                               LLVM::ICmpPredicate, predicate> {
-    using ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
-                         LLVM::ICmpPredicate, predicate>::ToCmpOpPattern;
-};
+// template <typename SourceOp, LLVM::ICmpPredicate predicate>
+// struct ToICmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
+//                                                LLVM::ICmpPredicate, predicate> {
+//     using ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
+//                          LLVM::ICmpPredicate, predicate>::ToCmpOpPattern;
+// };
 
-template <typename SourceOp, LLVM::FCmpPredicate predicate>
-struct ToFCmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
-                                               LLVM::FCmpPredicate, predicate> {
-    using ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
-                         LLVM::FCmpPredicate, predicate>::ToCmpOpPattern;
-};
+// template <typename SourceOp, LLVM::FCmpPredicate predicate>
+// struct ToFCmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
+//                                                LLVM::FCmpPredicate, predicate> {
+//     using ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
+//                          LLVM::FCmpPredicate, predicate>::ToCmpOpPattern;
+// };
 
 struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
@@ -412,87 +412,87 @@ struct InvokeOpLowering : public ToUndefOpPattern<InvokeOp> {
     using ToUndefOpPattern<InvokeOp>::ToUndefOpPattern;
 };
 
-struct GotoOpLowering : public OpConversionPattern<GotoOp> {
-    using OpConversionPattern<GotoOp>::OpConversionPattern;
+// struct GotoOpLowering : public OpConversionPattern<GotoOp> {
+//     using OpConversionPattern<GotoOp>::OpConversionPattern;
 
-    LogicalResult matchAndRewrite(GotoOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        rewriter.replaceOpWithNewOp<LLVM::BrOp>(
-            op, operands, op.getSuccessor());
-        return success();
-    }
-};
+//     LogicalResult matchAndRewrite(GotoOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         rewriter.replaceOpWithNewOp<LLVM::BrOp>(
+//             op, operands, op.getSuccessor());
+//         return success();
+//     }
+// };
 
-struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
-    using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
+// struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
+//     using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(GotoIfNotOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        assert(operands.size() >= 1);
+//     LogicalResult matchAndRewrite(GotoIfNotOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         assert(operands.size() >= 1);
 
-        // truncate condition from i8 to i1
-        SmallVector<Value, 4> new_operands;
-        std::copy(operands.begin(), operands.end(),
-                  std::back_inserter(new_operands));
-        new_operands.front() = truncateBool(
-            op.getLoc(), operands.front(), rewriter);
+//         // truncate condition from i8 to i1
+//         SmallVector<Value, 4> new_operands;
+//         std::copy(operands.begin(), operands.end(),
+//                   std::back_inserter(new_operands));
+//         new_operands.front() = truncateBool(
+//             op.getLoc(), operands.front(), rewriter);
 
-        rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-            op, new_operands, op.getSuccessors(), op.getAttrs());
-        return success();
-    }
-};
+//         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
+//             op, new_operands, op.getSuccessors(), op.getAttrs());
+//         return success();
+//     }
+// };
 
-struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
-    using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
+// struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
+//     using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(ReturnOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        // drop operand if its type is the LLVM void type
-        if (operands.size() == 1
-            && operands.front().getType() == lowering.void_type) {
-            operands = llvm::None;
-        }
-        rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
-        return success();
-    }
-};
+//     LogicalResult matchAndRewrite(ReturnOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         // drop operand if its type is the LLVM void type
+//         if (operands.size() == 1
+//             && operands.front().getType() == lowering.void_type) {
+//             operands = llvm::None;
+//         }
+//         rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
+//         return success();
+//     }
+// };
 
 struct PiOpLowering : public ToUndefOpPattern<PiOp> {
     // TODO
     using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
 };
 
-struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
-    using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
+// struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
+//     using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(Intrinsic_not_int op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        jl_datatype_t* operand_type =
-            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
-        bool is_bool = operand_type == jl_bool_type;
-        uint64_t mask_value = is_bool ? 1 : -1;
-        unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
+//     LogicalResult matchAndRewrite(Intrinsic_not_int op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         jl_datatype_t* operand_type =
+//             op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+//         bool is_bool = operand_type == jl_bool_type;
+//         uint64_t mask_value = is_bool ? 1 : -1;
+//         unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
 
-        LLVM::ConstantOp mask_constant =
-            rewriter.create<LLVM::ConstantOp>(
-                op.getLoc(), operands.front().getType(),
-                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
-                                        // need APInt to do sign extension of mask
-                                        APInt(num_bits, mask_value,
-                                              /*isSigned=*/true)));
+//         LLVM::ConstantOp mask_constant =
+//             rewriter.create<LLVM::ConstantOp>(
+//                 op.getLoc(), operands.front().getType(),
+//                 rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+//                                         // need APInt to do sign extension of mask
+//                                         APInt(num_bits, mask_value,
+//                                               /*isSigned=*/true)));
 
-        rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
-            op, operands.front().getType(),
-            operands.front(), mask_constant.getResult());
+//         rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
+//             op, operands.front().getType(),
+//             operands.front(), mask_constant.getResult());
 
-        return success();
-    }
-};
+//         return success();
+//     }
+// };
 
 struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
@@ -544,19 +544,19 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     }
 };
 
-struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
-    using OpAndTypeConversionPattern<Builtin_ifelse>::OpAndTypeConversionPattern;
+// struct IfElseOpLowering : public OpAndTypeConversionPattern<Builtin_ifelse> {
+//     using OpAndTypeConversionPattern<Builtin_ifelse>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(Builtin_ifelse op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        assert(operands.size() == 3);
-        Value condition = truncateBool(op.getLoc(), operands.front(), rewriter);
-        rewriter.replaceOpWithNewOp<LLVM::SelectOp>(
-            op, condition, operands[1], operands[2]);
-        return success();
-    }
-};
+//     LogicalResult matchAndRewrite(Builtin_ifelse op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         assert(operands.size() == 3);
+//         Value condition = truncateBool(op.getLoc(), operands.front(), rewriter);
+//         rewriter.replaceOpWithNewOp<LLVM::SelectOp>(
+//             op, condition, operands[1], operands[2]);
+//         return success();
+//     }
+// };
 
 } // namespace
 
