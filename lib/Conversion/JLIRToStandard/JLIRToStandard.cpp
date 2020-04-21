@@ -133,14 +133,13 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                 rewriter.applySignatureConversion(&funcOp.getBody(), result);
 
                 // convert converted arguments back to original JLIR type
+                OpBuilder::InsertionGuard guard(rewriter);
+                rewriter.setInsertionPointToStart(&funcOp.front());
                 for (unsigned i = 0; i < type.getNumInputs(); i++) {
                     if (convertedInputs[i] != type.getInput(i)) {
                         BlockArgument argument = funcOp.getArgument(i);
-                        auto p = rewriter.saveInsertionPoint();
-                        rewriter.setInsertionPointToStart(&funcOp.front());
                         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
                             funcOp.getLoc(), type.getInput(i), argument);
-                        rewriter.restoreInsertionPoint(p);
 
                         for (OpOperand &u : argument.getUses())
                             u.get().dump();
