@@ -1,6 +1,6 @@
 add_llvm_library(MLIRJulia
   Ops.cpp
-  CallOp.cpp
+  CanonicalizationPatterns.cpp
   ADDITIONAL_HEADER_DIRS
   ${BRUTUS_INCLUDE_DIR}/JuliaOps
   )

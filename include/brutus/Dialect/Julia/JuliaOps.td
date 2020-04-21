@@ -242,6 +242,8 @@ def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
 
     let arguments = (ins AnyType:$input);
     let results = (outs AnyType:$output);
+
+    let hasCanonicalizer = 1;
 }
 
 /*  wrap and unwrap */
