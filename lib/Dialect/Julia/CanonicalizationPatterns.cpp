@@ -14,6 +14,8 @@ namespace JL_I {
 using namespace mlir;
 using namespace jlir;
 
+namespace {
+
 /// Intrinsic rewriter
 struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
     public:
@@ -89,6 +91,8 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
     }
 };
 
+} // namespace
+
 /// Register our patterns as "canonicalization" patterns on the CallOp so
 /// that they can be picked up by the Canonicalization framework.
 void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
@@ -97,5 +101,29 @@ void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
     results.insert<LowerBuiltinCallPattern>(context);
 }
 
+namespace {
 
+struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
+    using OpRewritePattern<ConvertStdOp>::OpRewritePattern;
 
+    LogicalResult matchAndRewrite(ConvertStdOp op,
+                                  PatternRewriter &rewriter) const override {
+        ConvertStdOp inputOp = dyn_cast_or_null<ConvertStdOp>(
+            op.getOperand().getDefiningOp());
+
+        if (!inputOp)
+            return failure();
+
+        assert(inputOp.getOperand().getType() == op.getResult().getType());
+
+        rewriter.replaceOp(op, {inputOp.getOperand()});
+        return success();
+    }
+};
+
+} // namespace
+
+void ConvertStdOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                               MLIRContext *context) {
+    results.insert<SimplifyRedundantConvertStdOps>(context);
+}

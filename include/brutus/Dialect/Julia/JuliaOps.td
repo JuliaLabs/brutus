@@ -234,6 +234,18 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
     ];
 }
 
+def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
+    let summary = "JLIR-Standard type conversion operation";
+    let description = [{
+        TODO
+    }];
+
+    let arguments = (ins AnyType:$input);
+    let results = (outs AnyType:$output);
+
+    let hasCanonicalizer = 1;
+}
+
 /*  wrap and unwrap */
 def JLIR_Intrinsic_bitcast : JLIR_IntrinsicBuiltinOp<"bitcast", [NoSideEffect]>;
 

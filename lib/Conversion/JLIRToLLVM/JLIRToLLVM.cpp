@@ -316,7 +316,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
 
         // insert `LLVM::UndefOp`s to start of new function to replace removed
         // arguments
-        auto p = rewriter.saveInsertionPoint();
+        OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(&new_func.front());
         for (auto &entry : to_remove) {
             unsigned index = entry.first;
@@ -326,7 +326,6 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                 converted);
             result.remapInput(index, replacement.getResult());
         }
-        rewriter.restoreInsertionPoint(p);
 
         rewriter.applySignatureConversion(&new_func.getBody(), result);
         rewriter.eraseOp(op);
