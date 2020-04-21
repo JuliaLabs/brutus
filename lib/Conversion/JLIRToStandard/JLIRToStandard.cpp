@@ -126,10 +126,9 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         rewriter.updateRootInPlace(
             funcOp,
             [&]() {
-                funcOp.setType(FunctionType::get(
-                                   convertedInputs,
-                                   convertedResults,
-                                   funcOp.getContext()));
+                funcOp.setType(FunctionType::get(convertedInputs,
+                                                 convertedResults,
+                                                 funcOp.getContext()));
                 rewriter.applySignatureConversion(&funcOp.getBody(), result);
 
                 // convert converted arguments back to original JLIR type
@@ -140,11 +139,8 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                         BlockArgument argument = funcOp.getArgument(i);
                         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
                             funcOp.getLoc(), type.getInput(i), argument);
-
-                        for (OpOperand &u : argument.getUses())
-                            u.get().dump();
-                        // argument.replaceAllUsesWith(testOp.getResult());
-                        // convertOp.setOperand(argument);
+                        rewriter.replaceUsesOfBlockArgument(
+                            argument, convertOp.getResult());
                     }
                 }
             });
