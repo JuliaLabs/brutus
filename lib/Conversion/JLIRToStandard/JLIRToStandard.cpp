@@ -13,19 +13,18 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
 
     JLIRToStandardTypeConverter(MLIRContext *ctx) : ctx(ctx) {
         addConversion(
-            [&](JuliaType t, SmallVectorImpl<Type> &results) {
+            [&](JuliaType t) -> llvm::Optional<Type> {
                 llvm::Optional<Type> converted = convert_JuliaType(t);
                 if (converted.hasValue())
-                    results.push_back(converted.getValue());
-                results.push_back(t); // always an option not to convert
-                return success();
+                    return converted.getValue();
+                return t;
             });
     }
 
     llvm::Optional<Type> convert_JuliaType(JuliaType t) {
         jl_datatype_t *jdt = t.getDatatype();
         if ((jl_value_t*)jdt == jl_bottom_type) {
-            return {};
+            return llvm::None;
         } else if (jl_is_primitivetype(jdt)) {
             return convert_bitstype(jdt);
         // } else if (jl_is_structtype(jdt)
@@ -40,7 +39,7 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
         //         results.push_back(t); // don't convert for now
         //     }
         }
-        return {};
+        return llvm::None;
     }
 
     Type convert_bitstype(jl_datatype_t *jdt) {
@@ -78,13 +77,78 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        static_assert(
-            std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
-            "expected single result op");
-        // MLIR doxygen says return types shouldn't change when using
-        // `replaceOpWithNewOp`?
-        rewriter.replaceOpWithNewOp<StdOp>(
-            op, this->lowering.convertType(op.getType()), operands, llvm::None);
+        SmallVector<Value, 4> converted_operands;
+        converted_operands.reserve(operands.size());
+        for (unsigned i = 0; i < operands.size(); i++) {
+            ConvertStdOp convert_op = rewriter.create<ConvertStdOp>(
+                op.getLoc(),
+                this->lowering.convertType(op.getOperand(i).getType()),
+                operands[i]);
+            converted_operands.push_back(convert_op.getResult());
+        }
+
+        // should I pass return type or function type? probably return type?
+        StdOp new_op = rewriter.create<StdOp>(
+            op.getLoc(),
+            this->lowering.convertType(op.getResult().getType()),
+            llvm::None);
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(
+            op, op.getResult().getType(), new_op.getResult());
+        return success();
+    }
+};
+
+// largely the same as `FuncOpSignatureConversion` in DialectConversion.cpp,
+// except that converted argument types get converted back into `JuliaType`s
+// with `ConvertStdOp`s
+struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
+    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(FuncOp funcOp,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        FunctionType type = funcOp.getType();
+
+        // convert arguments
+        TypeConverter::SignatureConversion result(type.getNumInputs());
+        for (auto &en : llvm::enumerate(type.getInputs())) {
+            if (failed(lowering.convertSignatureArg(
+                           en.index(), en.value(), result)))
+                return failure();
+        }
+        ArrayRef<Type> convertedInputs = result.getConvertedTypes();
+
+        // convert results
+        SmallVector<Type, 1> convertedResults;
+        if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
+            return failure();
+
+        rewriter.updateRootInPlace(
+            funcOp,
+            [&]() {
+                funcOp.setType(FunctionType::get(
+                                   convertedInputs,
+                                   convertedResults,
+                                   funcOp.getContext()));
+                rewriter.applySignatureConversion(&funcOp.getBody(), result);
+
+                // convert converted arguments back to original JLIR type
+                for (unsigned i = 0; i < type.getNumInputs(); i++) {
+                    if (convertedInputs[i] != type.getInput(i)) {
+                        BlockArgument argument = funcOp.getArgument(i);
+                        auto p = rewriter.saveInsertionPoint();
+                        rewriter.setInsertionPointToStart(&funcOp.front());
+                        ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+                            funcOp.getLoc(), type.getInput(i), argument);
+                        rewriter.restoreInsertionPoint(p);
+
+                        for (OpOperand &u : argument.getUses())
+                            u.get().dump();
+                        // argument.replaceAllUsesWith(testOp.getResult());
+                        // convertOp.setOperand(argument);
+                    }
+                }
+            });
         return success();
     }
 };
@@ -169,7 +233,12 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         rewriter.replaceOpWithNewOp<CondBranchOp>(
-            op, operands.front(),
+            op,
+            rewriter.create<ConvertStdOp>(
+                op.getLoc(),
+                lowering.convertType(op.getOperand(0).getType()),
+                operands.front()
+                ).getResult(),
             op.falseDest(), op.fallthroughOperands(),
             op.trueDest(), op.branchOperands());
         return success();
@@ -182,14 +251,26 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        jl_datatype_t* operand_type =
-            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
-
-        // TODO: actually check if it can be converted to a std type
-        if (!jl_is_primitivetype(operand_type))
+        // ignore if operand is not a `JuliaType`
+        JuliaType operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>();
+        if (!operand_type)
             return failure();
 
-        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, operands);
+        // check if it can be converted to a Standard type
+        llvm::Optional<Type> conversion_result =
+            lowering.convert_JuliaType(operand_type);
+        if (!conversion_result.hasValue())
+            return failure();
+
+        assert(operands.size() == 1);
+        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
+            op,
+            rewriter.create<ConvertStdOp>(
+                op.getLoc(),
+                conversion_result.getValue(),
+                operands.front()
+                ).getResult());
         return success();
     }
 };
@@ -227,15 +308,15 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
 struct JLIRToStandardLoweringPass
     : public PassWrapper<JLIRToStandardLoweringPass, FunctionPass> {
 
-    static bool isFuncOpLegal(Operation *op) {
+    static bool isFuncOpLegal(Operation *op, JLIRToStandardTypeConverter &converter) {
         FunctionType ft = cast<FuncOp>(*op).getType().cast<FunctionType>();
 
-        // for now, the function is illegal if any of its types
-        // `jl_is_primitivetype`
+        // function is illegal if any of its types can but haven't been
+        // converted
         for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
             for (Type t : ts) {
                 if (JuliaType jt = t.dyn_cast_or_null<JuliaType>()) {
-                    if (jl_is_primitivetype(jt.getDatatype()))
+                    if (converter.convert_JuliaType(jt).hasValue())
                         return false;
                 }
             }
@@ -246,16 +327,22 @@ struct JLIRToStandardLoweringPass
     void runOnFunction() final {
         ConversionTarget target(getContext());
         target.addLegalDialect<StandardOpsDialect>();
-        target.addDynamicallyLegalOp<FuncOp>(isFuncOpLegal);
+        target.addLegalOp<ConvertStdOp>();
 
         OwningRewritePatternList patterns;
         JLIRToStandardTypeConverter converter(&getContext());
 
+        target.addDynamicallyLegalOp<FuncOp>(
+            [&](Operation *op) {
+                return isFuncOpLegal(op, converter);
+            });
+
         // TODO: what if return value is to be removed?
         // TODO: check that type conversion happens for block arguments
-        populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+        // populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
         patterns.insert<
-            //    ConstantOpLowering,
+            FuncOpConversion,
+            // ConstantOpLowering,
         //     // CallOpLowering,
         //     // InvokeOpLowering,
             GotoOpLowering,
