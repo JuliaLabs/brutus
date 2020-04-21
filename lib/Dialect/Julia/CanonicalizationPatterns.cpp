@@ -114,6 +114,8 @@ struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
         if (!inputOp)
             return failure();
 
+        assert(inputOp.getOperand().getType() == op.getResult().getType());
+
         rewriter.replaceOp(op, {inputOp.getOperand()});
         return success();
     }

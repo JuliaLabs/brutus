@@ -7,6 +7,8 @@ emit_lowered(f, tt...) =
                 emit_llvm=false, # TODO: change to true when ready
                 dump_options=[Brutus.DumpLoweredToLLVM])
 
+# TODO: f(c) = 1 + (c ? 2 : 3)
+
 emit_lowered(identity, Bool)
 # CHECK: llvm.func @identity(%arg0: !llvm.i8) -> !llvm.i8
 # CHECK:   %0 = llvm.mlir.undef : !llvm.void
