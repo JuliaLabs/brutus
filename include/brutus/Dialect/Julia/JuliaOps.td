@@ -204,17 +204,7 @@ def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
 
     // The return operation takes an optional input operand to return. This
     // value must match the return type of the enclosing function.
-    let arguments = (ins Variadic<JLIR_JuliaType>:$input);
-
-    // Allow building a ReturnOp with no return operand.
-    let builders = [OpBuilder<
-        "Builder *b, OperationState &state", [{ build(b, state, llvm::None); }]
-    >];
-
-    // Provide extra utility definitions on the c++ operation class definition.
-    let extraClassDeclaration = [{
-        bool hasOperand() { return getNumOperands() != 0; }
-    }];
+    let arguments = (ins JLIR_JuliaType:$input);
 
     // Invoke a static verify method to verify this return operation.
     let verifier = [{ return ::verify(*this); }];

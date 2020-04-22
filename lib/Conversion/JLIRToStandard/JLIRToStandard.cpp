@@ -64,6 +64,31 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
     OpAndTypeConversionPattern(MLIRContext *ctx,
                                JLIRToStandardTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
+
+    Value convertValue(ConversionPatternRewriter &rewriter,
+                      Location location,
+                      Value originalValue,
+                      Value remappedOriginalValue) const {
+        JuliaType type = originalValue.getType().cast<JuliaType>();
+        ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+            location,
+            this->lowering.convert_JuliaType(type).getValue(),
+            remappedOriginalValue);
+        return convertOp.getResult();
+    }
+
+    void convertOperands(ConversionPatternRewriter &rewriter,
+                         Location location,
+                         OperandRange originalOperands,
+                         ArrayRef<Value> remappedOriginalOperands,
+                         MutableArrayRef<Value> convertedOperands) const {
+        unsigned i = 0;
+        for (Value operand : originalOperands) {
+            convertedOperands[i] = this->convertValue(
+                rewriter, location, operand, remappedOriginalOperands[i]);
+            i++;
+        }
+    }
 };
 
 template <typename SourceOp, typename StdOp>
@@ -73,32 +98,18 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        SmallVector<Value, 4> converted_operands;
-        converted_operands.reserve(operands.size());
-        for (unsigned i = 0; i < operands.size(); i++) {
-            JuliaType operandType =
-                op.getOperation()->getOperand(i)
-                .getType().template cast<JuliaType>();
-            Optional<Type> conversionResult =
-                this->lowering.convert_JuliaType(operandType);
-            assert(conversionResult.hasValue());
-            ConvertStdOp convert_op = rewriter.create<ConvertStdOp>(
-                op.getLoc(),
-                conversionResult.getValue(),
-                operands[i]);
-            converted_operands.push_back(convert_op.getResult());
-        }
+        SmallVector<Value, 4> convertedOperands(operands.size());
+        this->convertOperands(
+            rewriter, op.getLoc(),
+            op.getOperation()->getOperands(), operands,
+            convertedOperands);
 
-        // should I pass return type or function type? probably return type?
         JuliaType returnType =
             op.getResult().getType().template cast<JuliaType>();
-        Optional<Type> returnTypeConversionResult =
-            this->lowering.convert_JuliaType(returnType);
-        assert(returnTypeConversionResult.hasValue());
         StdOp new_op = rewriter.create<StdOp>(
             op.getLoc(),
-            returnTypeConversionResult.getValue(),
-            converted_operands,
+            this->lowering.convert_JuliaType(returnType).getValue(),
+            convertedOperands,
             None);
         rewriter.replaceOpWithNewOp<ConvertStdOp>(
             op, returnType, new_op.getResult());
@@ -106,80 +117,80 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-struct MoveConvertStdOpPattern : public OpAndTypeConversionPattern<ConvertStdOp> {
-    using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
+// struct MoveConvertStdOpPattern : public OpAndTypeConversionPattern<ConvertStdOp> {
+//     using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(ConvertStdOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        if (JLIRToStandardLoweringPass::isConvertStdOpLegal(op))
-            return failure();
+//     LogicalResult matchAndRewrite(ConvertStdOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         if (JLIRToStandardLoweringPass::isConvertStdOpLegal(op))
+//             return failure();
 
-        BlockArgument blockArgument = op.getOperand().cast<BlockArgument>();
-        Block *block = blockArgument.getOwner();
+//         BlockArgument blockArgument = op.getOperand().cast<BlockArgument>();
+//         Block *block = blockArgument.getOwner();
 
-        // update each predecessor
-        for (Block *predecessor : block->getPredecessors()) {
-            Operation *terminator = predecessor->getTerminator();
+//         // update each predecessor
+//         for (Block *predecessor : block->getPredecessors()) {
+//             Operation *terminator = predecessor->getTerminator();
 
-            // find which successor of the terminator's block corresponds to
-            // the block argument's block
-            unsigned successorIndex = 0;
-            while (block != terminator->getSuccessor(successorIndex)) {
-                assert(successorIndex < terminator->getNumSuccessors());
-                successorIndex++;
-            }
+//             // find which successor of the terminator's block corresponds to
+//             // the block argument's block
+//             unsigned successorIndex = 0;
+//             while (block != terminator->getSuccessor(successorIndex)) {
+//                 assert(successorIndex < terminator->getNumSuccessors());
+//                 successorIndex++;
+//             }
 
-            // find operand in terminator corresponding to the block argument
-            unsigned operandIndex = 0;
-            if (isa<GotoOp>(terminator)) {
-                operandIndex = blockArgument.getArgNumber();
-            } else {
-                assert(isa<GotoIfNotOp>(terminator));
-                DenseIntElementsAttr operandSegmentSizesAttr = 
-                    terminator->getAttrOfType<DenseIntElementsAttr>(
-                        "operand_segment_sizes");
-                assert(operandSegmentSizesAttr);
-                unsigned segment = 0;
-                for (uint32_t segmentSize
-                         : operandSegmentSizesAttr.getValues<uint32_t>()) {
-                    // the first operand segment is for proper arguments to the
-                    // terminator, the following operand segments are operands
-                    // for successors
-                    if (segment < successorIndex + 1)
-                        operandIndex += segmentSize;
-                    else
-                        break;
-                    segment++;
-                }
-                assert(segment == successorIndex + 1
-                       && "successorIndex + 1 > number of segments");
-                operandIndex += blockArgument.getArgNumber();
-            }
-            Value operand = terminator->getOperand(operandIndex);
+//             // find operand in terminator corresponding to the block argument
+//             unsigned operandIndex = 0;
+//             if (isa<GotoOp>(terminator)) {
+//                 operandIndex = blockArgument.getArgNumber();
+//             } else {
+//                 assert(isa<GotoIfNotOp>(terminator));
+//                 DenseIntElementsAttr operandSegmentSizesAttr = 
+//                     terminator->getAttrOfType<DenseIntElementsAttr>(
+//                         "operand_segment_sizes");
+//                 assert(operandSegmentSizesAttr);
+//                 unsigned segment = 0;
+//                 for (uint32_t segmentSize
+//                          : operandSegmentSizesAttr.getValues<uint32_t>()) {
+//                     // the first operand segment is for proper arguments to the
+//                     // terminator, the following operand segments are operands
+//                     // for successors
+//                     if (segment < successorIndex + 1)
+//                         operandIndex += segmentSize;
+//                     else
+//                         break;
+//                     segment++;
+//                 }
+//                 assert(segment == successorIndex + 1
+//                        && "successorIndex + 1 > number of segments");
+//                 operandIndex += blockArgument.getArgNumber();
+//             }
+//             Value operand = terminator->getOperand(operandIndex);
 
-            // clone the `ConvertStdOp` to the predecessor (before its
-            // terminator), then set its operand to the corresponding operand
-            // in the terminator
-            OpBuilder::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPoint(terminator);
-            rewriter.clone(op);
+//             // clone the `ConvertStdOp` to the predecessor (before its
+//             // terminator), then set its operand to the corresponding operand
+//             // in the terminator
+//             OpBuilder::InsertionGuard guard(rewriter);
+//             rewriter.setInsertionPoint(terminator);
+//             rewriter.clone(op);
 
-            // // clone `ConvertStdOp` to predecessor, before terminator,
-            // // remapping its operand to the corresponding operand in terminator
-            // OpBuilder::InsertionGuard guard(rewriter);
-            // rewriter.setInsertionPoint(terminator);
-            // rewriter.clone(op);
+//             // // clone `ConvertStdOp` to predecessor, before terminator,
+//             // // remapping its operand to the corresponding operand in terminator
+//             // OpBuilder::InsertionGuard guard(rewriter);
+//             // rewriter.setInsertionPoint(terminator);
+//             // rewriter.clone(op);
 
-            // // replace corresponding operand in terminator
-            // // TODO
-        }
+//             // // replace corresponding operand in terminator
+//             // // TODO
+//         }
 
-        // replace original `ConvertStdOp` with block argument
-        rewriter.replaceOp(op, blockArgument);
-        return success();
-    }
-};
+//         // replace original `ConvertStdOp` with block argument
+//         rewriter.replaceOp(op, blockArgument);
+//         return success();
+//     }
+// };
 
 // largely the same as `FuncOpSignatureConversion` in DialectConversion.cpp,
 // except that converted argument types get converted back into `JuliaType`s
@@ -306,10 +317,11 @@ struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
     LogicalResult matchAndRewrite(GotoOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // TODO: f(c) = 1 + (c ? 2 : 3)
-
-        rewriter.replaceOpWithNewOp<BranchOp>(op, op.getSuccessor(), operands);
-        // TODO: convert the operands!!!
+        SmallVector<Value, 4> convertedOperands(operands.size());
+        convertOperands(
+            rewriter, op.getLoc(), op.getOperands(), operands, convertedOperands);
+        rewriter.replaceOpWithNewOp<BranchOp>(
+            op, op.getSuccessor(), convertedOperands);
         return success();
     }
 };
@@ -320,15 +332,28 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     LogicalResult matchAndRewrite(GotoIfNotOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
+        unsigned nOperands = op.getNumOperands();
+        unsigned nBranchOperands = op.branchOperands().size();
+        unsigned nFallthroughOperands = op.fallthroughOperands().size();
+
+        SmallVector<Value, 4> convertedBranchOperands(nBranchOperands);
+        SmallVector<Value, 4> convertedFallthroughOperands(nFallthroughOperands);
+        convertOperands(
+            rewriter, op.getLoc(),
+            op.branchOperands(), operands.slice(nOperands, nBranchOperands),
+            convertedBranchOperands);
+        convertOperands(
+            rewriter, op.getLoc(),
+            op.fallthroughOperands(),
+            operands.slice(nOperands + nBranchOperands, nFallthroughOperands),
+            convertedFallthroughOperands);
+
         rewriter.replaceOpWithNewOp<CondBranchOp>(
             op,
-            rewriter.create<ConvertStdOp>(
-                op.getLoc(),
-                lowering.convertType(op.getOperand(0).getType()),
-                operands.front()
-                ).getResult(),
-            op.falseDest(), op.fallthroughOperands(),
-            op.trueDest(), op.branchOperands());
+            convertValue(
+                rewriter, op.getLoc(), op.getOperand(0), operands.front()),
+            op.falseDest(), convertedFallthroughOperands,
+            op.trueDest(), convertedBranchOperands);
         return success();
     }
 };
@@ -339,26 +364,15 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
+        Value oldOperand = op.getOperand();
+
         // ignore if operand is not a `JuliaType`
-        JuliaType operand_type =
-            op.getOperand(0).getType().dyn_cast<JuliaType>();
-        if (!operand_type)
+        if (!oldOperand.getType().isa<JuliaType>())
             return failure();
 
-        // check if it can be converted to a Standard type
-        llvm::Optional<Type> conversion_result =
-            lowering.convert_JuliaType(operand_type);
-        if (!conversion_result.hasValue())
-            return failure();
-
-        assert(operands.size() == 1);
         rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
             op,
-            rewriter.create<ConvertStdOp>(
-                op.getLoc(),
-                conversion_result.getValue(),
-                operands.front()
-                ).getResult());
+            convertValue(rewriter, op.getLoc(), oldOperand, operands.front()));
         return success();
     }
 };
@@ -435,7 +449,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     // TODO: check that type conversion happens for block arguments
     // populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        MoveConvertStdOpPattern,
+        // MoveConvertStdOpPattern,
         FuncOpConversion,
         ConstantOpLowering,
         // CallOpLowering,

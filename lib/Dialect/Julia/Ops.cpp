@@ -95,33 +95,18 @@ static mlir::LogicalResult verify(ReturnOp op) {
     // trait attached to the operation definition.
     auto function = cast<FuncOp>(op.getParentOp());
 
-    /// ReturnOps can only have a single optional operand.
-    if (op.getNumOperands() > 1)
-        return op.emitOpError() << "expects at most 1 return operand";
-
-    // The operand number and types must match the function signature.
     const auto &results = function.getType().getResults();
-    if (op.getNumOperands() != results.size())
-        return op.emitOpError()
-            << "does not return the same number of values ("
-            << op.getNumOperands() << ") as the enclosing function ("
-            << results.size() << ")";
+    if (results.size() != 1)
+        return function.emitOpError() << "does not return exactly one value";
 
-    // If the operation does not have an input, we are done.
-    if (!op.hasOperand())
-        return mlir::success();
+    // check that result type of function matches the operand type
+    if (results.front() != op.getOperand().getType())
+        return op.emitError() << "type of return operand ("
+                              << op.getOperand().getType()
+                              << ") doesn't match function result type ("
+                              << results.front() << ")";
 
-    auto inputType = *op.operand_type_begin();
-    auto resultType = results.front();
-
-    // Check that the result type of the function matches the operand type.
-    if (inputType == resultType)
-        return mlir::success();
-
-    return op.emitError() << "type of return operand ("
-                          << *op.operand_type_begin()
-                          << ") doesn't match function result type ("
-                          << results.front() << ")";
+    return success();
 }
 
 //===----------------------------------------------------------------------===//
