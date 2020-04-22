@@ -217,6 +217,19 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
             return failure();
 
+        // convert converted arguments back to original JLIR type
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(&funcOp.front());
+        for (unsigned i = 0; i < type.getNumInputs(); i++) {
+            if (convertedInputs[i] != type.getInput(i)) {
+                BlockArgument argument = funcOp.getArgument(i);
+                ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+                    funcOp.getLoc(), type.getInput(i), argument);
+                rewriter.replaceUsesOfBlockArgument(
+                    argument, convertOp.getResult());
+            }
+        }
+
         rewriter.updateRootInPlace(
             funcOp,
             [&]() {
@@ -225,18 +238,27 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                                                  funcOp.getContext()));
                 rewriter.applySignatureConversion(&funcOp.getBody(), result);
 
-                // convert converted arguments back to original JLIR type
-                OpBuilder::InsertionGuard guard(rewriter);
-                rewriter.setInsertionPointToStart(&funcOp.front());
-                for (unsigned i = 0; i < type.getNumInputs(); i++) {
-                    if (convertedInputs[i] != type.getInput(i)) {
-                        BlockArgument argument = funcOp.getArgument(i);
-                        ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
-                            funcOp.getLoc(), type.getInput(i), argument);
-                        rewriter.replaceUsesOfBlockArgument(
-                            argument, convertOp.getResult());
-                    }
-                }
+                // // convert converted block arguments back to original JLIR type
+                // for (Block &block : funcOp.getBlocks()) {
+                //     OpBuilder::InsertionGuard guard(rewriter);
+                //     rewriter.setInsertionPointToStart(&block);
+                //     for (BlockArgument &argument : block.getArguments()) {
+                //         if (auto t = argument.getType().dyn_cast<JuliaType>()) {
+                //             Optional<Type> conversionResult =
+                //                 lowering.convert_JuliaType(t);
+                //             // if (conversionResult.hasValue()) {
+                //                 ConvertStdOp convertOp =
+                //                     rewriter.create<ConvertStdOp>(
+                //                         rewriter.getUnknownLoc(), // is there a better loc?
+                //                         argument.getType(),
+                //                         argument);
+                //                 rewriter.replaceUsesOfBlockArgument(
+                //                     argument, convertOp.getResult());
+                //             // }
+                //         }
+                //     }
+                // }
+
             });
         return success();
     }
