@@ -20,7 +20,6 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
 struct JLIRToStandardLoweringPass
     : public PassWrapper<JLIRToStandardLoweringPass, FunctionPass> {
 
-    static bool isConvertStdOpLegal(ConvertStdOp op);
     static bool isFuncOpLegal(FuncOp op, JLIRToStandardTypeConverter &converter);
     void runOnFunction() final;
 };

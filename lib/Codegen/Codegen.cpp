@@ -432,7 +432,7 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
 
     // lower to Standard dialect
 
-    llvm::DebugFlag = true;
+    // llvm::DebugFlag = true;
     mlir::PassManager loweringToStdPM(&context);
     loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
     // canonicalize again to remove redundant `ConvertStdOp`s

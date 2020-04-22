@@ -173,7 +173,7 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let arguments = (ins JLIR_JuliaType:$condition,
                      Variadic<JLIR_JuliaType>:$branchOperands,
                      Variadic<JLIR_JuliaType>:$fallthroughOperands);
-    let successors = (successor AnySuccessor:$falseDest, AnySuccessor:$trueDest);
+    let successors = (successor AnySuccessor:$branchDest, AnySuccessor:$fallthroughDest);
 
     let builders = [
         OpBuilder<"Builder *builder, OperationState &state, Value condition,"

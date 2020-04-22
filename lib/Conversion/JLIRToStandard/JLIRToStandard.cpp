@@ -9,13 +9,12 @@ using namespace jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    addConversion(
-        [&](JuliaType t) -> llvm::Optional<Type> {
-            llvm::Optional<Type> converted = convert_JuliaType(t);
-            if (converted.hasValue())
-                return converted.getValue();
-            return t;
-        });
+    addConversion([&](JuliaType t) -> llvm::Optional<Type> {
+        llvm::Optional<Type> converted = convert_JuliaType(t);
+        if (converted.hasValue())
+            return converted.getValue();
+        return t;
+    });
 }
 
 Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
@@ -117,84 +116,9 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-// struct MoveConvertStdOpPattern : public OpAndTypeConversionPattern<ConvertStdOp> {
-//     using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
-
-//     LogicalResult matchAndRewrite(ConvertStdOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         if (JLIRToStandardLoweringPass::isConvertStdOpLegal(op))
-//             return failure();
-
-//         BlockArgument blockArgument = op.getOperand().cast<BlockArgument>();
-//         Block *block = blockArgument.getOwner();
-
-//         // update each predecessor
-//         for (Block *predecessor : block->getPredecessors()) {
-//             Operation *terminator = predecessor->getTerminator();
-
-//             // find which successor of the terminator's block corresponds to
-//             // the block argument's block
-//             unsigned successorIndex = 0;
-//             while (block != terminator->getSuccessor(successorIndex)) {
-//                 assert(successorIndex < terminator->getNumSuccessors());
-//                 successorIndex++;
-//             }
-
-//             // find operand in terminator corresponding to the block argument
-//             unsigned operandIndex = 0;
-//             if (isa<GotoOp>(terminator)) {
-//                 operandIndex = blockArgument.getArgNumber();
-//             } else {
-//                 assert(isa<GotoIfNotOp>(terminator));
-//                 DenseIntElementsAttr operandSegmentSizesAttr = 
-//                     terminator->getAttrOfType<DenseIntElementsAttr>(
-//                         "operand_segment_sizes");
-//                 assert(operandSegmentSizesAttr);
-//                 unsigned segment = 0;
-//                 for (uint32_t segmentSize
-//                          : operandSegmentSizesAttr.getValues<uint32_t>()) {
-//                     // the first operand segment is for proper arguments to the
-//                     // terminator, the following operand segments are operands
-//                     // for successors
-//                     if (segment < successorIndex + 1)
-//                         operandIndex += segmentSize;
-//                     else
-//                         break;
-//                     segment++;
-//                 }
-//                 assert(segment == successorIndex + 1
-//                        && "successorIndex + 1 > number of segments");
-//                 operandIndex += blockArgument.getArgNumber();
-//             }
-//             Value operand = terminator->getOperand(operandIndex);
-
-//             // clone the `ConvertStdOp` to the predecessor (before its
-//             // terminator), then set its operand to the corresponding operand
-//             // in the terminator
-//             OpBuilder::InsertionGuard guard(rewriter);
-//             rewriter.setInsertionPoint(terminator);
-//             rewriter.clone(op);
-
-//             // // clone `ConvertStdOp` to predecessor, before terminator,
-//             // // remapping its operand to the corresponding operand in terminator
-//             // OpBuilder::InsertionGuard guard(rewriter);
-//             // rewriter.setInsertionPoint(terminator);
-//             // rewriter.clone(op);
-
-//             // // replace corresponding operand in terminator
-//             // // TODO
-//         }
-
-//         // replace original `ConvertStdOp` with block argument
-//         rewriter.replaceOp(op, blockArgument);
-//         return success();
-//     }
-// };
-
 // largely the same as `FuncOpSignatureConversion` in DialectConversion.cpp,
-// except that converted argument types get converted back into `JuliaType`s
-// with `ConvertStdOp`s
+// except that type-converted block arguments get converted back into
+// `JuliaType`s with `ConvertStdOp`s
 struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
@@ -217,49 +141,36 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
             return failure();
 
-        // convert converted arguments back to original JLIR type
-        OpBuilder::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(&funcOp.front());
-        for (unsigned i = 0; i < type.getNumInputs(); i++) {
-            if (convertedInputs[i] != type.getInput(i)) {
-                BlockArgument argument = funcOp.getArgument(i);
-                ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
-                    funcOp.getLoc(), type.getInput(i), argument);
-                rewriter.replaceUsesOfBlockArgument(
-                    argument, convertOp.getResult());
+        // convert converted block arguments back to original JLIR type
+        for (Block &block : funcOp.getBlocks()) {
+            OpBuilder::InsertionGuard guard(rewriter);
+            rewriter.setInsertionPointToStart(&block);
+            for (BlockArgument &argument : block.getArguments()) {
+                // only convert arguments that would have had their type
+                // converted
+                if (auto t = argument.getType().dyn_cast<JuliaType>()) {
+                    Optional<Type> conversionResult =
+                        lowering.convert_JuliaType(t);
+                    if (conversionResult.hasValue()) {
+                        ConvertStdOp convertOp =
+                            rewriter.create<ConvertStdOp>(
+                                // is there a better location we can use?
+                                rewriter.getUnknownLoc(),
+                                argument.getType(),
+                                argument);
+                        rewriter.replaceUsesOfBlockArgument(
+                            argument, convertOp.getResult());
+                    }
+                }
             }
         }
 
-        rewriter.updateRootInPlace(
-            funcOp,
-            [&]() {
-                funcOp.setType(FunctionType::get(convertedInputs,
-                                                 convertedResults,
-                                                 funcOp.getContext()));
-                rewriter.applySignatureConversion(&funcOp.getBody(), result);
-
-                // // convert converted block arguments back to original JLIR type
-                // for (Block &block : funcOp.getBlocks()) {
-                //     OpBuilder::InsertionGuard guard(rewriter);
-                //     rewriter.setInsertionPointToStart(&block);
-                //     for (BlockArgument &argument : block.getArguments()) {
-                //         if (auto t = argument.getType().dyn_cast<JuliaType>()) {
-                //             Optional<Type> conversionResult =
-                //                 lowering.convert_JuliaType(t);
-                //             // if (conversionResult.hasValue()) {
-                //                 ConvertStdOp convertOp =
-                //                     rewriter.create<ConvertStdOp>(
-                //                         rewriter.getUnknownLoc(), // is there a better loc?
-                //                         argument.getType(),
-                //                         argument);
-                //                 rewriter.replaceUsesOfBlockArgument(
-                //                     argument, convertOp.getResult());
-                //             // }
-                //         }
-                //     }
-                // }
-
-            });
+        rewriter.updateRootInPlace(funcOp, [&]() {
+            funcOp.setType(FunctionType::get(convertedInputs,
+                                             convertedResults,
+                                             funcOp.getContext()));
+            rewriter.applySignatureConversion(&funcOp.getBody(), result);
+        });
         return success();
     }
 };
@@ -374,8 +285,8 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
             op,
             convertValue(
                 rewriter, op.getLoc(), op.getOperand(0), operands.front()),
-            op.falseDest(), convertedFallthroughOperands,
-            op.trueDest(), convertedBranchOperands);
+            op.fallthroughDest(), convertedFallthroughOperands,
+            op.branchDest(), convertedBranchOperands);
         return success();
     }
 };
@@ -429,14 +340,6 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
 
 } // namespace
 
-bool JLIRToStandardLoweringPass::isConvertStdOpLegal(ConvertStdOp op) {
-    // mark conversion illegal if its operand is a block argument, unless
-    // that block has no predecessors, so as to trigger pattern that moves
-    // this conversion into predecessors
-    BlockArgument operand = op.getOperand().dyn_cast<BlockArgument>();
-    return !operand || operand.getOwner()->hasNoPredecessors();
-}
-
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
     FuncOp op, JLIRToStandardTypeConverter &converter) {
 
@@ -461,17 +364,12 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     OwningRewritePatternList patterns;
 
     target.addLegalDialect<StandardOpsDialect>();
-    target.addDynamicallyLegalOp<ConvertStdOp>(isConvertStdOpLegal);
-    target.addDynamicallyLegalOp<FuncOp>(
-        [&](FuncOp op) {
-            return isFuncOpLegal(op, converter);
-        });
+    target.addLegalOp<ConvertStdOp>();
+    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+        return isFuncOpLegal(op, converter);
+    });
 
-    // TODO: what if return value is to be removed?
-    // TODO: check that type conversion happens for block arguments
-    // populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        // MoveConvertStdOpPattern,
         FuncOpConversion,
         ConstantOpLowering,
         // CallOpLowering,
