@@ -5,6 +5,15 @@ configure_lit_site_cfg(
   ${CMAKE_CURRENT_SOURCE_DIR}/lit.cfg.py
 )
 
+add_custom_target(precompile-brutus
+    COMMAND
+        ${Julia_EXECUTABLE} --project=${BRUTUS_SOURCE_DIR}/Brutus -e "using Pkg; pkg\"instantiate\"; pkg\"precompile\""
+    DEPENDS
+    brutus
+    VERBATIM
+)
+
+
 add_lit_testsuite(check-brutus "Running the brutus tests"
   ${CMAKE_CURRENT_BINARY_DIR}
   #LIT ${LLVM_LIT}
@@ -12,5 +21,6 @@ add_lit_testsuite(check-brutus "Running the brutus tests"
   FileCheck 
   brutus
   count
+  precompile-brutus
   not
   )
