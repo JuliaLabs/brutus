@@ -41,7 +41,7 @@ class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
     let results = (outs JLIR_JuliaType);
 
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_datatype_t *type, ArrayRef<Value> arguments">
     ];
 }
@@ -75,7 +75,7 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
 
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_datatype_t *type = jl_any_type">
     ];
 }
@@ -88,7 +88,7 @@ def UndefOp : JLIR_Op<"undef"> {
 
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state">
+        OpBuilder<"OpBuilder &builder, OperationState &state">
     ];
 }
 
@@ -101,7 +101,7 @@ def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
     let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_value_t *value, jl_datatype_t *type = jl_any_type">
     ];
 
@@ -124,7 +124,7 @@ def CallOp : JLIR_Op<"call"> {
 
     // Add custom build methods for the generic call operation.
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_datatype_t *type, Value callee, ArrayRef<Value> arguments">
     ];
 
@@ -142,7 +142,7 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let results = (outs JLIR_JuliaType);
 
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_method_instance_t *methodInstance,"
                   "ArrayRef<Value> arguments">
     ];
@@ -158,7 +158,7 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
     let successors = (successor AnySuccessor:$dest);
 
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state, Block *dest,"
+        OpBuilder<"OpBuilder &builder, OperationState &state, Block *dest,"
                   "ValueRange operands = {}",
                   [{ build(builder, state, operands, dest); }]>
     ];
@@ -173,10 +173,10 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let arguments = (ins JLIR_JuliaType:$condition,
                      Variadic<JLIR_JuliaType>:$branchOperands,
                      Variadic<JLIR_JuliaType>:$fallthroughOperands);
-    let successors = (successor AnySuccessor:$falseDest, AnySuccessor:$trueDest);
+    let successors = (successor AnySuccessor:$branchDest, AnySuccessor:$fallthroughDest);
 
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state, Value condition,"
+        OpBuilder<"OpBuilder &builder, OperationState &state, Value condition,"
                   "Block *branchDest, ValueRange branchOperands,"
                   "Block *fallthroughDest, ValueRange fallthroughOperands",
                   [{
@@ -204,17 +204,7 @@ def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
 
     // The return operation takes an optional input operand to return. This
     // value must match the return type of the enclosing function.
-    let arguments = (ins Variadic<JLIR_JuliaType>:$input);
-
-    // Allow building a ReturnOp with no return operand.
-    let builders = [OpBuilder<
-        "Builder *b, OperationState &state", [{ build(b, state, llvm::None); }]
-    >];
-
-    // Provide extra utility definitions on the c++ operation class definition.
-    let extraClassDeclaration = [{
-        bool hasOperand() { return getNumOperands() != 0; }
-    }];
+    let arguments = (ins JLIR_JuliaType:$input);
 
     // Invoke a static verify method to verify this return operation.
     let verifier = [{ return ::verify(*this); }];
@@ -229,7 +219,7 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
     let arguments = (ins JLIR_JuliaType:$input);
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilder<"Builder *builder, OperationState &state,"
+        OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "Value value, jl_datatype_t *type">
     ];
 }
