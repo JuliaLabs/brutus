@@ -18,9 +18,12 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx)
         pjlvalue(jlvalue.getPointerTo()) {
 
     assert(llvm_dialect && "LLVM IR dialect is not registered");
-    addConversion(
-        [&](JuliaType jt) {
-            return julia_type_to_llvm((jl_value_t*)jt.getDatatype()); });
+    addConversion([&](JuliaType jt) {
+        return julia_type_to_llvm((jl_value_t*)jt.getDatatype());
+    });
+
+    // TESTING
+    void_type = pjlvalue;
 }
 
 LLVM::LLVMType JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
@@ -66,11 +69,6 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::julia_struct_to_llvm(jl_value_t *jt) {
 }
 
 LLVM::LLVMType JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt) {
-    // this function converts a Julia Type into the equivalent LLVM type
-
-    // TODO: something special needs to happen for functions, which right
-    //       now will just get turned into `void_type`
-
     if (jt == jl_bottom_type || jt == (jl_value_t*)jl_void_type)
         return void_type;
     if (jl_is_concrete_immutable(jt)) {
@@ -255,71 +253,83 @@ struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
 //                          LLVM::FCmpPredicate, predicate>::ToCmpOpPattern;
 // };
 
-struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
-    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
+struct ConvertStdOpLowering : public OpAndTypeConversionPattern<ConvertStdOp> {
+    using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(FuncOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        FunctionType type = op.getType();
-
-        // convert return type
-        assert(type.getNumResults() == 1);
-        LLVM::LLVMType new_return_type =
-            lowering.convertType(type.getResults().front()).cast<LLVM::LLVMType>();
-        assert(new_return_type && "failed to convert return type");
-
-        // convert argument types
-        SmallVector<LLVM::LLVMType, 8> new_arg_types;
-        new_arg_types.reserve(op.getNumArguments());
-        SmallVector<std::pair<unsigned, Type>, 4> to_remove;
-        TypeConverter::SignatureConversion result(op.getNumArguments());
-        for (auto &en : llvm::enumerate(type.getInputs())) {
-            LLVM::LLVMType converted =
-                lowering.convertType(en.value()).cast<LLVM::LLVMType>();
-            assert(converted && "failed to convert argument type");
-
-            // drop argument if it converts to void type
-            if (converted == lowering.void_type) {
-                // record that we need to remap it to an undef later, once we
-                // have actually created the new function in which to add the
-                // `LLVM::UndefOp`s
-                to_remove.emplace_back(en.index(), converted);
-                continue;
-            }
-
-            new_arg_types.push_back(converted);
-            result.addInputs(en.index(), converted);
-        }
-
-        // create new function operation
-        LLVM::LLVMType llvm_type = LLVM::LLVMType::getFunctionTy(
-            new_return_type,
-            new_arg_types,
-            /*isVarArg=*/false);
-        LLVM::LLVMFuncOp new_func = rewriter.create<LLVM::LLVMFuncOp>(
-            op.getLoc(), op.getName(), llvm_type, LLVM::Linkage::External);
-        rewriter.inlineRegionBefore(
-            op.getBody(), new_func.getBody(), new_func.end());
-
-        // insert `LLVM::UndefOp`s to start of new function to replace removed
-        // arguments
-        OpBuilder::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(&new_func.front());
-        for (auto &entry : to_remove) {
-            unsigned index = entry.first;
-            Type converted = entry.second;
-            LLVM::UndefOp replacement = rewriter.create<LLVM::UndefOp>(
-                new_func.getArgument(index).getLoc(), // get location from old argument
-                converted);
-            result.remapInput(index, replacement.getResult());
-        }
-
-        rewriter.applySignatureConversion(&new_func.getBody(), result);
-        rewriter.eraseOp(op);
+    LogicalResult
+    matchAndRewrite(ConvertStdOp op,
+                    ArrayRef<Value> operands,
+                    ConversionPatternRewriter &rewriter) const override {
+        rewriter.replaceOp(op, operands.front());
         return success();
     }
 };
+
+// struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
+//     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
+
+//     LogicalResult matchAndRewrite(FuncOp op,
+//                                   ArrayRef<Value> operands,
+//                                   ConversionPatternRewriter &rewriter) const override {
+//         FunctionType type = op.getType();
+
+//         // convert return type
+//         assert(type.getNumResults() == 1);
+//         LLVM::LLVMType new_return_type =
+//             lowering.convertType(type.getResults().front()).cast<LLVM::LLVMType>();
+//         assert(new_return_type && "failed to convert return type");
+
+//         // convert argument types
+//         SmallVector<LLVM::LLVMType, 8> new_arg_types;
+//         new_arg_types.reserve(op.getNumArguments());
+//         SmallVector<std::pair<unsigned, Type>, 4> to_remove;
+//         TypeConverter::SignatureConversion result(op.getNumArguments());
+//         for (auto &en : llvm::enumerate(type.getInputs())) {
+//             LLVM::LLVMType converted =
+//                 lowering.convertType(en.value()).cast<LLVM::LLVMType>();
+//             assert(converted && "failed to convert argument type");
+
+//             // drop argument if it converts to void type
+//             if (converted == lowering.void_type) {
+//                 // record that we need to remap it to an undef later, once we
+//                 // have actually created the new function in which to add the
+//                 // `LLVM::UndefOp`s
+//                 to_remove.emplace_back(en.index(), converted);
+//                 continue;
+//             }
+
+//             new_arg_types.push_back(converted);
+//             result.addInputs(en.index(), converted);
+//         }
+
+//         // create new function operation
+//         LLVM::LLVMType llvm_type = LLVM::LLVMType::getFunctionTy(
+//             new_return_type,
+//             new_arg_types,
+//             /*isVarArg=*/false);
+//         LLVM::LLVMFuncOp new_func = rewriter.create<LLVM::LLVMFuncOp>(
+//             op.getLoc(), op.getName(), llvm_type, LLVM::Linkage::External);
+//         rewriter.inlineRegionBefore(
+//             op.getBody(), new_func.getBody(), new_func.end());
+
+//         // insert `LLVM::UndefOp`s to start of new function to replace removed
+//         // arguments
+//         OpBuilder::InsertionGuard guard(rewriter);
+//         rewriter.setInsertionPointToStart(&new_func.front());
+//         for (auto &entry : to_remove) {
+//             unsigned index = entry.first;
+//             Type converted = entry.second;
+//             LLVM::UndefOp replacement = rewriter.create<LLVM::UndefOp>(
+//                 new_func.getArgument(index).getLoc(), // get location from old argument
+//                 converted);
+//             result.remapInput(index, replacement.getResult());
+//         }
+
+//         rewriter.applySignatureConversion(&new_func.getBody(), result);
+//         rewriter.eraseOp(op);
+//         return success();
+//     }
+// };
 
 struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
@@ -453,33 +463,33 @@ struct PiOpLowering : public ToUndefOpPattern<PiOp> {
     using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
 };
 
-// struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
-//     using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
+struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
+    using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
 
-//     LogicalResult matchAndRewrite(Intrinsic_not_int op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         jl_datatype_t* operand_type =
-//             op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
-//         bool is_bool = operand_type == jl_bool_type;
-//         uint64_t mask_value = is_bool ? 1 : -1;
-//         unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
+    LogicalResult matchAndRewrite(Intrinsic_not_int op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t* operand_type =
+            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
+        bool is_bool = operand_type == jl_bool_type;
+        uint64_t mask_value = is_bool ? 1 : -1;
+        unsigned num_bits = 8 * (is_bool ? 1 : jl_datatype_size(operand_type));
 
-//         LLVM::ConstantOp mask_constant =
-//             rewriter.create<LLVM::ConstantOp>(
-//                 op.getLoc(), operands.front().getType(),
-//                 rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
-//                                         // need APInt to do sign extension of mask
-//                                         APInt(num_bits, mask_value,
-//                                               /*isSigned=*/true)));
+        LLVM::ConstantOp mask_constant =
+            rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(), operands.front().getType(),
+                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+                                        // need APInt to do sign extension of mask
+                                        APInt(num_bits, mask_value,
+                                              /*isSigned=*/true)));
 
-//         rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
-//             op, operands.front().getType(),
-//             operands.front(), mask_constant.getResult());
+        rewriter.replaceOpWithNewOp<LLVM::XOrOp>(
+            op, operands.front().getType(),
+            operands.front(), mask_constant.getResult());
 
-//         return success();
-//     }
-// };
+        return success();
+    }
+};
 
 struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
@@ -559,11 +569,13 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     OwningRewritePatternList patterns;
     JLIRToLLVMTypeConverter converter(&getContext());
     populateStdToLLVMConversionPatterns(converter, patterns);
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        FuncOpConversion,
+        ConvertStdOpLowering,
+        // FuncOpConversion,
         ToUndefOpPattern<UnimplementedOp>,
         ToUndefOpPattern<UndefOp>,
-        ConstantOpLowering
+        ConstantOpLowering,
     //     CallOpLowering,
     //     InvokeOpLowering,
     //     GotoIfNotOpLowering,
@@ -609,7 +621,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     //     ToLLVMOpPattern<Intrinsic_and_int, LLVM::AndOp>,
     //     ToLLVMOpPattern<Intrinsic_or_int, LLVM::OrOp>,
     //     ToLLVMOpPattern<Intrinsic_xor_int, LLVM::XOrOp>,
-    //     NotIntOpLowering, // Intrinsic_not_int
+        NotIntOpLowering, // Intrinsic_not_int
     //     // Intrinsic_shl_int
     //     // Intrinsic_lshr_int
     //     // Intrinsic_ashr_int
@@ -652,11 +664,11 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     //     // Intrinsic_arraylen
     //     // Intrinsic_cglobal_auto
     //     // Builtin_throw
-    //     IsOpLowering, // Builtin_is
+        IsOpLowering, // Builtin_is
     //     // Builtin_typeof
     //     // Builtin_sizeof
     //     // Builtin_issubtype
-    //     ToUndefOpPattern<Builtin_isa>, // Builtin_isa
+        ToUndefOpPattern<Builtin_isa>, // Builtin_isa
     //     // Builtin__apply
     //     // Builtin__apply_pure
     //     // Builtin__apply_latest
@@ -665,7 +677,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     //     // Builtin_nfields
     //     // Builtin_tuple
     //     // Builtin_svec
-    //     ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
+        ToUndefOpPattern<Builtin_getfield> // Builtin_getfield
     //     // Builtin_setfield
     //     // Builtin_fieldtype
     //     // Builtin_arrayref

@@ -7,6 +7,7 @@ function __init__()
 end
 
 @enum DumpOption::UInt8 begin
+    DumpIRCode        = 0
     DumpTranslated    = 1
     DumpOptimized     = 2
     DumpLoweredToStd  = 4
@@ -25,6 +26,12 @@ function emit(@nospecialize(ft), @nospecialize(tt);
     matches = code_ircode_by_signature(Tuple{ft, tt...})
     @assert length(matches) > 0 "no method instances matching given signature"
     IR, rt = first(matches)
+
+    if DumpIRCode in dump_options
+        println("return type: ", rt)
+        println("IRCode:\n")
+        println(IR)
+    end
 
     # generate LLVM bitcode and load it
     dump_flags = reduce(|, map(UInt8, dump_options), init=0)

@@ -83,6 +83,13 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
                          MutableArrayRef<Value> convertedOperands) const {
         unsigned i = 0;
         for (Value operand : originalOperands) {
+            // // make sure that new, remapped operand is not a block argument
+            // // that should have been converted
+            // Type remappedOperandType = remappedOriginalOperands[i].getType();
+            // assert(!(remappedOperandType.isa<BlockArgument>()
+            //          && lowering.convert_JuliaType(
+            //              remappedOperandType).hasValue()));
+
             convertedOperands[i] = this->convertValue(
                 rewriter, location, operand, remappedOriginalOperands[i]);
             i++;
@@ -154,7 +161,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                     if (conversionResult.hasValue()) {
                         ConvertStdOp convertOp =
                             rewriter.create<ConvertStdOp>(
-                                // is there a better location we can use?
+                                // is there a reasonable location we can use?
                                 rewriter.getUnknownLoc(),
                                 argument.getType(),
                                 argument);
@@ -179,12 +186,20 @@ template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predi
 struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(SourceOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
+    LogicalResult
+    matchAndRewrite(SourceOp op,
+                    ArrayRef<Value> operands,
+                    ConversionPatternRewriter &rewriter) const override {
+
         assert(operands.size() == 2);
-        rewriter.replaceOpWithNewOp<CmpOp>(
-            op, predicate, operands[0], operands[1]);
+        SmallVector<Value, 2> convertedOperands(2);
+        this->convertOperands(
+            rewriter, op.getLoc(),
+            op.getOperands(), operands, convertedOperands);
+        CmpOp cmpOp = rewriter.create<CmpOp>(
+            op.getLoc(), predicate, convertedOperands[0], convertedOperands[1]);
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(
+            op, op.getType(), cmpOp.getResult());
         return success();
     }
 };
@@ -265,20 +280,25 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     LogicalResult matchAndRewrite(GotoIfNotOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        unsigned nOperands = op.getNumOperands();
         unsigned nBranchOperands = op.branchOperands().size();
         unsigned nFallthroughOperands = op.fallthroughOperands().size();
+        unsigned nProperOperands =
+            op.getNumOperands() - nBranchOperands - nFallthroughOperands;
 
-        SmallVector<Value, 4> convertedBranchOperands(nBranchOperands);
-        SmallVector<Value, 4> convertedFallthroughOperands(nFallthroughOperands);
+        SmallVector<Value, 2> convertedBranchOperands(nBranchOperands);
+        SmallVector<Value, 2> convertedFallthroughOperands(nFallthroughOperands);
         convertOperands(
-            rewriter, op.getLoc(),
-            op.branchOperands(), operands.slice(nOperands, nBranchOperands),
+            rewriter,
+            op.getLoc(),
+            op.branchOperands(),
+            operands.slice(nProperOperands, nBranchOperands),
             convertedBranchOperands);
         convertOperands(
-            rewriter, op.getLoc(),
+            rewriter,
+            op.getLoc(),
             op.fallthroughOperands(),
-            operands.slice(nOperands + nBranchOperands, nFallthroughOperands),
+            operands.slice(nProperOperands + nBranchOperands,
+                           nFallthroughOperands),
             convertedFallthroughOperands);
 
         rewriter.replaceOpWithNewOp<CondBranchOp>(
@@ -316,24 +336,30 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     LogicalResult matchAndRewrite(Intrinsic_not_int op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        jl_datatype_t* operand_type =
-            op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
-        bool is_bool = operand_type == jl_bool_type;
-        uint64_t mask_value = is_bool ? 1 : -1;
-        // unsigned num_bits = 8 * (is_bool? 1 : jl_datatype_size(operand_type));
-        unsigned num_bits = is_bool? 1 : (8*jl_datatype_size(operand_type));
+        // NOTE: this treats Bool as i1
 
-        Value mask_constant =
+        assert(operands.size() == 1);
+        SmallVector<Value, 1> convertedOperands(1);
+        convertOperands(rewriter, op.getLoc(),
+                        op.getOperands(), operands, convertedOperands);
+
+        JuliaType oldType = op.getType().cast<JuliaType>();
+        IntegerType newType =
+            convertedOperands.front().getType().cast<IntegerType>();
+
+        mlir::ConstantOp maskConstantOp =
             rewriter.create<mlir::ConstantOp>(
-                op.getLoc(), operands.front().getType(),
-                rewriter.getIntegerAttr(rewriter.getIntegerType(num_bits),
+                op.getLoc(), newType,
+                rewriter.getIntegerAttr(newType,
                                         // need APInt for sign extension
-                                        APInt(num_bits, mask_value,
-                                              /*isSigned=*/true)))
-            .getResult();
+                                        APInt(newType.getWidth(), -1,
+                                              /*isSigned=*/true)));
 
-        rewriter.replaceOpWithNewOp<XOrOp>(
-            op, operands.front().getType(), operands.front(), mask_constant);
+        XOrOp xorOp = rewriter.create<XOrOp>(
+            op.getLoc(), newType,
+            convertedOperands.front(), maskConstantOp.getResult());
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(
+            op, oldType, xorOp.getResult());
         return success();
     }
 };
@@ -372,12 +398,12 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     patterns.insert<
         FuncOpConversion,
         ConstantOpLowering,
-        // CallOpLowering,
-        // InvokeOpLowering,
+        // CallOp
+        // InvokeOp
         GotoOpLowering,
         GotoIfNotOpLowering,
         ReturnOpLowering,
-        // PiOpLowering,
+        // PiOp
         // Intrinsic_bitcast
         // Intrinsic_neg_int
         ToStdOpPattern<Intrinsic_add_int, AddIOp>,
@@ -395,7 +421,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         ToStdOpPattern<Intrinsic_mul_float, MulFOp>,
         ToStdOpPattern<Intrinsic_div_float, DivFOp>,
         ToStdOpPattern<Intrinsic_rem_float, RemFOp>,
-    //     ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
+        // Intrinsic_fma_float
         // Intrinsic_muladd_float
         // Intrinsic_neg_float_fast
         // Intrinsic_add_float_fast
@@ -403,22 +429,22 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_mul_float_fast
         // Intrinsic_div_float_fast
         // Intrinsic_rem_float_fast
-    //     ToCmpIOpPattern<Intrinsic_eq_int, CmpIPredicate::eq>,
-    //     ToCmpIOpPattern<Intrinsic_ne_int, CmpIPredicate::ne>,
-    //     ToCmpIOpPattern<Intrinsic_slt_int, CmpIPredicate::slt>,
-    //     ToCmpIOpPattern<Intrinsic_ult_int, CmpIPredicate::ult>,
-    //     ToCmpIOpPattern<Intrinsic_sle_int, CmpIPredicate::sle>,
-    //     ToCmpIOpPattern<Intrinsic_ule_int, CmpIPredicate::ule>,
-    //     ToCmpFOpPattern<Intrinsic_eq_float, CmpFPredicate::OEQ>,
-    //     ToCmpFOpPattern<Intrinsic_ne_float, CmpFPredicate::UNE>,
-    //     ToCmpFOpPattern<Intrinsic_lt_float, CmpFPredicate::OLT>,
-    //     ToCmpFOpPattern<Intrinsic_le_float, CmpFPredicate::OLE>,
+        ToCmpIOpPattern<Intrinsic_eq_int, CmpIPredicate::eq>,
+        ToCmpIOpPattern<Intrinsic_ne_int, CmpIPredicate::ne>,
+        ToCmpIOpPattern<Intrinsic_slt_int, CmpIPredicate::slt>,
+        ToCmpIOpPattern<Intrinsic_ult_int, CmpIPredicate::ult>,
+        ToCmpIOpPattern<Intrinsic_sle_int, CmpIPredicate::sle>,
+        ToCmpIOpPattern<Intrinsic_ule_int, CmpIPredicate::ule>,
+        ToCmpFOpPattern<Intrinsic_eq_float, CmpFPredicate::OEQ>,
+        ToCmpFOpPattern<Intrinsic_ne_float, CmpFPredicate::UNE>,
+        ToCmpFOpPattern<Intrinsic_lt_float, CmpFPredicate::OLT>,
+        ToCmpFOpPattern<Intrinsic_le_float, CmpFPredicate::OLE>,
         // Intrinsic_fpiseq
         // Intrinsic_fpislt
         ToStdOpPattern<Intrinsic_and_int, AndOp>,
         ToStdOpPattern<Intrinsic_or_int, OrOp>,
         ToStdOpPattern<Intrinsic_xor_int, XOrOp>,
-    //     NotIntOpLowering, // Intrinsic_not_int
+        NotIntOpLowering, // Intrinsic_not_int
         ToStdOpPattern<Intrinsic_shl_int, ShiftLeftOp>,
         ToStdOpPattern<Intrinsic_lshr_int, UnsignedShiftRightOp>,
         ToStdOpPattern<Intrinsic_ashr_int, SignedShiftRightOp>,
@@ -426,7 +452,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_ctpop_int
         // Intrinsic_ctlz_int
         // Intrinsic_cttz_int
-        ToStdOpPattern<Intrinsic_sext_int, SignExtendIOp>,
+        ToStdOpPattern<Intrinsic_sext_int, SignExtendIOp>, // TODO: args don't match
         ToStdOpPattern<Intrinsic_zext_int, ZeroExtendIOp>,
         ToStdOpPattern<Intrinsic_trunc_int, TruncateIOp>,
         // Intrinsic_fptoui
@@ -450,7 +476,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_flipsign_int
         ToStdOpPattern<Intrinsic_ceil_llvm, CeilFOp>,
         // Intrinsic_floor_llvm
-    //     ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
+        // Intrinsic_trunc_llvm
         // Intrinsic_rint_llvm
         ToStdOpPattern<Intrinsic_sqrt_llvm, SqrtOp>,
         // Intrinsic_sqrt_llvm_fast
@@ -461,11 +487,11 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_arraylen
         // Intrinsic_cglobal_auto
         // Builtin_throw
-    //     IsOpLowering, // Builtin_is
+        // Builtin_is
         // Builtin_typeof
         // Builtin_sizeof
         // Builtin_issubtype
-    //     ToUndefOpPattern<Builtin_isa>, // Builtin_isa
+        // Builtin_isa
         // Builtin__apply
         // Builtin__apply_pure
         // Builtin__apply_latest
@@ -474,7 +500,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Builtin_nfields
         // Builtin_tuple
         // Builtin_svec
-    //     ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
+        // Builtin_getfield
         // Builtin_setfield
         // Builtin_fieldtype
         // Builtin_arrayref
