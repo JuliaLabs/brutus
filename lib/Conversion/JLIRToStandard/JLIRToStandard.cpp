@@ -15,6 +15,7 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
             return converted.getValue();
         return t;
     });
+    // addConversion([&](Type t) { return t; });
 }
 
 Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
@@ -132,18 +133,110 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-// largely the same as `FuncOpSignatureConversion` in DialectConversion.cpp,
-// except that type-converted block arguments get converted back into
-// `JuliaType`s with `ConvertStdOp`s
 struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
-    LogicalResult matchAndRewrite(FuncOp funcOp,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
+    // compare with `ArgConverter::applySignatureConversion`
+    void applyBlockConversion(ConversionPatternRewriter &rewriter,
+                              // Block *block) const {
+                              Block *oldBlock) const {
+        llvm::outs() << "\n\n*********************applyBlockConversion\n\n";
 
-        // llvm::outs() << "\n**************FuncOpConversion\n\n";
+        // unsigned numArgs = block->getNumArguments();
 
+        // OpBuilder::InsertionGuard guard(rewriter);
+        // rewriter.setInsertionPointToStart(block);
+        // for (unsigned i = 0; i < numArgs; i++) {
+        //     BlockArgument oldArg = block->getArgument(i);
+        //     Type oldType = oldArg.getType();
+        //     Type newType = lowering.convertType(oldType);
+        //     BlockArgument newArg = block->addArgument(newType);
+        //     if (oldType == newType) {
+        //         rewriter.replaceUsesOfBlockArgument(oldArg, newArg);
+        //     } else {
+        //         llvm::outs() << "\n\n***************case\n\n";
+
+        //         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+        //             // is there a reasonable location for this? `BlockArgument`s
+        //             // have unknown locations
+        //             rewriter.getUnknownLoc(),
+        //             oldType,
+        //             newArg);
+        //         rewriter.replaceUsesOfBlockArgument(
+        //             oldArg, convertOp.getResult());
+        //     }
+        // }
+
+        // // this is the big problem
+        // // // delete old arguments
+        // // for (unsigned i = 0; i < numArgs; i++)
+        // //     block->eraseArgument(0);
+
+
+
+
+
+
+        // nothing needs to be done if there are no arguments
+        if (oldBlock->getNumArguments() == 0)
+            return;
+
+        // split block at beginning to obtain new block with no arguments
+        Block *newBlock = oldBlock->splitBlock(oldBlock->begin());
+        oldBlock->replaceAllUsesWith(newBlock);
+
+        OpBuilder::InsertionGuard guard(rewriter);
+        rewriter.setInsertionPointToStart(newBlock);
+        for (BlockArgument &oldArgument : oldBlock->getArguments()) {
+            Type oldType = oldArgument.getType();
+            Type newType = lowering.convertType(oldType);
+            BlockArgument newArgument = newBlock->addArgument(newType);
+            if (oldType == newType) {
+                rewriter.replaceUsesOfBlockArgument(oldArgument, newArgument);
+            } else {
+                ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+                    // is there a reasonable location for this? `BlockArgument`s
+                    // have unknown locations
+                    rewriter.getUnknownLoc(),
+                    oldType,
+                    newArgument);
+                rewriter.replaceUsesOfBlockArgument(
+                    oldArgument, convertOp.getResult());
+            }
+        }
+
+
+        // OpBuilder::InsertionGuard guard(rewriter);
+        // rewriter.setInsertionPointToStart(&block);
+        // for (BlockArgument &argument : block.getArguments()) {
+        //     // only convert arguments that would have had their type
+        //     // converted
+        //     if (auto t = argument.getType().dyn_cast<JuliaType>()) {
+        //         Optional<Type> conversionResult =
+        //             lowering.convert_JuliaType(t);
+        //         if (conversionResult.hasValue()) {
+        //             ConvertStdOp convertOp =
+        //                 rewriter.create<ConvertStdOp>(
+        //                     // is there a reasonable location we can use?
+        //                     rewriter.getUnknownLoc(),
+        //                     argument.getType(),
+        //                     argument);
+        //             rewriter.replaceUsesOfBlockArgument(
+        //                 argument, convertOp.getResult());
+        //         }
+        //     }
+        // }
+    }
+
+    // based on `FuncOpSignatureConversion::matchAndRewrite` in
+    // DialectConversion.cpp, except that `applyBlockConversion` (see above) is
+    // used in place of `ConversionPatternRewriter::applySignatureConversion` to
+    // convert type-converted block arguments back into `JuliaType`s with
+    // `ConvertStdOp`s, and this is applied to all blocks
+    LogicalResult
+    matchAndRewrite(FuncOp funcOp,
+                    ArrayRef<Value> operands,
+                    ConversionPatternRewriter &rewriter) const override {
         FunctionType type = funcOp.getType();
 
         // convert arguments
@@ -153,43 +246,28 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
                            en.index(), en.value(), result)))
                 return failure();
         }
-        ArrayRef<Type> convertedInputs = result.getConvertedTypes();
 
         // convert results
         SmallVector<Type, 1> convertedResults;
         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
             return failure();
 
-        // convert converted block arguments back to original JLIR type
-        for (Block &block : funcOp.getBlocks()) {
-            OpBuilder::InsertionGuard guard(rewriter);
-            rewriter.setInsertionPointToStart(&block);
-            for (BlockArgument &argument : block.getArguments()) {
-                // only convert arguments that would have had their type
-                // converted
-                if (auto t = argument.getType().dyn_cast<JuliaType>()) {
-                    Optional<Type> conversionResult =
-                        lowering.convert_JuliaType(t);
-                    if (conversionResult.hasValue()) {
-                        ConvertStdOp convertOp =
-                            rewriter.create<ConvertStdOp>(
-                                // is there a reasonable location we can use?
-                                rewriter.getUnknownLoc(),
-                                argument.getType(),
-                                argument);
-                        rewriter.replaceUsesOfBlockArgument(
-                            argument, convertOp.getResult());
-                    }
-                }
-            }
-        }
-
+        // update `FuncOp`
         rewriter.updateRootInPlace(funcOp, [&]() {
-            funcOp.setType(FunctionType::get(convertedInputs,
+            funcOp.setType(FunctionType::get(result.getConvertedTypes(),
                                              convertedResults,
                                              funcOp.getContext()));
-            rewriter.applySignatureConversion(&funcOp.getBody(), result);
+
+            // // instead of `rewriter.applySignatureConversion`
+            // for (Block &block : funcOp.getBlocks())
+            //     applyBlockConversion(rewriter, &block);
+            SmallVector<Block*, 4> oldBlocks;
+            for (Block &block : funcOp.getBlocks())
+                oldBlocks.push_back(&block);
+            for (Block *block : oldBlocks)
+                applyBlockConversion(rewriter, block);
         });
+
         return success();
     }
 };
@@ -393,7 +471,7 @@ bool JLIRToStandardLoweringPass::isFuncOpLegal(
     // converted
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
-            if (JuliaType jt = t.dyn_cast_or_null<JuliaType>()) {
+            if (JuliaType jt = t.dyn_cast<JuliaType>()) {
                 if (converter.convert_JuliaType(jt).hasValue())
                     return false;
             }
