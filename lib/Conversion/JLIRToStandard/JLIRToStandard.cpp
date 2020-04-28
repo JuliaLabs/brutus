@@ -136,54 +136,12 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
 struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
-    // compare with `ArgConverter::applySignatureConversion`
-    void applyBlockConversion(ConversionPatternRewriter &rewriter,
-                              // Block *block) const {
-                              Block *oldBlock) const {
+    Block* applyBlockConversion(ConversionPatternRewriter &rewriter,
+                                Block *oldBlock) const {
         llvm::outs() << "\n\n*********************applyBlockConversion\n\n";
-
-        // unsigned numArgs = block->getNumArguments();
-
-        // OpBuilder::InsertionGuard guard(rewriter);
-        // rewriter.setInsertionPointToStart(block);
-        // for (unsigned i = 0; i < numArgs; i++) {
-        //     BlockArgument oldArg = block->getArgument(i);
-        //     Type oldType = oldArg.getType();
-        //     Type newType = lowering.convertType(oldType);
-        //     BlockArgument newArg = block->addArgument(newType);
-        //     if (oldType == newType) {
-        //         rewriter.replaceUsesOfBlockArgument(oldArg, newArg);
-        //     } else {
-        //         llvm::outs() << "\n\n***************case\n\n";
-
-        //         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
-        //             // is there a reasonable location for this? `BlockArgument`s
-        //             // have unknown locations
-        //             rewriter.getUnknownLoc(),
-        //             oldType,
-        //             newArg);
-        //         rewriter.replaceUsesOfBlockArgument(
-        //             oldArg, convertOp.getResult());
-        //     }
-        // }
-
-        // // this is the big problem
-        // // // delete old arguments
-        // // for (unsigned i = 0; i < numArgs; i++)
-        // //     block->eraseArgument(0);
-
-
-
-
-
-
-        // nothing needs to be done if there are no arguments
-        if (oldBlock->getNumArguments() == 0)
-            return;
 
         // split block at beginning to obtain new block with no arguments
         Block *newBlock = oldBlock->splitBlock(oldBlock->begin());
-        oldBlock->replaceAllUsesWith(newBlock);
 
         OpBuilder::InsertionGuard guard(rewriter);
         rewriter.setInsertionPointToStart(newBlock);
@@ -205,27 +163,7 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
             }
         }
 
-
-        // OpBuilder::InsertionGuard guard(rewriter);
-        // rewriter.setInsertionPointToStart(&block);
-        // for (BlockArgument &argument : block.getArguments()) {
-        //     // only convert arguments that would have had their type
-        //     // converted
-        //     if (auto t = argument.getType().dyn_cast<JuliaType>()) {
-        //         Optional<Type> conversionResult =
-        //             lowering.convert_JuliaType(t);
-        //         if (conversionResult.hasValue()) {
-        //             ConvertStdOp convertOp =
-        //                 rewriter.create<ConvertStdOp>(
-        //                     // is there a reasonable location we can use?
-        //                     rewriter.getUnknownLoc(),
-        //                     argument.getType(),
-        //                     argument);
-        //             rewriter.replaceUsesOfBlockArgument(
-        //                 argument, convertOp.getResult());
-        //         }
-        //     }
-        // }
+        return newBlock;
     }
 
     // based on `FuncOpSignatureConversion::matchAndRewrite` in
@@ -240,10 +178,10 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         FunctionType type = funcOp.getType();
 
         // convert arguments
-        TypeConverter::SignatureConversion result(type.getNumInputs());
+        TypeConverter::SignatureConversion inputConversion(type.getNumInputs());
         for (auto &en : llvm::enumerate(type.getInputs())) {
             if (failed(lowering.convertSignatureArg(
-                           en.index(), en.value(), result)))
+                           en.index(), en.value(), inputConversion)))
                 return failure();
         }
 
@@ -252,21 +190,33 @@ struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
             return failure();
 
-        // update `FuncOp`
-        rewriter.updateRootInPlace(funcOp, [&]() {
-            funcOp.setType(FunctionType::get(result.getConvertedTypes(),
-                                             convertedResults,
-                                             funcOp.getContext()));
+        // create new `FuncOp`
+        FunctionType newFuncType = rewriter.getFunctionType(
+            inputConversion.getConvertedTypes(), convertedResults);
+        FuncOp newFuncOp = rewriter.create<FuncOp>(
+            funcOp.getLoc(), funcOp.getName(), newFuncType, None);
 
-            // // instead of `rewriter.applySignatureConversion`
-            // for (Block &block : funcOp.getBlocks())
-            //     applyBlockConversion(rewriter, &block);
-            SmallVector<Block*, 4> oldBlocks;
-            for (Block &block : funcOp.getBlocks())
-                oldBlocks.push_back(&block);
-            for (Block *block : oldBlocks)
-                applyBlockConversion(rewriter, block);
-        });
+        // convert block argument types (replacing
+        // `rewriter.applySignatureConversion`)
+        for (Block &block : funcOp.getBlocks()) {
+            newFuncOp.getBody().push_back(
+                applyBlockConversion(rewriter, &block));
+        }
+
+        rewriter.eraseOp(funcOp);
+
+        // rewriter.updateRootInPlace(funcOp, [&]() {
+
+        //     // instead of `rewriter.applySignatureConversion`
+        //     for (Block &block : funcOp.getBlocks())
+        //         newRegion.push_back(applyBlockConversion(rewriter, &block));
+
+        //     SmallVector<Block*, 4> oldBlocks;
+        //     for (Block &block : funcOp.getBlocks())
+        //         oldBlocks.push_back(&block);
+        //     for (Block *block : oldBlocks)
+        //         applyBlockConversion(rewriter, block);
+        // });
 
         return success();
     }
