@@ -42,35 +42,35 @@ std::string JLIRDialect::showValue(jl_value_t *value) {
     return s;
 }
 
-void UnimplementedOp::build(mlir::Builder *builder, mlir::OperationState &state, jl_datatype_t *type) {
-    state.addTypes(JuliaType::get(builder->getContext(), type));
+void UnimplementedOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, jl_datatype_t *type) {
+    state.addTypes(JuliaType::get(builder.getContext(), type));
 }
 
-void UndefOp::build(mlir::Builder *builder, mlir::OperationState &state) {
-    state.addTypes(JuliaType::get(builder->getContext(), jl_any_type));
+void UndefOp::build(mlir::OpBuilder &builder, mlir::OperationState &state) {
+    state.addTypes(JuliaType::get(builder.getContext(), jl_any_type));
 }
 
-void ConstantOp::build(mlir::Builder *builder, mlir::OperationState &state, jl_value_t *value, jl_datatype_t *type) {
-    state.addAttribute("value", JuliaValueAttr::get(builder->getContext(), value));
-    state.addTypes(JuliaType::get(builder->getContext(), type));
+void ConstantOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, jl_value_t *value, jl_datatype_t *type) {
+    state.addAttribute("value", JuliaValueAttr::get(builder.getContext(), value));
+    state.addTypes(JuliaType::get(builder.getContext(), type));
 }
 
 mlir::OpFoldResult ConstantOp::fold(llvm::ArrayRef<mlir::Attribute> operands) {
     return valueAttr();
 }
 
-void PiOp::build(mlir::Builder *builder, mlir::OperationState &state,
+void PiOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                  Value value, jl_datatype_t *type) {
-    state.addTypes(JuliaType::get(builder->getContext(), type));
+    state.addTypes(JuliaType::get(builder.getContext(), type));
     state.addOperands(value);
 }
 
 //===----------------------------------------------------------------------===//
 // CallOp
 
-void CallOp::build(mlir::Builder *builder, mlir::OperationState &state,
+void CallOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                    jl_datatype_t *type, mlir::Value callee, ArrayRef<mlir::Value> arguments) {
-    state.addTypes(JuliaType::get(builder->getContext(), type));
+    state.addTypes(JuliaType::get(builder.getContext(), type));
     state.addOperands(callee);
     state.addOperands(arguments);
 }
@@ -78,13 +78,13 @@ void CallOp::build(mlir::Builder *builder, mlir::OperationState &state,
 //===----------------------------------------------------------------------===//
 // InvokeOp
 
-void InvokeOp::build(mlir::Builder *builder, mlir::OperationState &state,
+void InvokeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
                      jl_method_instance_t *methodInstance,
                      ArrayRef<mlir::Value> arguments) {
-    state.addTypes(JuliaType::get(builder->getContext(), jl_any_type));
+    state.addTypes(JuliaType::get(builder.getContext(), jl_any_type));
     state.addOperands(arguments);
     state.addAttribute("methodInstance",
-                       JuliaValueAttr::get(builder->getContext(), (jl_value_t*)methodInstance));
+                       JuliaValueAttr::get(builder.getContext(), (jl_value_t*)methodInstance));
 }
 
 //===----------------------------------------------------------------------===//
