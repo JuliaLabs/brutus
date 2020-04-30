@@ -9,8 +9,19 @@ using namespace jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    addConversion([this](JuliaType t) {
-        return convert_JuliaType(t);
+    addConversion([](Type t) { return t; });
+    addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
+        return success();
+    });
+    addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
+        llvm::Optional<Type> converted = convert_JuliaType(t);
+        if (converted.hasValue()) {
+            results.push_back(converted.getValue());
+            results.push_back(NoneType::get(ctx));
+        } else {
+            results.push_back(t);
+        }
+        return success();
     });
 }
 
@@ -392,55 +403,33 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     }
 };
 
-struct JLIRToStandardHackTypeConverter : public JLIRToStandardTypeConverter {
-    JLIRToStandardHackTypeConverter(MLIRContext *ctx)
-        : JLIRToStandardTypeConverter(ctx) {
-
-        // TODO: document hack
-        addConversion([](Type t) { return t; }); // can this be moved to hack?
-        addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
-            return success();
-        });
-        addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
-            llvm::Optional<Type> converted = convert_JuliaType(t);
-            if (converted.hasValue()) {
-                results.push_back(converted.getValue());
-                results.push_back(NoneType::get(ctx));
-            } else {
-                results.push_back(t);
-            }
-            return success();
-        });
-    }
-};
-
 } // namespace
 
 // HACK
 namespace {
 
-struct HackConversion : public OpAndTypeConversionPattern<FuncOp> {
+struct HackFuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
-    static bool hasNoneTypeArguments(FuncOp funcOp) {
-        for (Block &block : funcOp.getBlocks()) {
-            for (BlockArgument &blockArg : block.getArguments())
-                if (blockArg.getType().isa<NoneType>())
-                    return true;
-        }
-        return false;
-    }
+    // static bool hasNoneTypeArguments(FuncOp funcOp) {
+    //     for (Block &block : funcOp.getBlocks()) {
+    //         for (BlockArgument &blockArg : block.getArguments())
+    //             if (blockArg.getType().isa<NoneType>())
+    //                 return true;
+    //     }
+    //     return false;
+    // }
 
     LogicalResult
     matchAndRewrite(FuncOp funcOp,
                     ArrayRef<Value> operands,
                     ConversionPatternRewriter &rewriter) const override {
-        // should match if any block argument is of `NoneType`
-        if (!hasNoneTypeArguments(funcOp))
-            return failure();
+        // // should match if any block argument is of `NoneType`
+        // if (!hasNoneTypeArguments(funcOp))
+        //     return failure();
 
-        // the rest is pretty much straight from
-        // `FuncOpSignatureConversion::matchAndRewrite`
+        // // the rest is pretty much straight from
+        // // `FuncOpSignatureConversion::matchAndRewrite`
 
         FunctionType type = funcOp.getType();
 
@@ -462,11 +451,22 @@ struct HackConversion : public OpAndTypeConversionPattern<FuncOp> {
         rewriter.updateRootInPlace(
             funcOp,
             [&funcOp, &conversionResult, &convertedResults, &rewriter]() {
+                // leave a `NoneType` argument as first argument to mark
+                // fact that this function needs to be processed
+                SmallVector<Type, 4> convertedInputs;
+                convertedInputs.push_back(rewriter.getNoneType());
+                for (Type t : conversionResult.getConvertedTypes())
+                    convertedInputs.push_back(t);
+
                 funcOp.setType(FunctionType::get(
-                                conversionResult.getConvertedTypes(),
-                                convertedResults, funcOp.getContext()));
+                                   convertedInputs,
+                                   convertedResults, funcOp.getContext()));
                 rewriter.applySignatureConversion(
                     &funcOp.getBody(), conversionResult);
+
+                // hack
+                funcOp.front().insertArgument(
+                    (unsigned)0, rewriter.getNoneType());
             });
 
         return success();
@@ -478,16 +478,7 @@ struct HackConversion : public OpAndTypeConversionPattern<FuncOp> {
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
     FuncOp op, JLIRToStandardTypeConverter &converter) {
 
-    // HACK--the following will not be necessary once `materializeConversion`
-    // for 1-1 type conversions has been implemented in MLIR. Note that block
-    // arguments that are not also the function arguments are converted
-    // automatically after all the patterns have been applied (block arguments
-    // are not converted by any pattern), and this legality check seems not be
-    // called for that, so the following in effect only detects if any of the
-    // function arguments are of `NoneType`.
-    if (HackConversion::hasNoneTypeArguments(op))
-        return false;
-
+    // TODO: the below be for all block arguments?
     // function is illegal if any of its types can but haven't been
     // converted
     FunctionType ft = op.getType().cast<FunctionType>();
@@ -517,11 +508,9 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     // implemented in MLIR, the following can be replaced with a call to
     // `populateFuncOpTypeConversionPattern` with `converter` instead of
     // `hackConverter`.
-    JLIRToStandardHackTypeConverter hackConverter(&getContext());
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), hackConverter);
-    patterns.insert<HackConversion>(&getContext(), hackConverter);
-
+    // populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
+        HackFuncOpConversion,
         // FuncOpConversion,
         ConstantOpLowering,
         // CallOp
@@ -645,6 +634,19 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     if (failed(applyPartialConversion(
                     getFunction(), target, patterns, &converter)))
+        signalPassFailure();
+
+    ConversionTarget hackTarget(getContext());
+    hackTarget.addLegalDialect<StandardOpsDialect>();
+    hackTarget.addLegalOp<ConvertStdOp>();
+    hackTarget.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
+        FunctionType t = op.getType();
+        return !(t.getNumInputs() > 0 && t.getInput(0).isa<NoneType>());
+    });
+    OwningRewritePatternList hackPatterns;
+    populateFuncOpTypeConversionPattern(hackPatterns, &getContext(), converter);
+    if (failed(applyPartialConversion(
+                    getFunction(), hackTarget, hackPatterns, &converter)))
         signalPassFailure();
 }
 
