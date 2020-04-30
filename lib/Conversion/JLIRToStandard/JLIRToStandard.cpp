@@ -10,6 +10,10 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
     // TODO: document hack
+    addConversion([](Type t) { return t; });
+    addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
+        return success();
+    });
     addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
         llvm::Optional<Type> converted = convert_JuliaType(t);
         if (converted.hasValue()) {
@@ -400,6 +404,60 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     }
 };
 
+struct HackConversion : public OpAndTypeConversionPattern<FuncOp> {
+    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
+
+    static bool hasNoneTypeArguments(FuncOp funcOp) {
+        for (Block &block : funcOp.getBlocks()) {
+            for (BlockArgument &blockArg : block.getArguments())
+                if (blockArg.getType().isa<NoneType>())
+                    return true;
+        }
+        return false;
+    }
+
+    LogicalResult
+    matchAndRewrite(FuncOp funcOp,
+                    ArrayRef<Value> operands,
+                    ConversionPatternRewriter &rewriter) const override {
+        // should match if any block argument is of `NoneType`
+        if (!hasNoneTypeArguments(funcOp))
+            return failure();
+
+        // the rest is pretty much straight from
+        // `FuncOpSignatureConversion::matchAndRewrite`
+
+        FunctionType type = funcOp.getType();
+
+        // convert function arguments
+        TypeConverter::SignatureConversion conversionResult(
+            type.getNumInputs());
+        for (auto &en : llvm::enumerate(type.getInputs())) {
+            if (failed(lowering.convertSignatureArg(
+                           en.index(), en.value(), conversionResult)))
+                return failure();
+        }
+
+        // convert function results
+        SmallVector<Type, 1> convertedResults;
+        if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
+            return failure();
+
+        // update function signature in-place
+        rewriter.updateRootInPlace(
+            funcOp,
+            [&funcOp, &conversionResult, &convertedResults, &rewriter]() {
+                funcOp.setType(FunctionType::get(
+                                conversionResult.getConvertedTypes(),
+                                convertedResults, funcOp.getContext()));
+                rewriter.applySignatureConversion(
+                    &funcOp.getBody(), conversionResult);
+            });
+
+        return success();
+    }
+};
+
 } // namespace
 
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
@@ -411,9 +469,9 @@ bool JLIRToStandardLoweringPass::isFuncOpLegal(
     // converted
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
-            // // TODO: document
-            // if (t.isa<NoneType>())
-            //     return false;
+            // TODO: document
+            if (t.isa<NoneType>())
+                return false;
 
             if (JuliaType jt = t.dyn_cast<JuliaType>()) {
                 if (converter.convert_JuliaType(jt).hasValue())
@@ -437,6 +495,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
+        HackConversion,
         // FuncOpConversion,
         ConstantOpLowering,
         // CallOp
@@ -565,40 +624,4 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
 std::unique_ptr<Pass> mlir::jlir::createJLIRToStandardLoweringPass() {
     return std::make_unique<JLIRToStandardLoweringPass>();
-}
-
-JLIRToStandardHackTypeConverter::JLIRToStandardHackTypeConverter(
-    MLIRContext *ctx)
-    : ctx(ctx) {
-
-    addConversion(
-        [](NoneType t, SmallVectorImpl<Type> &results) { return success(); });
-}
-
-bool JLIRToStandardHackLoweringPass::isFuncOpLegal(FuncOp op) {
-    FunctionType ft = op.getType().cast<FunctionType>();
-    for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
-        for (Type t : ts) {
-            if (t.isa<NoneType>())
-                return false;
-        }
-    }
-    return true;
-}
-
-void JLIRToStandardHackLoweringPass::runOnFunction() {
-    ConversionTarget target(getContext());
-    target.addDynamicallyLegalOp<FuncOp>(isFuncOpLegal);
-
-    JLIRToStandardHackTypeConverter converter(&getContext());
-    OwningRewritePatternList patterns;
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
-
-    if (failed(applyPartialConversion(
-                    getFunction(), target, patterns, &converter)))
-        signalPassFailure();
-}
-
-std::unique_ptr<Pass> mlir::jlir::createJLIRToStandardHackLoweringPass() {
-    return std::make_unique<JLIRToStandardHackLoweringPass>();
 }
