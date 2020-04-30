@@ -115,16 +115,18 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
 
     // truncate a Bool (i8) to an i1
     Value truncateBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
-        LLVM::TruncOp truncated = rewriter.create<LLVM::TruncOp>(
-            loc, LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect), b);
-        return truncated.getResult();
+        return b;
+        // LLVM::TruncOp truncated = rewriter.create<LLVM::TruncOp>(
+        //     loc, LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect), b);
+        // return truncated.getResult();
     }
 
     // zero extend an i1 to a Bool (i8)
     Value extendBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
-        LLVM::ZExtOp extended = rewriter.create<LLVM::ZExtOp>(
-            loc, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect), b);
-        return extended.getResult();
+        return b;
+        // LLVM::ZExtOp extended = rewriter.create<LLVM::ZExtOp>(
+        //     loc, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect), b);
+        // return extended.getResult();
     }
 
     Value compareBits(Location loc, Value a, Value b, ConversionPatternRewriter &rewriter) const {

@@ -433,11 +433,11 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
 
     // lower to Standard dialect
 
-    llvm::DebugFlag = true;
+    // llvm::DebugFlag = true;
     mlir::PassManager loweringToStdPM(&context);
     loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
     // canonicalize to remove redundant `ConvertStdOp`s
-    // loweringToStdPM.addPass(mlir::createCanonicalizerPass());
+    loweringToStdPM.addPass(mlir::createCanonicalizerPass());
     LogicalResult loweringToStdResult = loweringToStdPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_STD) {
@@ -450,8 +450,6 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
         module.emitError("lowering to Standard dialect failed");
         return nullptr;
     }
-
-    return nullptr;
 
     // lower to LLVM dialect
 

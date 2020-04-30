@@ -437,6 +437,10 @@ struct HackFuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
         TypeConverter::SignatureConversion conversionResult(
             type.getNumInputs());
         for (auto &en : llvm::enumerate(type.getInputs())) {
+            // TESTING (drop first argument)
+            if (en.index() == 0)
+                continue;
+
             if (failed(lowering.convertSignatureArg(
                            en.index(), en.value(), conversionResult)))
                 return failure();
