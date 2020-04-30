@@ -18,6 +18,7 @@ def JLIR_Dialect : Dialect {
 }
 
 def JLIR_JuliaType : Type<CPred<"$_self.isa<JuliaType>()">, "JLIR Julia type">;
+def JLIR_JuliaDummyType : Type<CPred<"$_self.isa<JuliaDummyType>()">, "JLIR dummy type">; // for a hack
 
 def JLIR_JuliaValueAttr : Attr<CPred<"$_self.isa<JuliaValueAttr>()">,
                                "JLIR Julia Value attribute"> {

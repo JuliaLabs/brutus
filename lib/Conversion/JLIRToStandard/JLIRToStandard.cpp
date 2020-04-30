@@ -9,13 +9,17 @@ using namespace jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    addConversion([&](JuliaType t) -> llvm::Optional<Type> {
+    // TODO: document hack
+    addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
         llvm::Optional<Type> converted = convert_JuliaType(t);
-        if (converted.hasValue())
-            return converted.getValue();
-        return t;
+        if (converted.hasValue()) {
+            results.push_back(converted.getValue());
+            results.push_back(NoneType::get(ctx));
+        } else {
+            results.push_back(t);
+        }
+        return success();
     });
-    // addConversion([&](Type t) { return t; });
 }
 
 Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
@@ -55,6 +59,14 @@ Type JLIRToStandardTypeConverter::convert_bitstype(jl_datatype_t *jdt) {
     return IntegerType::get(nb * 8, ctx);
 }
 
+Operation
+*JLIRToStandardTypeConverter::materializeConversion(PatternRewriter &rewriter,
+                                                    Type resultType,
+                                                    ArrayRef<Value> inputs,
+                                                    Location loc) {
+    return rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
+}
+
 namespace {
 
 template <typename SourceOp>
@@ -75,12 +87,6 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
             location,
             this->lowering.convert_JuliaType(type).getValue(),
             remappedOriginalValue);
-        // if (relevant) {
-        //     llvm::outs() << "\n**************************************convertValue\n";
-        //     originalValue.dump();
-        //     remappedOriginalValue.dump();
-        //     convertOp.dump();
-        // }
         return convertOp.getResult();
     }
 
@@ -91,13 +97,6 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
                          MutableArrayRef<Value> convertedOperands) const {
         unsigned i = 0;
         for (Value operand : originalOperands) {
-            // // make sure that new, remapped operand is not a block argument
-            // // that should have been converted
-            // Type remappedOperandType = remappedOriginalOperands[i].getType();
-            // assert(!(remappedOperandType.isa<BlockArgument>()
-            //          && lowering.convert_JuliaType(
-            //              remappedOperandType).hasValue()));
-
             convertedOperands[i] = this->convertValue(
                 rewriter, location, operand, remappedOriginalOperands[i]);
             i++;
@@ -112,8 +111,6 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************ToStdOpPattern\n\n";
-
         SmallVector<Value, 4> convertedOperands(operands.size());
         this->convertOperands(
             rewriter, op.getLoc(),
@@ -133,94 +130,94 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
-    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
+// struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
+//     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
 
-    Block* applyBlockConversion(ConversionPatternRewriter &rewriter,
-                                Block *oldBlock) const {
-        llvm::outs() << "\n\n*********************applyBlockConversion\n\n";
+//     Block* applyBlockConversion(ConversionPatternRewriter &rewriter,
+//                                 Block *oldBlock) const {
+//         llvm::outs() << "\n\n*********************applyBlockConversion\n\n";
 
-        // split block at beginning to obtain new block with no arguments
-        Block *newBlock = oldBlock->splitBlock(oldBlock->begin());
+//         // split block at beginning to obtain new block with no arguments
+//         Block *newBlock = oldBlock->splitBlock(oldBlock->begin());
 
-        OpBuilder::InsertionGuard guard(rewriter);
-        rewriter.setInsertionPointToStart(newBlock);
-        for (BlockArgument &oldArgument : oldBlock->getArguments()) {
-            Type oldType = oldArgument.getType();
-            Type newType = lowering.convertType(oldType);
-            BlockArgument newArgument = newBlock->addArgument(newType);
-            if (oldType == newType) {
-                rewriter.replaceUsesOfBlockArgument(oldArgument, newArgument);
-            } else {
-                ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
-                    // is there a reasonable location for this? `BlockArgument`s
-                    // have unknown locations
-                    rewriter.getUnknownLoc(),
-                    oldType,
-                    newArgument);
-                rewriter.replaceUsesOfBlockArgument(
-                    oldArgument, convertOp.getResult());
-            }
-        }
+//         OpBuilder::InsertionGuard guard(rewriter);
+//         rewriter.setInsertionPointToStart(newBlock);
+//         for (BlockArgument &oldArgument : oldBlock->getArguments()) {
+//             Type oldType = oldArgument.getType();
+//             Type newType = lowering.convertType(oldType);
+//             BlockArgument newArgument = newBlock->addArgument(newType);
+//             if (oldType == newType) {
+//                 rewriter.replaceUsesOfBlockArgument(oldArgument, newArgument);
+//             } else {
+//                 ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
+//                     // is there a reasonable location for this? `BlockArgument`s
+//                     // have unknown locations
+//                     rewriter.getUnknownLoc(),
+//                     oldType,
+//                     newArgument);
+//                 rewriter.replaceUsesOfBlockArgument(
+//                     oldArgument, convertOp.getResult());
+//             }
+//         }
 
-        return newBlock;
-    }
+//         return newBlock;
+//     }
 
-    // based on `FuncOpSignatureConversion::matchAndRewrite` in
-    // DialectConversion.cpp, except that `applyBlockConversion` (see above) is
-    // used in place of `ConversionPatternRewriter::applySignatureConversion` to
-    // convert type-converted block arguments back into `JuliaType`s with
-    // `ConvertStdOp`s, and this is applied to all blocks
-    LogicalResult
-    matchAndRewrite(FuncOp funcOp,
-                    ArrayRef<Value> operands,
-                    ConversionPatternRewriter &rewriter) const override {
-        FunctionType type = funcOp.getType();
+//     // based on `FuncOpSignatureConversion::matchAndRewrite` in
+//     // DialectConversion.cpp, except that `applyBlockConversion` (see above) is
+//     // used in place of `ConversionPatternRewriter::applySignatureConversion` to
+//     // convert type-converted block arguments back into `JuliaType`s with
+//     // `ConvertStdOp`s, and this is applied to all blocks
+//     LogicalResult
+//     matchAndRewrite(FuncOp funcOp,
+//                     ArrayRef<Value> operands,
+//                     ConversionPatternRewriter &rewriter) const override {
+//         FunctionType type = funcOp.getType();
 
-        // convert arguments
-        TypeConverter::SignatureConversion inputConversion(type.getNumInputs());
-        for (auto &en : llvm::enumerate(type.getInputs())) {
-            if (failed(lowering.convertSignatureArg(
-                           en.index(), en.value(), inputConversion)))
-                return failure();
-        }
+//         // convert arguments
+//         TypeConverter::SignatureConversion inputConversion(type.getNumInputs());
+//         for (auto &en : llvm::enumerate(type.getInputs())) {
+//             if (failed(lowering.convertSignatureArg(
+//                            en.index(), en.value(), inputConversion)))
+//                 return failure();
+//         }
 
-        // convert results
-        SmallVector<Type, 1> convertedResults;
-        if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
-            return failure();
+//         // convert results
+//         SmallVector<Type, 1> convertedResults;
+//         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
+//             return failure();
 
-        // create new `FuncOp`
-        FunctionType newFuncType = rewriter.getFunctionType(
-            inputConversion.getConvertedTypes(), convertedResults);
-        FuncOp newFuncOp = rewriter.create<FuncOp>(
-            funcOp.getLoc(), funcOp.getName(), newFuncType, None);
+//         // create new `FuncOp`
+//         FunctionType newFuncType = rewriter.getFunctionType(
+//             inputConversion.getConvertedTypes(), convertedResults);
+//         FuncOp newFuncOp = rewriter.create<FuncOp>(
+//             funcOp.getLoc(), funcOp.getName(), newFuncType, None);
 
-        // convert block argument types (replacing
-        // `rewriter.applySignatureConversion`)
-        for (Block &block : funcOp.getBlocks()) {
-            newFuncOp.getBody().push_back(
-                applyBlockConversion(rewriter, &block));
-        }
+//         // convert block argument types (replacing
+//         // `rewriter.applySignatureConversion`)
+//         for (Block &block : funcOp.getBlocks()) {
+//             newFuncOp.getBody().push_back(
+//                 applyBlockConversion(rewriter, &block));
+//         }
 
-        rewriter.eraseOp(funcOp);
+//         rewriter.eraseOp(funcOp);
 
-        // rewriter.updateRootInPlace(funcOp, [&]() {
+//         // rewriter.updateRootInPlace(funcOp, [&]() {
 
-        //     // instead of `rewriter.applySignatureConversion`
-        //     for (Block &block : funcOp.getBlocks())
-        //         newRegion.push_back(applyBlockConversion(rewriter, &block));
+//         //     // instead of `rewriter.applySignatureConversion`
+//         //     for (Block &block : funcOp.getBlocks())
+//         //         newRegion.push_back(applyBlockConversion(rewriter, &block));
 
-        //     SmallVector<Block*, 4> oldBlocks;
-        //     for (Block &block : funcOp.getBlocks())
-        //         oldBlocks.push_back(&block);
-        //     for (Block *block : oldBlocks)
-        //         applyBlockConversion(rewriter, block);
-        // });
+//         //     SmallVector<Block*, 4> oldBlocks;
+//         //     for (Block &block : funcOp.getBlocks())
+//         //         oldBlocks.push_back(&block);
+//         //     for (Block *block : oldBlocks)
+//         //         applyBlockConversion(rewriter, block);
+//         // });
 
-        return success();
-    }
-};
+//         return success();
+//     }
+// };
 
 template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
 struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
@@ -230,8 +227,6 @@ struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     matchAndRewrite(SourceOp op,
                     ArrayRef<Value> operands,
                     ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************ToCmpOpPattern\n\n";
-
         assert(operands.size() == 2);
         SmallVector<Value, 2> convertedOperands(2);
         this->convertOperands(
@@ -265,7 +260,6 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<jlir::ConstantOp> 
     LogicalResult matchAndRewrite(jlir::ConstantOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************ConstantOpLowering\n\n";
         JuliaType type = op.getType().cast<JuliaType>();
         jl_datatype_t *julia_type = type.getDatatype();
         Optional<Type> conversionResult = lowering.convert_JuliaType(type);
@@ -307,7 +301,6 @@ struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
     LogicalResult matchAndRewrite(GotoOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************GotoOpLowering\n\n";
         SmallVector<Value, 4> convertedOperands(operands.size());
         convertOperands(
             rewriter, op.getLoc(), op.getOperands(), operands, convertedOperands);
@@ -323,7 +316,6 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     LogicalResult matchAndRewrite(GotoIfNotOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************GotoIfNotOpLowering\n\n";
         unsigned nBranchOperands = op.branchOperands().size();
         unsigned nFallthroughOperands = op.fallthroughOperands().size();
         unsigned nProperOperands =
@@ -361,7 +353,6 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************ReturnOpLowering\n\n";
         Value oldOperand = op.getOperand();
 
         // ignore if operand is not a `JuliaType`
@@ -381,8 +372,7 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     LogicalResult matchAndRewrite(Intrinsic_not_int op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // llvm::outs() << "\n**************NotIntOpLowering\n\n";
-        // NOTE: this treats Bool as i1
+        // NOTE: this treats Bool as having been converted to i1
 
         assert(operands.size() == 1);
         SmallVector<Value, 1> convertedOperands(1);
@@ -421,6 +411,10 @@ bool JLIRToStandardLoweringPass::isFuncOpLegal(
     // converted
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
+            // // TODO: document
+            // if (t.isa<NoneType>())
+            //     return false;
+
             if (JuliaType jt = t.dyn_cast<JuliaType>()) {
                 if (converter.convert_JuliaType(jt).hasValue())
                     return false;
@@ -437,12 +431,13 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalOp<ConvertStdOp>();
-    target.addDynamicallyLegalOp<FuncOp>([&](FuncOp op) {
+    target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
 
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        FuncOpConversion,
+        // FuncOpConversion,
         ConstantOpLowering,
         // CallOp
         // InvokeOp
@@ -570,4 +565,40 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
 std::unique_ptr<Pass> mlir::jlir::createJLIRToStandardLoweringPass() {
     return std::make_unique<JLIRToStandardLoweringPass>();
+}
+
+JLIRToStandardHackTypeConverter::JLIRToStandardHackTypeConverter(
+    MLIRContext *ctx)
+    : ctx(ctx) {
+
+    addConversion(
+        [](NoneType t, SmallVectorImpl<Type> &results) { return success(); });
+}
+
+bool JLIRToStandardHackLoweringPass::isFuncOpLegal(FuncOp op) {
+    FunctionType ft = op.getType().cast<FunctionType>();
+    for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
+        for (Type t : ts) {
+            if (t.isa<NoneType>())
+                return false;
+        }
+    }
+    return true;
+}
+
+void JLIRToStandardHackLoweringPass::runOnFunction() {
+    ConversionTarget target(getContext());
+    target.addDynamicallyLegalOp<FuncOp>(isFuncOpLegal);
+
+    JLIRToStandardHackTypeConverter converter(&getContext());
+    OwningRewritePatternList patterns;
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+
+    if (failed(applyPartialConversion(
+                    getFunction(), target, patterns, &converter)))
+        signalPassFailure();
+}
+
+std::unique_ptr<Pass> mlir::jlir::createJLIRToStandardHackLoweringPass() {
+    return std::make_unique<JLIRToStandardHackLoweringPass>();
 }

@@ -45,7 +45,8 @@ public:
 namespace JLIRTypes {
 enum Kind {
     // TODO: reserve own range of type kinds?
-    JuliaType = mlir::Type::FIRST_PRIVATE_EXPERIMENTAL_0_TYPE
+    JuliaType = mlir::Type::FIRST_PRIVATE_EXPERIMENTAL_0_TYPE,
+    JuliaDummyType
 };
 }
 
@@ -92,6 +93,41 @@ public:
     jl_datatype_t *getDatatype() {
         // `getImpl` returns a pointer to the internal storage instance
         return getImpl()->datatype;
+    }
+};
+
+class JuliaDummyTypeStorage : public mlir::TypeStorage {
+public:
+    JuliaDummyTypeStorage() {}
+
+    using KeyTy = unsigned;
+
+    bool operator==(const KeyTy &key) const {
+        return true;
+    }
+
+    static llvm::hash_code hashKey(const KeyTy &key) {
+        return 0;
+    }
+
+    static JuliaDummyTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
+                                            const KeyTy &key) {
+        return new (allocator.allocate<JuliaDummyTypeStorage>())
+            JuliaDummyTypeStorage();
+    }
+};
+
+// hack
+class JuliaDummyType : public Type::TypeBase<JuliaDummyType, Type, JuliaDummyTypeStorage> {
+public:
+    using Base::Base;
+
+    static bool kindof(unsigned kind) {
+        return kind == JLIRTypes::JuliaDummyType;
+    }
+
+    static JuliaDummyType get(MLIRContext *context) {
+        return Base::get(context, JLIRTypes::JuliaDummyType);
     }
 };
 
