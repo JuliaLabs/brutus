@@ -9,22 +9,32 @@ using namespace jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    // TODO: document hack
-    addConversion([](Type t) { return t; });
-    addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
-        return success();
-    });
-    addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
-        llvm::Optional<Type> converted = convert_JuliaType(t);
-        if (converted.hasValue()) {
-            results.push_back(converted.getValue());
-            results.push_back(NoneType::get(ctx));
-        } else {
-            results.push_back(t);
-        }
-        return success();
+    addConversion([this](JuliaType t) {
+        return convert_JuliaType(t);
     });
 }
+
+struct JLIRToStandardHackTypeConverter : public JLIRToStandardTypeConverter {
+    JLIRToStandardHackTypeConverter(MLIRContext *ctx)
+        : JLIRToStandardTypeConverter(ctx) {
+
+        // TODO: document hack
+        addConversion([](Type t) { return t; }); // can this be moved to hack?
+        addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
+            return success();
+        });
+        addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
+            llvm::Optional<Type> converted = convert_JuliaType(t);
+            if (converted.hasValue()) {
+                results.push_back(converted.getValue());
+                results.push_back(NoneType::get(ctx));
+            } else {
+                results.push_back(t);
+            }
+            return success();
+        });
+    }
+};
 
 Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
     jl_datatype_t *jdt = t.getDatatype();
@@ -460,19 +470,22 @@ struct HackConversion : public OpAndTypeConversionPattern<FuncOp> {
 
 } // namespace
 
+
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
     FuncOp op, JLIRToStandardTypeConverter &converter) {
 
-    FunctionType ft = op.getType().cast<FunctionType>();
+    // HACK--note that block arguments that are not the function arguments are
+    // only converted after all the patterns are applied, and it seems that
+    // legality is only checked for the patterns, so the following in effect
+    // only detects if any of the function arguments are of `NoneType`
+    if (HackConversion::hasNoneTypeArguments(op))
+        return false;
 
     // function is illegal if any of its types can but haven't been
     // converted
+    FunctionType ft = op.getType().cast<FunctionType>();
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
-            // TODO: document
-            if (t.isa<NoneType>())
-                return false;
-
             if (JuliaType jt = t.dyn_cast<JuliaType>()) {
                 if (converter.convert_JuliaType(jt).hasValue())
                     return false;
@@ -493,9 +506,10 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         return isFuncOpLegal(op, converter);
     });
 
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+    JLIRToStandardHackTypeConverter hackConverter(&getContext());
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), hackConverter);
+    patterns.insert<HackConversion>(&getContext(), hackConverter);
     patterns.insert<
-        HackConversion,
         // FuncOpConversion,
         ConstantOpLowering,
         // CallOp
