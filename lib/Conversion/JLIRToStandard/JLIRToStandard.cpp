@@ -19,7 +19,7 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
         return success();
     });
     addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
-        llvm::Optional<Type> converted = convert_JuliaType(t);
+        llvm::Optional<Type> converted = convertJuliaType(t);
         if (converted.hasValue()) {
             results.push_back(converted.getValue());
             results.push_back(NoneType::get(ctx));
@@ -31,12 +31,12 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
 }
 
 // returns `None` if the Julia type could not be converted to an MLIR builtin type
-Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
+Optional<Type> JLIRToStandardTypeConverter::convertJuliaType(JuliaType t) {
     jl_datatype_t *jdt = t.getDatatype();
     if ((jl_value_t*)jdt == jl_bottom_type) {
         return None;
     } else if (jl_is_primitivetype(jdt)) {
-        return convert_bitstype(jdt);
+        return convertBitstype(jdt);
     } else if (jl_is_structtype(jdt)
                && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
         // bool is_tuple = jl_is_tuple_type(jt);
@@ -52,7 +52,7 @@ Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
     return None;
 }
 
-Type JLIRToStandardTypeConverter::convert_bitstype(jl_datatype_t *jdt) {
+Type JLIRToStandardTypeConverter::convertBitstype(jl_datatype_t *jdt) {
     assert(jl_is_primitivetype(jdt));
     if (jdt == jl_bool_type) {
         // convert to i1 even though Julia converts to i8
@@ -90,29 +90,38 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
                                JLIRToStandardTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
 
-    Value convertValue(ConversionPatternRewriter &rewriter,
-                       Location location,
-                       Value originalValue,
-                       Value remappedOriginalValue) const {
+    Optional<Value> convertValue(ConversionPatternRewriter &rewriter,
+                                 Location location,
+                                 Value originalValue,
+                                 Value remappedOriginalValue) const {
         JuliaType type = originalValue.getType().cast<JuliaType>();
+        Optional<Type> conversionResult =
+            this->lowering.convertJuliaType(type);
+        if (!conversionResult.hasValue())
+            return None;
         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
             location,
-            this->lowering.convert_JuliaType(type).getValue(),
+            conversionResult.getValue(),
             remappedOriginalValue);
         return convertOp.getResult();
     }
 
-    void convertOperands(ConversionPatternRewriter &rewriter,
-                         Location location,
-                         OperandRange originalOperands,
-                         ArrayRef<Value> remappedOriginalOperands,
-                         MutableArrayRef<Value> convertedOperands) const {
+    LogicalResult
+    convertOperands(ConversionPatternRewriter &rewriter,
+                    Location location,
+                    OperandRange originalOperands,
+                    ArrayRef<Value> remappedOriginalOperands,
+                    MutableArrayRef<Value> convertedOperands) const {
         unsigned i = 0;
         for (Value operand : originalOperands) {
-            convertedOperands[i] = this->convertValue(
+            Optional<Value> conversionResult = this->convertValue(
                 rewriter, location, operand, remappedOriginalOperands[i]);
+            if (!conversionResult.hasValue())
+                return failure();
+            convertedOperands[i] = conversionResult.getValue();
             i++;
         }
+        return success();
     }
 };
 
@@ -124,16 +133,22 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         SmallVector<Value, 4> convertedOperands(operands.size());
-        this->convertOperands(
-            rewriter, op.getLoc(),
-            op.getOperation()->getOperands(), operands,
-            convertedOperands);
+        if (failed(this->convertOperands(
+                       rewriter, op.getLoc(),
+                       op.getOperation()->getOperands(), operands,
+                       convertedOperands)))
+            return failure();
 
         JuliaType returnType =
             op.getResult().getType().template cast<JuliaType>();
+        Optional<Type> newReturnType =
+            this->lowering.convertJuliaType(returnType);
+        if (!newReturnType.hasValue())
+            return failure();
+
         StdOp new_op = rewriter.create<StdOp>(
             op.getLoc(),
-            this->lowering.convert_JuliaType(returnType).getValue(),
+            newReturnType.getValue(),
             convertedOperands,
             None);
         rewriter.replaceOpWithNewOp<ConvertStdOp>(
@@ -151,10 +166,12 @@ struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
                     ArrayRef<Value> operands,
                     ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() == 2);
-        SmallVector<Value, 2> convertedOperands(2);
-        this->convertOperands(
-            rewriter, op.getLoc(),
-            op.getOperands(), operands, convertedOperands);
+        SmallVector<Value, 2> convertedOperands(operands.size());
+        if (failed(this->convertOperands(
+                       rewriter, op.getLoc(),
+                       op.getOperands(), operands, convertedOperands)))
+            return failure();
+
         CmpOp cmpOp = rewriter.create<CmpOp>(
             op.getLoc(), predicate, convertedOperands[0], convertedOperands[1]);
         rewriter.replaceOpWithNewOp<ConvertStdOp>(
@@ -185,7 +202,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<jlir::ConstantOp> 
                                   ConversionPatternRewriter &rewriter) const override {
         JuliaType type = op.getType().cast<JuliaType>();
         jl_datatype_t *julia_type = type.getDatatype();
-        Optional<Type> conversionResult = lowering.convert_JuliaType(type);
+        Optional<Type> conversionResult = lowering.convertJuliaType(type);
 
         if (!conversionResult.hasValue())
             return failure();
@@ -225,8 +242,9 @@ struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         SmallVector<Value, 4> convertedOperands(operands.size());
-        convertOperands(
-            rewriter, op.getLoc(), op.getOperands(), operands, convertedOperands);
+        if (failed(convertOperands(rewriter, op.getLoc(), op.getOperands(),
+                                   operands, convertedOperands)))
+            return failure();
         rewriter.replaceOpWithNewOp<BranchOp>(
             op, op.getSuccessor(), convertedOperands);
         return success();
@@ -246,24 +264,30 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
 
         SmallVector<Value, 2> convertedBranchOperands(nBranchOperands);
         SmallVector<Value, 2> convertedFallthroughOperands(nFallthroughOperands);
-        convertOperands(
-            rewriter,
-            op.getLoc(),
-            op.branchOperands(),
-            operands.slice(nProperOperands, nBranchOperands),
-            convertedBranchOperands);
-        convertOperands(
-            rewriter,
-            op.getLoc(),
-            op.fallthroughOperands(),
-            operands.slice(nProperOperands + nBranchOperands,
-                           nFallthroughOperands),
-            convertedFallthroughOperands);
+        if (failed(convertOperands(
+                       rewriter,
+                       op.getLoc(),
+                       op.branchOperands(),
+                       operands.slice(nProperOperands, nBranchOperands),
+                       convertedBranchOperands)))
+            return failure();
+        if (failed(convertOperands(
+                       rewriter,
+                       op.getLoc(),
+                       op.fallthroughOperands(),
+                       operands.slice(nProperOperands + nBranchOperands,
+                                      nFallthroughOperands),
+                       convertedFallthroughOperands)))
+            return failure();
+
+        Optional<Value> conditionConversionResult = convertValue(
+            rewriter, op.getLoc(), op.getOperand(0), operands.front());
+        if (!conditionConversionResult.hasValue())
+            return failure();
 
         rewriter.replaceOpWithNewOp<CondBranchOp>(
             op,
-            convertValue(
-                rewriter, op.getLoc(), op.getOperand(0), operands.front()),
+            conditionConversionResult.getValue(),
             op.fallthroughDest(), convertedFallthroughOperands,
             op.branchDest(), convertedBranchOperands);
         return success();
@@ -276,16 +300,12 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        Value oldOperand = op.getOperand();
-        JuliaType type = oldOperand.getType().cast<JuliaType>();
-        Optional<Type> conversionResult = lowering.convert_JuliaType(type);
-
-        if (!conversionResult.hasValue())
+        Optional<Value> newOperand = convertValue(
+            rewriter, op.getLoc(), op.getOperand(), operands.front());
+        if (!newOperand.hasValue())
             return failure();
 
-        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
-            op,
-            convertValue(rewriter, op.getLoc(), oldOperand, operands.front()));
+        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, newOperand.getValue());
         return success();
     }
 };
@@ -297,9 +317,10 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         assert(operands.size() == 1);
-        SmallVector<Value, 1> convertedOperands(1);
-        convertOperands(rewriter, op.getLoc(),
-                        op.getOperands(), operands, convertedOperands);
+        SmallVector<Value, 1> convertedOperands(operands.size());
+        if (failed(convertOperands(rewriter, op.getLoc(), op.getOperands(),
+                                   operands, convertedOperands)))
+            return failure();
 
         JuliaType oldType = op.getType().cast<JuliaType>();
         IntegerType newType =
@@ -366,7 +387,7 @@ bool JLIRToStandardLoweringPass::isFuncOpLegal(
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
             if (JuliaType jt = t.dyn_cast<JuliaType>()) {
-                if (converter.convert_JuliaType(jt).hasValue())
+                if (converter.convertJuliaType(jt).hasValue())
                     return false;
             }
         }

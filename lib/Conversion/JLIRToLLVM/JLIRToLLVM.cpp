@@ -420,12 +420,12 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         ToUndefOpPattern<UnimplementedOp>,
         ToUndefOpPattern<UndefOp>,
         ConstantOpLowering, // (also JLIRTOStandard)
-        // ToUndefOpPattern<CallOp>,
-        // ToUndefOpPattern<InvokeOp>,
+        ToUndefOpPattern<CallOp>,
+        ToUndefOpPattern<InvokeOp>,
         // GotoOp (JLIRToStandard)
         GotoIfNotOpLowering,
         ReturnOpLowering,
-        // ToUndefOpPattern<PiOp>,
+        ToUndefOpPattern<PiOp>,
         // Intrinsic_bitcast
         // Intrinsic_neg_int
         // Intrinsic_add_int  (JLIRToStandard)

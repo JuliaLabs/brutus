@@ -5,7 +5,8 @@ import Brutus
 emit_lowered(f, tt...) =
     Brutus.emit(typeof(f), tt,
                 emit_llvm=false, # TODO: change to true when ready
-                dump_options=[Brutus.DumpLoweredToLLVM])
+                dump_options=[Brutus.DumpLoweredToStd,
+                              Brutus.DumpLoweredToLLVM])
 
 # TODO: f(c) = 1 + (c ? 2 : 3)
 # TODO: examples where function signature doesn't have anything that needs to
