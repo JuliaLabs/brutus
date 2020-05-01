@@ -30,32 +30,34 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     });
 }
 
+// returns `None` if the Julia type could not be converted to an MLIR builtin type
 Optional<Type> JLIRToStandardTypeConverter::convert_JuliaType(JuliaType t) {
     jl_datatype_t *jdt = t.getDatatype();
     if ((jl_value_t*)jdt == jl_bottom_type) {
-        return llvm::None;
+        return None;
     } else if (jl_is_primitivetype(jdt)) {
         return convert_bitstype(jdt);
-    // } else if (jl_is_structtype(jdt)
-    //            && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
-    //     // bool is_tuple = jl_is_tuple_type(jt);
-    //     jl_svec_t *ftypes = jl_get_fieldtypes(jdt);
-    //     size_t ntypes = jl_svec_len(ftypes);
-    //     if (ntypes == 0 || (jdt->layout && jl_datatype_nbits(jdt) == 0)) {
-
-    //     } else {
-    //         // TODO: actually handle structs
-    //         results.push_back(t); // don't convert for now
-    //     }
+    } else if (jl_is_structtype(jdt)
+               && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
+        // bool is_tuple = jl_is_tuple_type(jt);
+        jl_svec_t *ftypes = jl_get_fieldtypes(jdt);
+        size_t ntypes = jl_svec_len(ftypes);
+        if (ntypes == 0 || (jdt->layout && jl_datatype_nbits(jdt) == 0)) {
+            return None;
+        } else {
+            // TODO: actually handle structs
+            return t; // don't convert for now
+        }
     }
-    return llvm::None;
+    return None;
 }
 
 Type JLIRToStandardTypeConverter::convert_bitstype(jl_datatype_t *jdt) {
     assert(jl_is_primitivetype(jdt));
-    if (jdt == jl_bool_type)
-        return IntegerType::get(1, ctx); // will this work, or does it need to be 8?
-    else if (jdt == jl_int32_type)
+    if (jdt == jl_bool_type) {
+        // convert to i1 even though Julia converts to i8
+        return IntegerType::get(1, ctx);
+    } else if (jdt == jl_int32_type)
         return IntegerType::get(32, ctx);
     else if (jdt == jl_int64_type)
         return IntegerType::get(64, ctx);
@@ -91,8 +93,7 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
     Value convertValue(ConversionPatternRewriter &rewriter,
                        Location location,
                        Value originalValue,
-                       Value remappedOriginalValue,
-                       bool relevant = false) const {
+                       Value remappedOriginalValue) const {
         JuliaType type = originalValue.getType().cast<JuliaType>();
         ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
             location,
@@ -284,7 +285,7 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
 
         rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
             op,
-            convertValue(rewriter, op.getLoc(), oldOperand, operands.front(), true));
+            convertValue(rewriter, op.getLoc(), oldOperand, operands.front()));
         return success();
     }
 };
@@ -295,8 +296,6 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
     LogicalResult matchAndRewrite(Intrinsic_not_int op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // NOTE: this treats Bool as having been converted to i1
-
         assert(operands.size() == 1);
         SmallVector<Value, 1> convertedOperands(1);
         convertOperands(rewriter, op.getLoc(),
@@ -320,6 +319,40 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
         rewriter.replaceOpWithNewOp<ConvertStdOp>(
             op, oldType, xorOp.getResult());
         return success();
+    }
+};
+
+struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
+    using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(Builtin_is op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        IntegerAttr falseAttr =
+            rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
+
+        assert(operands.size() == 2);
+        jl_value_t *jt1 = (jl_value_t*)op.getOperand(0).getType()
+            .cast<JuliaType>().getDatatype();
+        jl_value_t *jt2 = (jl_value_t*)op.getOperand(1).getType()
+            .cast<JuliaType>().getDatatype();
+        if (jl_is_concrete_type(jt1) && jl_is_concrete_type(jt2)
+            && !jl_is_kind(jt1) && !jl_is_kind(jt2) && jt1 != jt2) {
+            // disjoint concrete leaf types are never equal
+            rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, falseAttr);
+            return success();
+        }
+
+        // TODO: ghosts, see `emit_f_is`
+
+        if (jl_type_intersection(jt1, jt2) == (jl_value_t*)jl_bottom_type) {
+            rewriter.replaceOpWithNewOp<mlir::ConstantOp>(op, falseAttr);
+            return success();
+        }
+
+        // TODO
+
+        return failure();
     }
 };
 
@@ -354,12 +387,15 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        ConstantOpLowering,
+        // ConvertStdOp    (JLIRToLLVM)
+        // UnimplementedOp (JLIRToLLVM)
+        // UndefOp         (JLIRToLLVM)
+        ConstantOpLowering, // (also JLIRToLLVM)
         // CallOp
         // InvokeOp
         GotoOpLowering,
-        GotoIfNotOpLowering,
-        ReturnOpLowering,
+        GotoIfNotOpLowering, // (also JLIRToLLVM)
+        ReturnOpLowering,    // (also JLIRToLLVM)
         // PiOp
         // Intrinsic_bitcast
         // Intrinsic_neg_int
@@ -378,7 +414,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         ToStdOpPattern<Intrinsic_mul_float, MulFOp>,
         ToStdOpPattern<Intrinsic_div_float, DivFOp>,
         ToStdOpPattern<Intrinsic_rem_float, RemFOp>,
-        // Intrinsic_fma_float
+        // Intrinsic_fma_float (JLIRToLLVM)
         // Intrinsic_muladd_float
         // Intrinsic_neg_float_fast
         // Intrinsic_add_float_fast
@@ -433,7 +469,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_flipsign_int
         ToStdOpPattern<Intrinsic_ceil_llvm, CeilFOp>,
         // Intrinsic_floor_llvm
-        // Intrinsic_trunc_llvm
+        // Intrinsic_trunc_llvm (JLIRToLLVM, but maybe could be here?)
         // Intrinsic_rint_llvm
         ToStdOpPattern<Intrinsic_sqrt_llvm, SqrtOp>,
         // Intrinsic_sqrt_llvm_fast
@@ -444,7 +480,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Intrinsic_arraylen
         // Intrinsic_cglobal_auto
         // Builtin_throw
-        // Builtin_is
+        IsOpLowering, // Builtin_is (also JLIRToLLVM)
         // Builtin_typeof
         // Builtin_sizeof
         // Builtin_issubtype
@@ -469,7 +505,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Builtin_invoke ?
         // Builtin__expr
         // Builtin_typeassert
-        ToStdOpPattern<Builtin_ifelse, SelectOp>
+        ToStdOpPattern<Builtin_ifelse, SelectOp> // (also JLIRToLLVM)
         // Builtin__typevar
         // invoke_kwsorter?
         >(&getContext(), converter);

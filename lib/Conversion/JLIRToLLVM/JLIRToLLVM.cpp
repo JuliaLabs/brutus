@@ -113,23 +113,12 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
                                JLIRToLLVMTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
 
-    // truncate a Bool (i8) to an i1
-    Value truncateBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
-        return b;
-        // LLVM::TruncOp truncated = rewriter.create<LLVM::TruncOp>(
-        //     loc, LLVM::LLVMType::getInt1Ty(lowering.llvm_dialect), b);
-        // return truncated.getResult();
-    }
+    Value compareBits(ConversionPatternRewriter &rewriter, Location loc,
+                      Value a, Value b) const {
+        // TODO: check if this actually works--it may not, because new operands
+        //       are being passed in through `a` and `b`, and they might not
+        //       have a type yet
 
-    // zero extend an i1 to a Bool (i8)
-    Value extendBool(Location loc, Value b, ConversionPatternRewriter &rewriter) const {
-        return b;
-        // LLVM::ZExtOp extended = rewriter.create<LLVM::ZExtOp>(
-        //     loc, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect), b);
-        // return extended.getResult();
-    }
-
-    Value compareBits(Location loc, Value a, Value b, ConversionPatternRewriter &rewriter) const {
         assert(a.getType() == b.getType());
         LLVM::LLVMType t = a.getType().dyn_cast<LLVM::LLVMType>();
 
@@ -141,10 +130,8 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
                 a = rewriter.create<LLVM::BitcastOp>(loc, t_int, a).getResult();
                 b = rewriter.create<LLVM::BitcastOp>(loc, t_int, b).getResult();
             }
-            Value result = rewriter.create<LLVM::ICmpOp>(
+            return rewriter.create<LLVM::ICmpOp>(
                 loc, LLVM::ICmpPredicate::eq, a, b).getResult();
-            // do I really need to extend back to i8?
-            return extendBool(loc, result, rewriter);
         }
 
         // TODO
@@ -153,7 +140,7 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
 };
 
 // is there some template magic that would allow us to combine
-// `ToLLVMOpPattern`, `ToUnaryLLVMOpPattern`, and `ToTernaryLLVMOpPattern`?
+// `ToLLVMOpPattern`, `ToUnaryLLVMOpPattern`, and `ToTernaryLLVMOpPattern`
 
 template <typename SourceOp, typename LLVMOp>
 struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
@@ -224,37 +211,6 @@ struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
     }
 };
 
-// template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
-// struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
-//     using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
-
-//     LogicalResult matchAndRewrite(SourceOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         assert(operands.size() == 2);
-//         CmpOp cmp = rewriter.create<CmpOp>(
-//             op.getLoc(), predicate, operands[0], operands[1]);
-//         // assumes a Bool (i8) is to be returned
-//         rewriter.replaceOp(
-//             op, this->extendBool(op.getLoc(), cmp.getResult(), rewriter));
-//         return success();
-//     }
-// };
-
-// template <typename SourceOp, LLVM::ICmpPredicate predicate>
-// struct ToICmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
-//                                                LLVM::ICmpPredicate, predicate> {
-//     using ToCmpOpPattern<SourceOp, LLVM::ICmpOp,
-//                          LLVM::ICmpPredicate, predicate>::ToCmpOpPattern;
-// };
-
-// template <typename SourceOp, LLVM::FCmpPredicate predicate>
-// struct ToFCmpOpPattern : public ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
-//                                                LLVM::FCmpPredicate, predicate> {
-//     using ToCmpOpPattern<SourceOp, LLVM::FCmpOp,
-//                          LLVM::FCmpPredicate, predicate>::ToCmpOpPattern;
-// };
-
 struct ConvertStdOpLowering : public OpAndTypeConversionPattern<ConvertStdOp> {
     using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
 
@@ -262,76 +218,11 @@ struct ConvertStdOpLowering : public OpAndTypeConversionPattern<ConvertStdOp> {
     matchAndRewrite(ConvertStdOp op,
                     ArrayRef<Value> operands,
                     ConversionPatternRewriter &rewriter) const override {
+        // TODO: check that this conversion is valid
         rewriter.replaceOp(op, operands.front());
         return success();
     }
 };
-
-// struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
-//     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
-
-//     LogicalResult matchAndRewrite(FuncOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         FunctionType type = op.getType();
-
-//         // convert return type
-//         assert(type.getNumResults() == 1);
-//         LLVM::LLVMType new_return_type =
-//             lowering.convertType(type.getResults().front()).cast<LLVM::LLVMType>();
-//         assert(new_return_type && "failed to convert return type");
-
-//         // convert argument types
-//         SmallVector<LLVM::LLVMType, 8> new_arg_types;
-//         new_arg_types.reserve(op.getNumArguments());
-//         SmallVector<std::pair<unsigned, Type>, 4> to_remove;
-//         TypeConverter::SignatureConversion result(op.getNumArguments());
-//         for (auto &en : llvm::enumerate(type.getInputs())) {
-//             LLVM::LLVMType converted =
-//                 lowering.convertType(en.value()).cast<LLVM::LLVMType>();
-//             assert(converted && "failed to convert argument type");
-
-//             // drop argument if it converts to void type
-//             if (converted == lowering.void_type) {
-//                 // record that we need to remap it to an undef later, once we
-//                 // have actually created the new function in which to add the
-//                 // `LLVM::UndefOp`s
-//                 to_remove.emplace_back(en.index(), converted);
-//                 continue;
-//             }
-
-//             new_arg_types.push_back(converted);
-//             result.addInputs(en.index(), converted);
-//         }
-
-//         // create new function operation
-//         LLVM::LLVMType llvm_type = LLVM::LLVMType::getFunctionTy(
-//             new_return_type,
-//             new_arg_types,
-//             /*isVarArg=*/false);
-//         LLVM::LLVMFuncOp new_func = rewriter.create<LLVM::LLVMFuncOp>(
-//             op.getLoc(), op.getName(), llvm_type, LLVM::Linkage::External);
-//         rewriter.inlineRegionBefore(
-//             op.getBody(), new_func.getBody(), new_func.end());
-
-//         // insert `LLVM::UndefOp`s to start of new function to replace removed
-//         // arguments
-//         OpBuilder::InsertionGuard guard(rewriter);
-//         rewriter.setInsertionPointToStart(&new_func.front());
-//         for (auto &entry : to_remove) {
-//             unsigned index = entry.first;
-//             Type converted = entry.second;
-//             LLVM::UndefOp replacement = rewriter.create<LLVM::UndefOp>(
-//                 new_func.getArgument(index).getLoc(), // get location from old argument
-//                 converted);
-//             result.remapInput(index, replacement.getResult());
-//         }
-
-//         rewriter.applySignatureConversion(&new_func.getBody(), result);
-//         rewriter.eraseOp(op);
-//         return success();
-//     }
-// };
 
 struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
@@ -401,68 +292,28 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
     }
 };
 
-struct CallOpLowering : public ToUndefOpPattern<CallOp> {
-    // TODO
-    using ToUndefOpPattern<CallOp>::ToUndefOpPattern;
+struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
+    using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(GotoIfNotOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        assert(operands.size() >= 1);
+        rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
+            op, operands, op.getSuccessors(), op.getAttrs());
+        return success();
+    }
 };
 
-struct InvokeOpLowering : public ToUndefOpPattern<InvokeOp> {
-    // TODO
-    using ToUndefOpPattern<InvokeOp>::ToUndefOpPattern;
-};
+struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
+    using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
-// struct GotoOpLowering : public OpConversionPattern<GotoOp> {
-//     using OpConversionPattern<GotoOp>::OpConversionPattern;
-
-//     LogicalResult matchAndRewrite(GotoOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         rewriter.replaceOpWithNewOp<LLVM::BrOp>(
-//             op, operands, op.getSuccessor());
-//         return success();
-//     }
-// };
-
-// struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
-//     using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
-
-//     LogicalResult matchAndRewrite(GotoIfNotOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         assert(operands.size() >= 1);
-
-//         // truncate condition from i8 to i1
-//         SmallVector<Value, 4> new_operands;
-//         std::copy(operands.begin(), operands.end(),
-//                   std::back_inserter(new_operands));
-//         new_operands.front() = truncateBool(
-//             op.getLoc(), operands.front(), rewriter);
-
-//         rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-//             op, new_operands, op.getSuccessors(), op.getAttrs());
-//         return success();
-//     }
-// };
-
-// struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
-//     using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
-
-//     LogicalResult matchAndRewrite(ReturnOp op,
-//                                   ArrayRef<Value> operands,
-//                                   ConversionPatternRewriter &rewriter) const override {
-//         // drop operand if its type is the LLVM void type
-//         if (operands.size() == 1
-//             && operands.front().getType() == lowering.void_type) {
-//             operands = llvm::None;
-//         }
-//         rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
-//         return success();
-//     }
-// };
-
-struct PiOpLowering : public ToUndefOpPattern<PiOp> {
-    // TODO
-    using ToUndefOpPattern<PiOp>::ToUndefOpPattern;
+    LogicalResult matchAndRewrite(ReturnOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
+        return success();
+    }
 };
 
 struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
@@ -499,38 +350,30 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     LogicalResult matchAndRewrite(Builtin_is op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // should result be an i1 or i8? `emit_f_is` uses i1 but Bool is i8
-
         assert(operands.size() == 2);
-        jl_value_t *t1 = (jl_value_t*)op.getOperand(0).getType()
-            .dyn_cast<JuliaType>().getDatatype();
-        jl_value_t *t2 = (jl_value_t*)op.getOperand(1).getType()
-            .dyn_cast<JuliaType>().getDatatype();
-        if (jl_is_concrete_type(t1) && jl_is_concrete_type(t2)
-            && !jl_is_kind(t1) && !jl_is_kind(t2) && t1 != t2) {
+        jl_value_t *jt1 = (jl_value_t*)op.getOperand(0).getType()
+            .cast<JuliaType>().getDatatype();
+        jl_value_t *jt2 = (jl_value_t*)op.getOperand(1).getType()
+            .cast<JuliaType>().getDatatype();
+        if (jl_is_concrete_type(jt1) && jl_is_concrete_type(jt2)
+            && !jl_is_kind(jt1) && !jl_is_kind(jt2) && jt1 != jt2) {
             // disjoint concrete leaf types are never equal
-            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
-                op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
-                rewriter.getI8IntegerAttr(0));
-            return success();
+            assert(false && "should have been handled in JLIRToStandard");
         }
 
         // TODO: ghosts, see `emit_f_is`
 
-        if (jl_type_intersection(t1, t2) == (jl_value_t*)jl_bottom_type) {
-            rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
-                op, LLVM::LLVMType::getInt8Ty(lowering.llvm_dialect),
-                rewriter.getI8IntegerAttr(0));
-            return success();
+        if (jl_type_intersection(jt1, jt2) == (jl_value_t*)jl_bottom_type) {
+            assert(false && "should have been handled in JLIRToStandard");
         }
 
-        bool justbits1 = jl_is_concrete_immutable(t1);
-        bool justbits2 = jl_is_concrete_immutable(t2);
+        bool justbits1 = jl_is_concrete_immutable(jt1);
+        bool justbits2 = jl_is_concrete_immutable(jt2);
         if (justbits1 || justbits2) {
-            if (t1 == t2) {
+            if (jt1 == jt2) {
                 rewriter.replaceOp(
                     op, compareBits(
-                        op.getLoc(), operands[0], operands[1], rewriter));
+                        rewriter, op.getLoc(), operands[0], operands[1]));
                 return success();
             }
 
@@ -559,7 +402,7 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
 
 } // namespace
 
-// NOTE: maybe values that convert to void should not be removed--pass a
+// TODO: maybe values that convert to void should not be removed--pass a
 //       pointer?
 //
 //       f(x::Bool) = x ? nothing : 100
@@ -574,130 +417,128 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
         ConvertStdOpLowering,
-        // FuncOpConversion,
         ToUndefOpPattern<UnimplementedOp>,
         ToUndefOpPattern<UndefOp>,
-        ConstantOpLowering,
-    //     CallOpLowering,
-    //     InvokeOpLowering,
-    //     GotoIfNotOpLowering,
-    //     ReturnOpLowering,
-    //     PiOpLowering,
-    //     // Intrinsic_bitcast
-    //     // Intrinsic_neg_int
-    //     ToLLVMOpPattern<Intrinsic_add_int, LLVM::AddOp>,
-    //     ToLLVMOpPattern<Intrinsic_sub_int, LLVM::SubOp>,
-    //     ToLLVMOpPattern<Intrinsic_mul_int, LLVM::MulOp>,
-    //     ToLLVMOpPattern<Intrinsic_sdiv_int, LLVM::SDivOp>,
-    //     ToLLVMOpPattern<Intrinsic_udiv_int, LLVM::UDivOp>,
-    //     ToLLVMOpPattern<Intrinsic_srem_int, LLVM::SRemOp>,
-    //     ToLLVMOpPattern<Intrinsic_urem_int, LLVM::URemOp>,
-    //     // Intrinsic_add_ptr
-    //     // Intrinsic_sub_ptr
-    //     ToLLVMOpPattern<Intrinsic_neg_float, LLVM::FNegOp>,
-    //     ToLLVMOpPattern<Intrinsic_add_float, LLVM::FAddOp>,
-    //     ToLLVMOpPattern<Intrinsic_sub_float, LLVM::FSubOp>,
-    //     ToLLVMOpPattern<Intrinsic_mul_float, LLVM::FMulOp>,
-    //     ToLLVMOpPattern<Intrinsic_div_float, LLVM::FDivOp>,
-    //     ToLLVMOpPattern<Intrinsic_rem_float, LLVM::FRemOp>,
-    //     ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
-    //     // Intrinsic_muladd_float
-    //     // Intrinsic_neg_float_fast
-    //     // Intrinsic_add_float_fast
-    //     // Intrinsic_sub_float_fast
-    //     // Intrinsic_mul_float_fast
-    //     // Intrinsic_div_float_fast
-    //     // Intrinsic_rem_float_fast
-    //     ToICmpOpPattern<Intrinsic_eq_int, LLVM::ICmpPredicate::eq>,
-    //     ToICmpOpPattern<Intrinsic_ne_int, LLVM::ICmpPredicate::ne>,
-    //     ToICmpOpPattern<Intrinsic_slt_int, LLVM::ICmpPredicate::slt>,
-    //     ToICmpOpPattern<Intrinsic_ult_int, LLVM::ICmpPredicate::ult>,
-    //     ToICmpOpPattern<Intrinsic_sle_int, LLVM::ICmpPredicate::sle>,
-    //     ToICmpOpPattern<Intrinsic_ule_int, LLVM::ICmpPredicate::ule>,
-    //     ToFCmpOpPattern<Intrinsic_eq_float, LLVM::FCmpPredicate::oeq>,
-    //     ToFCmpOpPattern<Intrinsic_ne_float, LLVM::FCmpPredicate::une>,
-    //     ToFCmpOpPattern<Intrinsic_lt_float, LLVM::FCmpPredicate::olt>,
-    //     ToFCmpOpPattern<Intrinsic_le_float, LLVM::FCmpPredicate::ole>,
-    //     // Intrinsic_fpiseq
-    //     // Intrinsic_fpislt
-    //     ToLLVMOpPattern<Intrinsic_and_int, LLVM::AndOp>,
-    //     ToLLVMOpPattern<Intrinsic_or_int, LLVM::OrOp>,
-    //     ToLLVMOpPattern<Intrinsic_xor_int, LLVM::XOrOp>,
-        NotIntOpLowering, // Intrinsic_not_int
-    //     // Intrinsic_shl_int
-    //     // Intrinsic_lshr_int
-    //     // Intrinsic_ashr_int
-    //     // Intrinsic_bswap_int
-    //     // Intrinsic_ctpop_int
-    //     // Intrinsic_ctlz_int
-    //     // Intrinsic_cttz_int
-    //     // Intrinsic_sext_int
-    //     // Intrinsic_zext_int
-    //     // Intrinsic_trunc_int
-    //     // Intrinsic_fptoui
-    //     // Intrinsic_fptosi
-    //     // Intrinsic_uitofp
-    //     // Intrinsic_sitofp
-    //     // Intrinsic_fptrunc
-    //     // Intrinsic_fpext
-    //     // Intrinsic_checked_sadd_int
-    //     // Intrinsic_checked_uadd_int
-    //     // Intrinsic_checked_ssub_int
-    //     // Intrinsic_checked_usub_int
-    //     // Intrinsic_checked_smul_int
-    //     // Intrinsic_checked_umul_int
-    //     // Intrinsic_checked_sdiv_int
-    //     // Intrinsic_checked_udiv_int
-    //     // Intrinsic_checked_srem_int
-    //     // Intrinsic_checked_urem_int
-    //     ToUnaryLLVMOpPattern<Intrinsic_abs_float, LLVM::FAbsOp>,
-    //     // Intrinsic_copysign_float
-    //     // Intrinsic_flipsign_int
-    //     ToUnaryLLVMOpPattern<Intrinsic_ceil_llvm, LLVM::FCeilOp>,
-    //     // Intrinsic_floor_llvm
-    //     ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
-    //     // Intrinsic_rint_llvm
-    //     ToUnaryLLVMOpPattern<Intrinsic_sqrt_llvm, LLVM::SqrtOp>,
-    //     // Intrinsic_sqrt_llvm_fast
-    //     // Intrinsic_pointerref
-    //     // Intrinsic_pointerset
-    //     // Intrinsic_cglobal
-    //     // Intrinsic_llvmcall
-    //     // Intrinsic_arraylen
-    //     // Intrinsic_cglobal_auto
-    //     // Builtin_throw
-        IsOpLowering, // Builtin_is
-    //     // Builtin_typeof
-    //     // Builtin_sizeof
-    //     // Builtin_issubtype
+        ConstantOpLowering, // (also JLIRTOStandard)
+        // ToUndefOpPattern<CallOp>,
+        // ToUndefOpPattern<InvokeOp>,
+        // GotoOp (JLIRToStandard)
+        GotoIfNotOpLowering,
+        ReturnOpLowering,
+        // ToUndefOpPattern<PiOp>,
+        // Intrinsic_bitcast
+        // Intrinsic_neg_int
+        // Intrinsic_add_int  (JLIRToStandard)
+        // Intrinsic_sub_int  (JLIRToStandard)
+        // Intrinsic_mul_int  (JLIRToStandard)
+        // Intrinsic_sdiv_int (JLIRToStandard)
+        // Intrinsic_udiv_int (JLIRToStandard)
+        // Intrinsic_srem_int (JLIRToStandard)
+        // Intrinsic_urem_int (JLIRToStandard)
+        // Intrinsic_add_ptr
+        // Intrinsic_sub_ptr
+        // Intrinsic_neg_float (JLIRToStandard)
+        // Intrinsic_add_float (JLIRToStandard)
+        // Intrinsic_sub_float (JLIRToStandard)
+        // Intrinsic_mul_float (JLIRToStandard)
+        // Intrinsic_div_float (JLIRToStandard)
+        // Intrinsic_rem_float (JLIRToStandard)
+        ToTernaryLLVMOpPattern<Intrinsic_fma_float, LLVM::FMAOp>,
+        // Intrinsic_muladd_float
+        // Intrinsic_neg_float_fast
+        // Intrinsic_add_float_fast
+        // Intrinsic_sub_float_fast
+        // Intrinsic_mul_float_fast
+        // Intrinsic_div_float_fast
+        // Intrinsic_rem_float_fast
+        // Intrinsic_eq_int   (JLIRToStandard)
+        // Intrinsic_ne_int   (JLIRToStandard)
+        // Intrinsic_slt_int  (JLIRToStandard)
+        // Intrinsic_ult_int  (JLIRToStandard)
+        // Intrinsic_sle_int  (JLIRToStandard)
+        // Intrinsic_ule_int  (JLIRToStandard)
+        // Intrinsic_eq_float (JLIRToStandard)
+        // Intrinsic_ne_float (JLIRToStandard)
+        // Intrinsic_lt_float (JLIRToStandard)
+        // Intrinsic_le_float (JLIRToStandard)
+        // Intrinsic_fpiseq
+        // Intrinsic_fpislt
+        // Intrinsic_and_int  (JLIRToStandard)
+        // Intrinsic_or_int   (JLIRToStandard)
+        // Intrinsic_xor_int  (JLIRToStandard)
+        // Intrinsic_not_int  (JLIRToStandard)
+        // Intrinsic_shl_int  (JLIRToStandard)
+        // Intrinsic_lshr_int (JLIRToStandard)
+        // Intrinsic_ashr_int (JLIRToStandard)
+        // Intrinsic_bswap_int
+        // Intrinsic_ctpop_int
+        // Intrinsic_ctlz_int
+        // Intrinsic_cttz_int
+        // Intrinsic_sext_int  (JLIRToStandard)
+        // Intrinsic_zext_int  (JLIRToStandard)
+        // Intrinsic_trunc_int (JLIRToStandard)
+        // Intrinsic_fptoui
+        // Intrinsic_fptosi
+        // Intrinsic_uitofp
+        // Intrinsic_sitofp  (JLIRToStandard)
+        // Intrinsic_fptrunc (JLIRToStandard)
+        // Intrinsic_fpext   (JLIRToStandard)
+        // Intrinsic_checked_sadd_int
+        // Intrinsic_checked_uadd_int
+        // Intrinsic_checked_ssub_int
+        // Intrinsic_checked_usub_int
+        // Intrinsic_checked_smul_int
+        // Intrinsic_checked_umul_int
+        // Intrinsic_checked_sdiv_int
+        // Intrinsic_checked_udiv_int
+        // Intrinsic_checked_srem_int
+        // Intrinsic_checked_urem_int
+        // Intrinsic_abs_float      (JLIRToStandard)
+        // Intrinsic_copysign_float (JLIRToStandard)
+        // Intrinsic_flipsign_int
+        // Intrinsic_ceil_llvm (JLIRToStandard)
+        // Intrinsic_floor_llvm
+        ToUnaryLLVMOpPattern<Intrinsic_trunc_llvm, LLVM::TruncOp>,
+        // Intrinsic_rint_llvm
+        // Intrinsic_sqrt_llvm (JLIRToStandard)
+        // Intrinsic_sqrt_llvm_fast
+        // Intrinsic_pointerref
+        // Intrinsic_pointerset
+        // Intrinsic_cglobal
+        // Intrinsic_llvmcall
+        // Intrinsic_arraylen
+        // Intrinsic_cglobal_auto
+        // Builtin_throw
+        IsOpLowering, // Builtin_is (also JLIRToStandard)
+        // Builtin_typeof
+        // Builtin_sizeof
+        // Builtin_issubtype
         ToUndefOpPattern<Builtin_isa>, // Builtin_isa
-    //     // Builtin__apply
-    //     // Builtin__apply_pure
-    //     // Builtin__apply_latest
-    //     // Builtin__apply_iterate
-    //     // Builtin_isdefined
-    //     // Builtin_nfields
-    //     // Builtin_tuple
-    //     // Builtin_svec
-        ToUndefOpPattern<Builtin_getfield> // Builtin_getfield
-    //     // Builtin_setfield
-    //     // Builtin_fieldtype
-    //     // Builtin_arrayref
-    //     // Builtin_const_arrayref
-    //     // Builtin_arrayset
-    //     // Builtin_arraysize
-    //     // Builtin_apply_type
-    //     // Builtin_applicable
-    //     // Builtin_invoke ?
-    //     // Builtin__expr
-    //     // Builtin_typeassert
-    //     IfElseOpLowering // Builtin_ifelse
-    //     // Builtin__typevar
-    //     // invoke_kwsorter?
+        // Builtin__apply
+        // Builtin__apply_pure
+        // Builtin__apply_latest
+        // Builtin__apply_iterate
+        // Builtin_isdefined
+        // Builtin_nfields
+        // Builtin_tuple
+        // Builtin_svec
+        ToUndefOpPattern<Builtin_getfield>, // Builtin_getfield
+        // Builtin_setfield
+        // Builtin_fieldtype
+        // Builtin_arrayref
+        // Builtin_const_arrayref
+        // Builtin_arrayset
+        // Builtin_arraysize
+        // Builtin_apply_type
+        // Builtin_applicable
+        // Builtin_invoke ?
+        // Builtin__expr
+        // Builtin_typeassert
+        ToTernaryLLVMOpPattern<
+            Builtin_ifelse, LLVM::SelectOp> // (also JLIRToStandard)
+        // Builtin__typevar
+        // invoke_kwsorter?
         >(&getContext(), converter);
-    // patterns.insert<
-    //     GotoOpLowering
-    //     >(&getContext());
 
     if (failed(applyPartialConversion(
                     getFunction(), target, patterns, &converter)))
