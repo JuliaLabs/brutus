@@ -82,7 +82,8 @@ mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
         // FIXME: this is unsafe and stupid, but they do have the same layout
         // first argument is function itself, can be needed with call overloading
         // and closures
-        ssize_t idx = ((jl_ssavalue_t*)value)->id - 1;
+        // ssize_t idx = ((jl_ssavalue_t*)value)->id - 1;
+        ssize_t idx = ((jl_ssavalue_t*)value)->id - 2;
         assert(idx >= 0);
         return (mlir::Value) ctx.arguments[idx];
     } else if (jl_is_globalref(value)) {
@@ -176,14 +177,15 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
 
     // 2. Function prototype
     jl_array_t *argtypes = (jl_array_t*)jl_get_field(ir_code, "argtypes");
-    size_t nargs = jl_array_dim0(argtypes);
+    size_t nargs = jl_array_dim0(argtypes)-1;
     // FIXME: Handle varargs
     std::vector<mlir::Type> args;
     // First argument is the function, can be needed with call overloading and closures
-    for (int i = 0; i < (int)nargs; i++) {
+    for (int i = 1; i < (int)nargs + 1; i++) {
         // this assumes that we have `jl_datatype_t`s!
         args.push_back(
-            JuliaType::get(ctx.context, (jl_datatype_t*)jl_arrayref(argtypes, i)));
+            JuliaType::get(ctx.context,
+                           (jl_datatype_t*)jl_arrayref(argtypes, i)));
     }
     mlir::Type ret = (mlir::Type) JuliaType::get(ctx.context, (jl_datatype_t*)ret_type);
     mlir::FunctionType ftype = ctx.builder.getFunctionType(args, llvm::makeArrayRef(ret));

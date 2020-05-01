@@ -7,6 +7,8 @@ using Test
 @test Brutus.call(identity, true) == identity(true)
 
 @test Brutus.call(+, 1, 2) == 1 + 2
+@test Brutus.call(+, 1, 2, 3) == 1 + 2 + 3
+# @test Brutus.call(+, 1, 2, 3, 4) == 1 + 2 + 3 + 4
 @test Brutus.call(+, 1.1, 2.2) == 1.1 + 2.2
 # @test Brutus.call(+, true, false) == true + false
 
