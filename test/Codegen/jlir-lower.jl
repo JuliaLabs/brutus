@@ -8,6 +8,8 @@ emit_lowered(f, tt...) =
                 dump_options=[Brutus.DumpLoweredToLLVM])
 
 # TODO: f(c) = 1 + (c ? 2 : 3)
+# TODO: examples where function signature doesn't have anything that needs to
+#       be type-converted
 
 emit_lowered(identity, Bool)
 # CHECK: llvm.func @identity(%arg0: !llvm.i8) -> !llvm.i8

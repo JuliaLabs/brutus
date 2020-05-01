@@ -9,6 +9,11 @@ using namespace jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
+    // HACK: Until `materializeConversion` is called for 1-1 type conversions in
+    //       MLIR, we convert function/block arguments to two result types,
+    //       the second being a dummy `NoneType` type, to be removed in a second
+    //       call to `applyPartialConversion`. The first two conversions are
+    //       only necessary for this second call to `applyPartialConversion`.
     addConversion([](Type t) { return t; });
     addConversion([](NoneType t, SmallVectorImpl<Type> &results) {
         return success();
@@ -67,6 +72,9 @@ Operation
                                                     Type resultType,
                                                     ArrayRef<Value> inputs,
                                                     Location loc) {
+    // HACK
+    assert(inputs.size() == 2 && inputs.back().getType().isa<NoneType>());
+
     return rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
 }
 
@@ -132,95 +140,6 @@ struct ToStdOpPattern : public OpAndTypeConversionPattern<SourceOp> {
         return success();
     }
 };
-
-// struct FuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
-//     using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
-
-//     Block* applyBlockConversion(ConversionPatternRewriter &rewriter,
-//                                 Block *oldBlock) const {
-//         llvm::outs() << "\n\n*********************applyBlockConversion\n\n";
-
-//         // split block at beginning to obtain new block with no arguments
-//         Block *newBlock = oldBlock->splitBlock(oldBlock->begin());
-
-//         OpBuilder::InsertionGuard guard(rewriter);
-//         rewriter.setInsertionPointToStart(newBlock);
-//         for (BlockArgument &oldArgument : oldBlock->getArguments()) {
-//             Type oldType = oldArgument.getType();
-//             Type newType = lowering.convertType(oldType);
-//             BlockArgument newArgument = newBlock->addArgument(newType);
-//             if (oldType == newType) {
-//                 rewriter.replaceUsesOfBlockArgument(oldArgument, newArgument);
-//             } else {
-//                 ConvertStdOp convertOp = rewriter.create<ConvertStdOp>(
-//                     // is there a reasonable location for this? `BlockArgument`s
-//                     // have unknown locations
-//                     rewriter.getUnknownLoc(),
-//                     oldType,
-//                     newArgument);
-//                 rewriter.replaceUsesOfBlockArgument(
-//                     oldArgument, convertOp.getResult());
-//             }
-//         }
-
-//         return newBlock;
-//     }
-
-//     // based on `FuncOpSignatureConversion::matchAndRewrite` in
-//     // DialectConversion.cpp, except that `applyBlockConversion` (see above) is
-//     // used in place of `ConversionPatternRewriter::applySignatureConversion` to
-//     // convert type-converted block arguments back into `JuliaType`s with
-//     // `ConvertStdOp`s, and this is applied to all blocks
-//     LogicalResult
-//     matchAndRewrite(FuncOp funcOp,
-//                     ArrayRef<Value> operands,
-//                     ConversionPatternRewriter &rewriter) const override {
-//         FunctionType type = funcOp.getType();
-
-//         // convert arguments
-//         TypeConverter::SignatureConversion inputConversion(type.getNumInputs());
-//         for (auto &en : llvm::enumerate(type.getInputs())) {
-//             if (failed(lowering.convertSignatureArg(
-//                            en.index(), en.value(), inputConversion)))
-//                 return failure();
-//         }
-
-//         // convert results
-//         SmallVector<Type, 1> convertedResults;
-//         if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
-//             return failure();
-
-//         // create new `FuncOp`
-//         FunctionType newFuncType = rewriter.getFunctionType(
-//             inputConversion.getConvertedTypes(), convertedResults);
-//         FuncOp newFuncOp = rewriter.create<FuncOp>(
-//             funcOp.getLoc(), funcOp.getName(), newFuncType, None);
-
-//         // convert block argument types (replacing
-//         // `rewriter.applySignatureConversion`)
-//         for (Block &block : funcOp.getBlocks()) {
-//             newFuncOp.getBody().push_back(
-//                 applyBlockConversion(rewriter, &block));
-//         }
-
-//         rewriter.eraseOp(funcOp);
-
-//         // rewriter.updateRootInPlace(funcOp, [&]() {
-
-//         //     // instead of `rewriter.applySignatureConversion`
-//         //     for (Block &block : funcOp.getBlocks())
-//         //         newRegion.push_back(applyBlockConversion(rewriter, &block));
-
-//         //     SmallVector<Block*, 4> oldBlocks;
-//         //     for (Block &block : funcOp.getBlocks())
-//         //         oldBlocks.push_back(&block);
-//         //     for (Block *block : oldBlocks)
-//         //         applyBlockConversion(rewriter, block);
-//         // });
-
-//         return success();
-//     }
-// };
 
 template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
 struct ToCmpOpPattern : public OpAndTypeConversionPattern<SourceOp> {
@@ -357,9 +276,10 @@ struct ReturnOpLowering : public OpAndTypeConversionPattern<jlir::ReturnOp> {
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         Value oldOperand = op.getOperand();
+        JuliaType type = oldOperand.getType().cast<JuliaType>();
+        Optional<Type> conversionResult = lowering.convert_JuliaType(type);
 
-        // ignore if operand is not a `JuliaType`
-        if (!oldOperand.getType().isa<JuliaType>())
+        if (!conversionResult.hasValue())
             return failure();
 
         rewriter.replaceOpWithNewOp<mlir::ReturnOp>(
@@ -405,86 +325,10 @@ struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
 
 } // namespace
 
-// HACK
-namespace {
-
-struct HackFuncOpConversion : public OpAndTypeConversionPattern<FuncOp> {
-    using OpAndTypeConversionPattern<FuncOp>::OpAndTypeConversionPattern;
-
-    // static bool hasNoneTypeArguments(FuncOp funcOp) {
-    //     for (Block &block : funcOp.getBlocks()) {
-    //         for (BlockArgument &blockArg : block.getArguments())
-    //             if (blockArg.getType().isa<NoneType>())
-    //                 return true;
-    //     }
-    //     return false;
-    // }
-
-    LogicalResult
-    matchAndRewrite(FuncOp funcOp,
-                    ArrayRef<Value> operands,
-                    ConversionPatternRewriter &rewriter) const override {
-        // // should match if any block argument is of `NoneType`
-        // if (!hasNoneTypeArguments(funcOp))
-        //     return failure();
-
-        // // the rest is pretty much straight from
-        // // `FuncOpSignatureConversion::matchAndRewrite`
-
-        FunctionType type = funcOp.getType();
-
-        // convert function arguments
-        TypeConverter::SignatureConversion conversionResult(
-            type.getNumInputs());
-        for (auto &en : llvm::enumerate(type.getInputs())) {
-            // TESTING (drop first argument)
-            if (en.index() == 0)
-                continue;
-
-            if (failed(lowering.convertSignatureArg(
-                           en.index(), en.value(), conversionResult)))
-                return failure();
-        }
-
-        // convert function results
-        SmallVector<Type, 1> convertedResults;
-        if (failed(lowering.convertTypes(type.getResults(), convertedResults)))
-            return failure();
-
-        // update function signature in-place
-        rewriter.updateRootInPlace(
-            funcOp,
-            [&funcOp, &conversionResult, &convertedResults, &rewriter]() {
-                // leave a `NoneType` argument as first argument to mark
-                // fact that this function needs to be processed
-                SmallVector<Type, 4> convertedInputs;
-                convertedInputs.push_back(rewriter.getNoneType());
-                for (Type t : conversionResult.getConvertedTypes())
-                    convertedInputs.push_back(t);
-
-                funcOp.setType(FunctionType::get(
-                                   convertedInputs,
-                                   convertedResults, funcOp.getContext()));
-                rewriter.applySignatureConversion(
-                    &funcOp.getBody(), conversionResult);
-
-                // hack
-                funcOp.front().insertArgument(
-                    (unsigned)0, rewriter.getNoneType());
-            });
-
-        return success();
-    }
-};
-
-} // namespace
-
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
     FuncOp op, JLIRToStandardTypeConverter &converter) {
-
-    // TODO: the below be for all block arguments?
-    // function is illegal if any of its types can but haven't been
-    // converted
+    // function is illegal if any of its input or result types can but haven't
+    // been converted
     FunctionType ft = op.getType().cast<FunctionType>();
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
@@ -508,14 +352,8 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         return isFuncOpLegal(op, converter);
     });
 
-    // HACK--once `materializeConversion` for 1-1 type conversions has been
-    // implemented in MLIR, the following can be replaced with a call to
-    // `populateFuncOpTypeConversionPattern` with `converter` instead of
-    // `hackConverter`.
-    // populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        HackFuncOpConversion,
-        // FuncOpConversion,
         ConstantOpLowering,
         // CallOp
         // InvokeOp
@@ -640,12 +478,24 @@ void JLIRToStandardLoweringPass::runOnFunction() {
                     getFunction(), target, patterns, &converter)))
         signalPassFailure();
 
+    // HACK: Remove dummy `NoneType` function/block arguments. This is done
+    //       using a second call to `applyPartialConversion` because block
+    //       arguments for blocks in an op (such as the `FuncOp`) are only
+    //       converted after all patterns have been applied (and only if
+    //       legalization of the op succeeds).
     ConversionTarget hackTarget(getContext());
     hackTarget.addLegalDialect<StandardOpsDialect>();
     hackTarget.addLegalOp<ConvertStdOp>();
-    hackTarget.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
-        FunctionType t = op.getType();
-        return !(t.getNumInputs() > 0 && t.getInput(0).isa<NoneType>());
+    hackTarget.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
+        // function is illegal if any of its input or result types are `NoneType`
+        FunctionType ft = op.getType().cast<FunctionType>();
+        for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
+            for (Type t : ts) {
+                if (t.isa<NoneType>())
+                    return false;
+            }
+        }
+        return true;
     });
     OwningRewritePatternList hackPatterns;
     populateFuncOpTypeConversionPattern(hackPatterns, &getContext(), converter);
