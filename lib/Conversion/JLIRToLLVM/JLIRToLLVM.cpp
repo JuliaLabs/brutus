@@ -137,6 +137,19 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
         // TODO
         assert(false && "unimplemented");
     }
+
+    Value emitPointer(ConversionPatternRewriter &rewriter, Location loc,
+                      jl_value_t *val) const {
+        LLVM::ConstantOp addressOp = rewriter.create<LLVM::ConstantOp>(
+            loc,
+            // assumes 64-bit address
+            LLVM::LLVMType::getInt64Ty(lowering.llvm_dialect),
+            rewriter.getIntegerAttr(
+                rewriter.getIntegerType(64),
+                (int64_t)val));
+        return rewriter.create<LLVM::IntToPtrOp>(
+            loc, lowering.pjlvalue, addressOp.getResult()).getResult();
+    }
 };
 
 // is there some template magic that would allow us to combine
@@ -235,7 +248,8 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
         LLVM::LLVMType llvm_type = lowering.convertType(op.getType()).cast<LLVM::LLVMType>();
 
         if (llvm_type == lowering.void_type) {
-            rewriter.replaceOpWithNewOp<LLVM::UndefOp>(op, llvm_type);
+            rewriter.replaceOp(
+                op, emitPointer(rewriter, op.getLoc(), op.value()));
             return success();
 
         } else if (jl_is_primitivetype(julia_type)) {
@@ -272,17 +286,8 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
         }
 
         if (llvm_type == lowering.pjlvalue) {
-            LLVM::LLVMType int64 = LLVM::LLVMType::getInt64Ty(
-                lowering.llvm_dialect);
-            LLVM::ConstantOp address_op = rewriter.create<LLVM::ConstantOp>(
-                op.getLoc(), int64, rewriter.getIntegerAttr(
-                    rewriter.getIntegerType(64), (int64_t)op.value()));
-            rewriter.replaceOpWithNewOp<LLVM::IntToPtrOp>(
-                op, lowering.pjlvalue, address_op.getResult());
-            // rewriter.replaceOpWithNewOp<LLVM::ConstantOp>(
-            //     op, lowering.pjlvalue,
-            //     rewriter.getIntegerAttr(rewriter.getIntegerType(64),
-            //                             (int64_t)op.value()));
+            rewriter.replaceOp(
+                op, emitPointer(rewriter, op.getLoc(), op.value()));
             return success();
         }
 
@@ -420,12 +425,12 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         ToUndefOpPattern<UnimplementedOp>,
         ToUndefOpPattern<UndefOp>,
         ConstantOpLowering, // (also JLIRTOStandard)
-        // ToUndefOpPattern<CallOp>,
-        // ToUndefOpPattern<InvokeOp>,
+        ToUndefOpPattern<CallOp>,
+        ToUndefOpPattern<InvokeOp>,
         // GotoOp (JLIRToStandard)
         GotoIfNotOpLowering,
         ReturnOpLowering,
-        // ToUndefOpPattern<PiOp>,
+        ToUndefOpPattern<PiOp>,
         // Intrinsic_bitcast
         // Intrinsic_neg_int
         // Intrinsic_add_int  (JLIRToStandard)

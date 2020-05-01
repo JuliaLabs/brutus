@@ -13,8 +13,8 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
     MLIRContext *ctx;
 
     JLIRToStandardTypeConverter(MLIRContext *ctx);
-    Optional<Type> convert_JuliaType(JuliaType t);
-    Type convert_bitstype(jl_datatype_t *jdt);
+    Optional<Type> convertJuliaType(JuliaType t);
+    Type convertBitstype(jl_datatype_t *jdt);
 
     Operation *materializeConversion(PatternRewriter &rewriter,
                                      Type resultType,
