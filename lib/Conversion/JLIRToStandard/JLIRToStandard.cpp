@@ -377,6 +377,42 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     }
 };
 
+struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> {
+    using OpAndTypeConversionPattern<Builtin_arrayref>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(Builtin_arrayref op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        JuliaType arrayType = op.getOperand(1).getType().cast<JuliaType>();
+        jl_datatype_t *arrayDatatype = arrayType.getDatatype();
+        assert(jl_is_array_type(arrayDatatype));
+
+        JuliaType elementJuliaType = JuliaType::get(
+            rewriter.getContext(), (jl_datatype_t*)jl_tparam0(arrayDatatype));
+        Optional<Type> elementType = lowering.convertJuliaType(elementJuliaType);
+        assert(elementType.hasValue() && "cannot convert Array element type");
+
+        unsigned rank = jl_unbox_uint64(jl_tparam1(arrayDatatype));
+        assert(rank == 1 && "unimplemented");
+        SmallVector<int64_t, 2> shape(rank, -1);
+
+        // just handle a single index for now
+        JuliaType indexJuliaType = op.getOperand(2).getType().cast<JuliaType>();
+        jl_datatype_t *indexDatatype = indexJuliaType.getDatatype();
+        assert(indexDatatype == jl_int64_type || indexDatatype == jl_int32_type);
+        Value newIndex = rewriter.create<ConvertStdOp>(
+            op.getLoc(), rewriter.getIndexType(), operands[2]).getResult();
+
+        Value memref = rewriter.create<ArrayToMemRefOp>(
+            op.getLoc(), MemRefType::get(shape, elementType.getValue()),
+            operands[1]).getResult();
+        Value element = rewriter.create<LoadOp>(
+            op.getLoc(), elementType.getValue(), memref, newIndex).getResult();
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, elementJuliaType, element);
+        return success();
+    }
+};
+
 } // namespace
 
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
@@ -402,12 +438,17 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalOp<ConvertStdOp>();
+    target.addLegalOp<ArrayToMemRefOp>();
+    target.addLegalOp<UnimplementedOp>();
     target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
 
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
+        // TESTING
+        ArrayrefOpLowering,
+
         // ConvertStdOp    (JLIRToLLVM)
         // UnimplementedOp (JLIRToLLVM)
         // UndefOp         (JLIRToLLVM)
@@ -543,6 +584,8 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     ConversionTarget hackTarget(getContext());
     hackTarget.addLegalDialect<StandardOpsDialect>();
     hackTarget.addLegalOp<ConvertStdOp>();
+    hackTarget.addLegalOp<ArrayToMemRefOp>();
+    hackTarget.addLegalOp<UnimplementedOp>();
     hackTarget.addDynamicallyLegalOp<FuncOp>([](FuncOp op) {
         // function is illegal if any of its input or result types are `NoneType`
         FunctionType ft = op.getType().cast<FunctionType>();

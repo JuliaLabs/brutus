@@ -110,13 +110,19 @@ struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
                                   PatternRewriter &rewriter) const override {
         ConvertStdOp inputOp = dyn_cast_or_null<ConvertStdOp>(
             op.getOperand().getDefiningOp());
-
         if (!inputOp)
             return failure();
 
-        assert(inputOp.getOperand().getType() == op.getResult().getType());
 
-        rewriter.replaceOp(op, {inputOp.getOperand()});
+        Type originalType = inputOp.getOperand().getType();
+        Type finalType = op.getResult().getType();
+        if (originalType == finalType) {
+            rewriter.replaceOp(op, {inputOp.getOperand()});
+        } else {
+            ConvertStdOp newConvertStdOp = rewriter.create<ConvertStdOp>(
+                op.getLoc(), finalType, inputOp.getOperand());
+            rewriter.replaceOp(op, {newConvertStdOp.getResult()});
+        }
         return success();
     }
 };

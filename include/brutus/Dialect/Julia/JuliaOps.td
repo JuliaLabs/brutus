@@ -236,6 +236,16 @@ def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
     let hasCanonicalizer = 1;
 }
 
+def ArrayToMemRefOp : JLIR_Op<"arraytomemref"> {
+    let summary = "Array to MemRef conversion operation";
+    let description = [{
+        TODO
+    }];
+
+    let arguments = (ins JLIR_JuliaType:$a);
+    let results = (outs AnyMemRef);
+}
+
 /*  wrap and unwrap */
 def JLIR_Intrinsic_bitcast : JLIR_IntrinsicBuiltinOp<"bitcast", [NoSideEffect]>;
 
