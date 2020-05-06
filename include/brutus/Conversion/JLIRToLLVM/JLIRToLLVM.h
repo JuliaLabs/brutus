@@ -12,10 +12,19 @@ namespace mlir {
 namespace jlir {
 
 struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
-    LLVM::LLVMDialect *llvm_dialect;
-    LLVM::LLVMType void_type;
-    LLVM::LLVMType jlvalue;
-    LLVM::LLVMType pjlvalue;
+    LLVM::LLVMDialect *llvmDialect;
+    LLVM::LLVMType voidType;
+    LLVM::LLVMType int8Type;
+    LLVM::LLVMType int16Type;
+    LLVM::LLVMType int32Type;
+    LLVM::LLVMType int64Type;
+    LLVM::LLVMType sizeType;
+    LLVM::LLVMType longType;
+    Type           mlirLongType;
+    LLVM::LLVMType jlvalueType;
+    LLVM::LLVMType pjlvalueType;
+    LLVM::LLVMType jlarrayType;
+    LLVM::LLVMType pjlarrayType;
 
     JLIRToLLVMTypeConverter(MLIRContext *ctx);
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt);
