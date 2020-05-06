@@ -12,12 +12,11 @@ end
     DumpOptimized     = 2
     DumpLoweredToStd  = 4
     DumpLoweredToLLVM = 8
-    DumpLLVMIR        = 16
 end
 
 # Emit MLIR IR to stdout
 function emit(@nospecialize(ft), @nospecialize(tt);
-              emit_llvm::Bool=true,
+              emit_fptr::Bool=true,
               optimize::Bool=true,
               dump_options::Vector{DumpOption}=DumpOption[])
     name = (ft <: Function) ? nameof(ft.instance) : nameof(ft)
@@ -35,36 +34,34 @@ function emit(@nospecialize(ft), @nospecialize(tt);
 
     # generate LLVM bitcode and load it
     dump_flags = reduce(|, map(UInt8, dump_options), init=0)
-    bitcode = ccall((:brutus_codegen, "libbrutus"),
-                    LLVM.MemoryBuffer,
-                    (Any, Any, Cstring, Cuchar, Cuchar, Cuchar),
-                    IR, rt, name, emit_llvm, optimize, dump_flags)
-    if !emit_llvm
+    fptr = ccall((:brutus_codegen, "libbrutus"),
+                 Ptr{Nothing},
+                 (Any, Any, Cstring, Cuchar, Cuchar, Cuchar),
+                 IR, rt, name, emit_fptr, optimize, dump_flags)
+    if convert(Int, fptr) == 0
         return nothing
     end
-    @assert convert(UInt64, LLVM.ref(bitcode)) != 0 "Brutus codegen failed"
-    module_ref = Ref{LLVM.API.LLVMModuleRef}()
-    context = LLVM.Interop.JuliaContext()
-    status = convert(Bool, LLVM.API.LLVMParseBitcodeInContext2(
-        LLVM.ref(context), LLVM.ref(bitcode), module_ref))
-    @assert !status # caught by LLVM.jl diagnostics handler
-    mod = LLVM.Module(module_ref[])
 
-    # add attributes to LLVM function so that it inlines
-    llvm_function = LLVM.functions(mod)[string(name)]
-    push!(LLVM.function_attributes(llvm_function),
-          LLVM.EnumAttribute("alwaysinline", 0, context))
-    LLVM.linkage!(llvm_function, LLVM.API.LLVMPrivateLinkage)
-
-    return llvm_function, rt
+    return fptr, rt
 end
 
 @generated function call(f, args...)
-    llvm_function, rt, = emit(f, args)
-    _args = (:(args[$i]) for i in 1:length(args))
-    LLVM.Interop.call_function(llvm_function,
-                               rt, Tuple{args...},
-                               Expr(:tuple, _args...))
+    fptr, rt, = emit(f, args)
+    convert_type(t) = isprimitivetype(t) ? t : Any
+    converted_args = collect(map(convert_type, args))
+    return quote
+        arg_pointers = Ref[
+            Base.unsafe_convert(Ptr{Cvoid}, Ref{$(convert_type(f))}(f))]
+        for i in 1:length(args)
+            push!(arg_pointers,
+                  Base.unsafe_convert(
+                      Ptr{Cvoid}, Ref{$converted_args[i]}(args[i])))
+        end
+        push!(arg_pointers, Ref{$(convert_type(rt))}())
+        # ccall(:jl_breakpoint, Cvoid, (Ptr{Ptr{Cvoid}},), arg_pointers)
+        ccall($fptr, Cvoid, (Ptr{Ptr{Cvoid}},), arg_pointers)
+        arg_pointers[end][]
+    end
 end
 
 function code_ircode_by_signature(@nospecialize(sig);

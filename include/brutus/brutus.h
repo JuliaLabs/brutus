@@ -9,10 +9,15 @@
 extern "C" {
 #endif
 
+typedef void (*ExecutionEngineFPtrResult)(void **);
+
 void brutus_init();
-LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
-                                   char *name, char emit_llvm, char optimize,
-                                   char dump_flags);
+ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
+                                         jl_value_t *ret_type,
+                                         char *name,
+                                         char emit_fptr,
+                                         char optimize,
+                                         char dump_flags);
 
 #ifdef __cplusplus
 } // end extern "C"

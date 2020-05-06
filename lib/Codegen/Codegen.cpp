@@ -4,7 +4,11 @@
 #include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
+#include "julia.h"
+
 #include "mlir/IR/Verifier.h"
+#include "mlir/ExecutionEngine/ExecutionEngine.h"
+#include "mlir/ExecutionEngine/OptUtils.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
@@ -12,13 +16,7 @@
 #include "mlir/IR/Module.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
-#include "mlir/Target/LLVMIR.h"
 #include "mlir/Transforms/Passes.h"
-
-#include "llvm/Bitcode/BitcodeWriter.h"
-#include "llvm/Support/MemoryBuffer.h"
-
-#include "julia.h"
 
 using namespace mlir;
 using namespace mlir::jlir;
@@ -64,12 +62,12 @@ mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
         }
     }
 
-    // Not to be confused with a raw symbol... 
+    // Not to be confused with a raw symbol...
     // that would mean a global variable
     if (jl_is_quotenode(value)) {
         value = jl_fieldref_noalloc(value, 0);
     }
- 
+
     if (type == nullptr)
         type = (jl_datatype_t*)jl_typeof(value);
 
@@ -154,6 +152,15 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
     }
 }
 
+void handleLLVMError(llvm::Error error) {
+    llvm::handleAllErrors(std::move(error),
+                          [](const llvm::ErrorInfoBase &info) {
+                              llvm::errs() << "error: ";
+                              info.log(llvm::errs());
+                              llvm::errs() << "\n";
+                          });
+}
+
 extern "C" {
 
 enum DumpOption {
@@ -162,12 +169,14 @@ enum DumpOption {
     DUMP_OPTIMIZED       = 2,
     DUMP_LOWERED_TO_STD  = 4,
     DUMP_LOWERED_TO_LLVM = 8,
-    DUMP_LLVM_IR         = 16
 };
 
-LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
-                                   char *name, char emit_llvm, char optimize,
-                                   char dump_flags) {
+ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
+                                         jl_value_t *ret_type,
+                                         char *name,
+                                         char emit_fptr,
+                                         char optimize,
+                                         char dump_flags) {
     mlir::MLIRContext context;
     jl_mlirctx_t ctx(&context);
 
@@ -260,7 +269,7 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
     auto emit_branchargs = [&](int current_block, int target, mlir::Location loc) {
         llvm::SmallVector<mlir::Value, 4> v;
 
-        jl_value_t *range = jl_get_field(jl_arrayref(cfg_blocks, target-1), "stmts");  
+        jl_value_t *range = jl_get_field(jl_arrayref(cfg_blocks, target-1), "stmts");
         int start = jl_unbox_long(jl_get_field(range, "start"))-1;
         int stop  = jl_unbox_long(jl_get_field(range, "stop"))-1;
         for (int i = start; start <= stop; ++i) {
@@ -474,21 +483,43 @@ LLVMMemoryBufferRef brutus_codegen(jl_value_t *ir_code, jl_value_t *ret_type,
         return nullptr;
     }
 
-    if (!emit_llvm) {
+    if (!emit_fptr) {
         return nullptr;
     }
 
-    // Translate to LLVM IR and return bitcode in MemoryBuffer
-    std::unique_ptr<llvm::Module> llvm_module = translateModuleToLLVMIR(module);
-    if (dump_flags & DUMP_LLVM_IR) {
-        llvm::outs() << "after translating to LLVM IR:";
-        llvm_module->print(llvm::dbgs(), nullptr);
-        llvm::outs() << "\n\n";
+    // see mlir/lib/Support/JitRunner.cpp
+
+    Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
+        llvm::CodeGenOpt::Aggressive;
+
+    auto tmBuilderOrError = llvm::orc::JITTargetMachineBuilder::detectHost();
+    if (!tmBuilderOrError) {
+        llvm::errs() << "failed to create a JITTargetMachineBuilder for the host\n";
+        return nullptr;
     }
-    std::string data;
-    llvm::raw_string_ostream os(data);
-    WriteBitcodeToFile(*llvm_module, os);
-    return wrap(llvm::MemoryBuffer::getMemBufferCopy(os.str()).release());
+    auto tmOrError = tmBuilderOrError->createTargetMachine();
+    if (!tmOrError) {
+        llvm::errs() << "failed to create a TargetMachine for the host\n";
+        return nullptr;
+    }
+
+    auto transformer = makeLLVMPassesTransformer(None, 3, tmOrError->get());
+
+    auto expectedEngine = ExecutionEngine::create(
+        module, transformer, jitCodeGenOptLevel);
+    if (!expectedEngine) {
+        handleLLVMError(expectedEngine.takeError());
+        return nullptr;
+    }
+
+    ExecutionEngine *engine = expectedEngine.get().release();
+    auto expectedFPtr = engine->lookup(name);
+    if (!expectedFPtr) {
+        handleLLVMError(expectedFPtr.takeError());
+        return nullptr;
+    }
+
+    return expectedFPtr.get();
 }
 
 } // extern "C"

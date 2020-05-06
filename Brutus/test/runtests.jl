@@ -28,3 +28,5 @@ function loop(N)
 end
 @test Brutus.call(loop, 0) == loop(0) == 0
 @test Brutus.call(loop, 1000) == loop(1000) == 500500
+
+@test Brutus.call(Brutus.call(identity, identity), identity)(identity) === identity
