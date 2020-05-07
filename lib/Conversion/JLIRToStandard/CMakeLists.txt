@@ -1,11 +1,9 @@
-add_llvm_library(BRUTUSJLIRToStandard
+add_mlir_conversion_library(
+  BRUTUSJLIRToStandard
   JLIRToStandard.cpp
   ADDITIONAL_HEADER_DIRS
-  ${BRUTUS_INCLUDE_DIR}/JuliaOps
-  )
-add_dependencies(BRUTUSJLIRToStandard
-    MLIRJulia
+  ${PROJECT_SOURCE_DIR}/include/Brutus/JuliaOps
+  LINK_LIBS PUBLIC
+  MLIRJulia
 )
-target_link_libraries(BRUTUSJLIRToStandard
-)
-set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS BRUTUSJLIRToStandard)
+llvm_update_compile_flags(BRUTUSJLIRToStandard)

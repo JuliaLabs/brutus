@@ -9,19 +9,20 @@ optimisations for Julia.
 ## Setting it up
 
 ```
-# Build Julia with LLVM 11 support
+# Build Julia with LLVM 11 support and MLIR
 git clone https://github.com/JuliaLang/julia
 cd julia
-git checkout jn/llvm-11-svn
+git checkout vc/mlir 
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     LLVM_VER=svn \
+    USE_MLIR=1 \
     LLVM_DEBUG=0 \
-    LLVM_GIT_VER="b9f1b8be1cb02f6159c27856e33996a7edb2bd18"
+    LLVM_GIT_VER="dad6de411227faed9b15cd85d916e96e751b8528" 
 cd ..
 
 # Build Brutus
-git clone --recursive https://github.com/JuliaLabs/brutus
+git clone https://github.com/JuliaLabs/brutus
 cd brutus && mkdir build && cd build
 cmake ../llvm-project/llvm -GNinja \
       -DLLVM_ENABLE_PROJECTS="mlir" \
