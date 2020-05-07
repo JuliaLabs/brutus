@@ -4,7 +4,7 @@
 #include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
-#include "mlir/Analysis/Verifier.h"
+#include "mlir/IR/Verifier.h"
 #include "mlir/IR/Attributes.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/Function.h"
