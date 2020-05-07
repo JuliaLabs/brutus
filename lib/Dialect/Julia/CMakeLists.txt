@@ -1,18 +1,18 @@
-add_llvm_library(MLIRJulia
+add_mlir_dialect_library(
+  MLIRJulia
   Ops.cpp
   CanonicalizationPatterns.cpp
   ADDITIONAL_HEADER_DIRS
-  ${BRUTUS_INCLUDE_DIR}/JuliaOps
-  )
-add_dependencies(MLIRJulia
-  MLIRIR
+  StandaloneDialect.cpp
+  StandaloneOps.cpp
+
+  ADDITIONAL_HEADER_DIRS
+  ${PROJECT_SOURCE_DIR}/include/Brutus/JuliaOps
+
+  DEPENDS
   MLIRJuliaOpsIncGen
-  MLIRSideEffects
-  LLVMSupport
+
+  LINK_LIBS PUBLIC
+  MLIR
 )
-target_link_libraries(MLIRJulia
-  MLIRIR
-  MLIRSideEffects
-  LLVMSupport
-)
-set_property(GLOBAL APPEND PROPERTY BRUTUS_LIBS MLIRJulia)
+llvm_update_compile_flags(MLIRJulia)

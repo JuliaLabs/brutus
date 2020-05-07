@@ -1,104 +1,51 @@
-cmake_minimum_required(VERSION 3.4.3)
+cmake_minimum_required(VERSION 3.10)
 
-# Based of SPIRV-LLVM Translator
-set(BASE_LLVM_VERSION 11.0.0)
-set(BRUTUS_VERSION ${BASE_LLVM_VERSION}.0)
-
-if (NOT DEFINED BRUTUS_BUILD_EXTERNAL)
-  # check if we build inside llvm or not
-  if(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-    set(BRUTUS_BUILD_EXTERNAL YES)
-  endif(CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR)
-endif (NOT DEFINED BRUTUS_BUILD_EXTERNAL)
-
-# If we are not building as part of LLVM, build brutus as an
-# standalone project using LLVM and MLIR as an external library
-if(BRUTUS_BUILD_EXTERNAL)
-  project(BRUTUS
-    VERSION
-      ${BRUTUS_VERSION}
-    LANGUAGES
-      CXX
-  )
-
-  set(CMAKE_CXX_STANDARD 14)
-  set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
-  find_package(LLVM ${BASE_LLVM_VERSION} REQUIRED CONFIG)
-  list(APPEND CMAKE_MODULE_PATH
-    ${LLVM_CMAKE_DIR}
-  )
-  include(AddLLVM)
-
-  message(STATUS "${LLVM_CMAKE_DIR}")
-  message(STATUS "Found LLVM: ${LLVM_VERSION}")
-
+if(POLICY CMP0068)
+  cmake_policy(SET CMP0068 NEW)
+  set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 endif()
 
-set(MLIR_TABLEGEN_EXE mlir-tblgen)
+if(POLICY CMP0075)
+  cmake_policy(SET CMP0075 NEW)
+endif()
 
-add_custom_target(brutus-headers)
-set_target_properties(brutus-headers PROPERTIES FOLDER "Misc")
-add_custom_target(brutus-doc)
+if(POLICY CMP0077)
+  cmake_policy(SET CMP0077 NEW)
+endif()
 
-# The next two variables need to be called this way for `mlir-tablegen` to work
-set(MLIR_MAIN_SRC_DIR ${LLVM_EXTERNAL_MLIR_SOURCE_DIR})
-set(MLIR_INCLUDE_DIR ${MLIR_MAIN_SRC_DIR}/include)
-set(MLIR_BIN_INCLUDE_DIR ${CMAKE_CURRENT_BINARY_DIR}/../../tools/mlir/include)
+project(brutus)
 set(BRUTUS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
-set(BRUTUS_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 
-list(APPEND CMAKE_MODULE_PATH "${LLVM_EXTERNAL_MLIR_SOURCE_DIR}/cmake/modules")
-include(AddMLIR)
+find_package(MLIR REQUIRED CONFIG)
 
+message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+
+set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
+set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
+set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
+
+list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
+list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${BRUTUS_SOURCE_DIR}/cmake/modules")
-include(AddDialect)
+include(TableGen)
+include(AddLLVM)
+include(AddMLIR)
+include(HandleLLVMOptions)
 include(FindJulia)
-
-set(BRUTUS_INCLUDE_DIR ${BRUTUS_BINARY_DIR}/include)
 
 find_package(Julia REQUIRED)
 # TODO: Check that Julia_LLVM_VERSION and this LLVM_VERSION match
 
-include_directories("include")
+include_directories(${LLVM_INCLUDE_DIRS})
+include_directories(${MLIR_INCLUDE_DIRS})
+include_directories(${PROJECT_SOURCE_DIR}/include)
+include_directories(${PROJECT_BINARY_DIR}/include)
 include_directories(${Julia_INCLUDE_DIRS})
-include_directories(${BRUTUS_INCLUDE_DIR})
-include_directories(${MLIR_INCLUDE_DIR})
-include_directories(${MLIR_BIN_INCLUDE_DIR})
+link_directories(${LLVM_BUILD_LIBRARY_DIR})
+add_definitions(${LLVM_DEFINITIONS})
 
 add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(tools)
-
-if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
-  install(DIRECTORY include
-    DESTINATION include
-    COMPONENT brutus-headers
-    FILES_MATCHING
-    PATTERN "*.def"
-    PATTERN "*.h"
-    PATTERN "*.inc"
-    PATTERN "*.td"
-    PATTERN "LICENSE.TXT"
-    )
-
-  install(DIRECTORY ${MLIR_INCLUDE_DIR}
-    DESTINATION include
-    COMPONENT brutus-headers
-    FILES_MATCHING
-    PATTERN "*.def"
-    PATTERN "*.h"
-    PATTERN "*.gen"
-    PATTERN "*.inc"
-    PATTERN "*.td"
-    PATTERN "CMakeFiles" EXCLUDE
-    PATTERN "config.h" EXCLUDE
-    )
-
-  if (NOT LLVM_ENABLE_IDE)
-    add_llvm_install_targets(install-brutus-headers
-                             DEPENDS brutus-headers
-                             COMPONENT brutus-headers)
-  endif()
-endif()
