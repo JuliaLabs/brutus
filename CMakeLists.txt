@@ -37,6 +37,8 @@ include(FindJulia)
 find_package(Julia REQUIRED)
 # TODO: Check that Julia_LLVM_VERSION and this LLVM_VERSION match
 
+set(LLVM_TOOLS_BINARY_DIR "${LLVM_INSTALL_PREFIX}/${LLVM_TOOLS_INSTALL_DIR}")
+
 include_directories(${LLVM_INCLUDE_DIRS})
 include_directories(${MLIR_INCLUDE_DIRS})
 include_directories(${PROJECT_SOURCE_DIR}/include)
