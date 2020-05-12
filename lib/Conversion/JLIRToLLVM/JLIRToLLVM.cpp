@@ -1,4 +1,5 @@
 #include "brutus/Conversion/JLIRToLLVM/JLIRToLLVM.h"
+#include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
 #include "juliapriv/julia_private.h"
 
@@ -169,6 +170,52 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
             rewriter.getIntegerAttr(lowering.mlirLongType, (int64_t)val));
         return rewriter.create<LLVM::IntToPtrOp>(
             loc, lowering.pjlvalueType, addressOp.getResult()).getResult();
+    }
+
+    // bitcast a `jl_value_t*` to a `jl_array_t*`
+    Value emitPointerToArray(ConversionPatternRewriter &rewriter,
+                             Location loc,
+                             Value value) const {
+        return rewriter.create<LLVM::BitcastOp>(
+            loc, lowering.pjlarrayType, value).getResult();
+    }
+
+    // emit a pointer to the `nrows` field of a `jl_array_t`, given a `jl_value_t*`
+    Value emitPointerToArrayField(ConversionPatternRewriter &rewriter,
+                                  Location loc,
+                                  Value pointerToArray,
+                                  unsigned field) const {
+        return rewriter.create<LLVM::GEPOp>(
+            loc,
+            lowering.sizeType.getPointerTo(),
+            pointerToArray,
+            llvm::makeArrayRef({
+                    // dereference `jl_array_t*` to get to `jl_array_t`
+                    rewriter.create<LLVM::ConstantOp>(
+                        loc,
+                        lowering.int64Type,
+                        rewriter.getI64IntegerAttr(0)).getResult(),
+
+                    // get `nrows` field
+                    rewriter.create<LLVM::ConstantOp>(
+                        loc,
+                        lowering.int32Type,
+                        rewriter.getI32IntegerAttr(field)).getResult()
+                })).getResult();
+    }
+
+    // NOTE: `dimension` is 0-indexed
+    Value emitArraySize(ConversionPatternRewriter &rewriter,
+                        Location loc,
+                        Value pointerToNrows,
+                        Value dimension) const {
+        Value pointerToSize = rewriter.create<LLVM::GEPOp>(
+            loc,
+            lowering.sizeType.getPointerTo(),
+            pointerToNrows,
+            llvm::makeArrayRef(dimension));
+        return rewriter.create<LLVM::LoadOp>(
+            loc, lowering.sizeType, pointerToSize).getResult();
     }
 };
 
@@ -411,51 +458,34 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     }
 };
 
+// NOTE: doesn't produce correct value for dimensions greater than the number of
+//       dimensions of the array (and doesn't produce error if dimension is 0)
 struct ArraysizeOpLowering : public OpAndTypeConversionPattern<Builtin_arraysize> {
     using OpAndTypeConversionPattern<Builtin_arraysize>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_arraysize op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // get pointer to `nrows` field
-        Value pointerToArray = rewriter.create<LLVM::BitcastOp>(
-            op.getLoc(), lowering.pjlarrayType, operands[0]).getResult();
-        Value pointerToNrows = rewriter.create<LLVM::GEPOp>(
-            op.getLoc(),
-            lowering.sizeType.getPointerTo(),
-            pointerToArray,
-            llvm::makeArrayRef({
-                    // dereference `jl_array_t*` to get to `jl_array_t`
-                    rewriter.create<LLVM::ConstantOp>(
-                        op.getLoc(),
-                        lowering.int64Type,
-                        rewriter.getI64IntegerAttr(0)).getResult(),
+        Value pointerToArray = emitPointerToArray(
+            rewriter, op.getLoc(), operands[0]);
+        Value pointerToNrows = emitPointerToArrayField(
+            rewriter, op.getLoc(), pointerToArray, 5);
 
-                    // get `nrows` field
-                    rewriter.create<LLVM::ConstantOp>(
-                        op.getLoc(),
-                        lowering.int32Type,
-                        rewriter.getI32IntegerAttr(5)).getResult()
-                })).getResult();
-
-        Value pointerToSize = rewriter.create<LLVM::GEPOp>(
+        // compute 0-indexed dimension number
+        Value dimension = rewriter.create<LLVM::SubOp>(
             op.getLoc(),
-            lowering.sizeType.getPointerTo(),
-            pointerToNrows,
-            llvm::makeArrayRef({
-                    rewriter.create<LLVM::SubOp>(
-                        op.getLoc(),
-                        // will this type be correct on all platforms?
-                        lowering.longType,
-                        operands[1], // dimension number, 1-indexed
-                        rewriter.create<LLVM::ConstantOp>(
-                            op.getLoc(),
-                            lowering.longType,
-                            rewriter.getIntegerAttr(
-                                lowering.mlirLongType, 1))).getResult()
-                })).getResult();
-        Value size = rewriter.create<LLVM::LoadOp>(
-            op.getLoc(), lowering.sizeType, pointerToSize).getResult();
+            // will this type be correct on all platforms?
+            // (`jl_arraysize` uses `long`)
+            lowering.longType,
+            operands[1], // dimension number, 1-indexed
+            rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(),
+                lowering.longType,
+                rewriter.getIntegerAttr(lowering.mlirLongType, 1))
+            ).getResult();
+
+        Value size = emitArraySize(
+            rewriter, op.getLoc(), pointerToNrows, dimension);
 
         rewriter.replaceOp(op, size);
         return success();
@@ -463,25 +493,69 @@ struct ArraysizeOpLowering : public OpAndTypeConversionPattern<Builtin_arraysize
 };
 
 struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRefOp> {
-    using OpAndTypeConversionPattern<ArrayToMemRefOp>::OpAndTypeConversionPattern;
+    JLIRToStandardTypeConverter &stdLowering;
+
+    ArrayToMemRefOpLowering(MLIRContext *ctx,
+                            JLIRToLLVMTypeConverter &lowering,
+                            JLIRToStandardTypeConverter &stdLowering)
+        : OpAndTypeConversionPattern<ArrayToMemRefOp>(ctx, lowering),
+          stdLowering(stdLowering) {}
 
     LogicalResult matchAndRewrite(ArrayToMemRefOp op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
+        jl_datatype_t *jdt =
+            op.getOperand().getType().cast<JuliaType>().getDatatype();
+        JuliaType elementType = JuliaType::get(
+            rewriter.getContext(), (jl_datatype_t*)jl_tparam0(jdt));
+        unsigned nDims = jl_unbox_long(jl_tparam1(jdt)); // is long the right type?
 
-        jl_array_t *testing = jl_alloc_array_3d(
-            jl_eval_string("Array{Int64, 3}"), 10, 20, 30);
+        Optional<Type> convertedElementType =
+            stdLowering.convertJuliaType(elementType);
+        SmallVector<int64_t, 2> shape(nDims, -1);
+        MemRefType memrefType = MemRefType::get(
+            shape, convertedElementType.getValue());
 
-        jl_array_ptr(testing);
+        Value pointerToArray = emitPointerToArray(
+            rewriter, op.getLoc(), operands[0]);
+        Value pointerToDataField = emitPointerToArrayField(
+            rewriter, op.getLoc(), pointerToArray, 0);
+        Value pointerToData = rewriter.create<LLVM::BitcastOp>(
+            op.getLoc(),
+            lowering.int64Type.getPointerTo(),
+            rewriter.create<LLVM::LoadOp>(
+                op.getLoc(),
+                lowering.int8Type.getPointerTo(),
+                pointerToDataField).getResult());
 
+        Value pointerToNrows = emitPointerToArrayField(
+            rewriter, op.getLoc(), pointerToArray, 5);
 
-        // need pointer to data
-        // need pointer to aligned data??
-        // index type integer with distance between beginning and first element
-        // array with rank number of index-type integers for sizes in dimensions
-        // stride??
+        MemRefDescriptor memref = MemRefDescriptor::undef(
+            rewriter, op.getLoc(), lowering.convertType(memrefType));
+        memref.setAllocatedPtr(rewriter, op.getLoc(), pointerToData);
+        memref.setAlignedPtr(rewriter, op.getLoc(), pointerToData);
+        memref.setOffset(
+            rewriter,
+            op.getLoc(),
+            rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(),
+                lowering.int64Type,
+                rewriter.getI64IntegerAttr(0)).getResult());
 
-        return failure();
+        for (unsigned i = 0; i < nDims; i++) {
+            Value dimension = rewriter.create<LLVM::ConstantOp>(
+                op.getLoc(),
+                lowering.longType,
+                rewriter.getIntegerAttr(lowering.mlirLongType, i)).getResult();
+            Value size = emitArraySize(
+                rewriter, op.getLoc(), pointerToNrows, dimension);
+            memref.setSize(rewriter, op.getLoc(), i, size);
+            memref.setStride(rewriter, op.getLoc(), i, size);
+        }
+
+        rewriter.replaceOp(op, {Value(memref)});
+        return success();
     }
 };
 
@@ -501,9 +575,6 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
     populateStdToLLVMConversionPatterns(converter, patterns);
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        // TESTING
-        ArrayToMemRefOpLowering,
-
         ConvertStdOpLowering,
         ToUndefOpPattern<UnimplementedOp>,
         ToUndefOpPattern<UndefOp>,
@@ -627,6 +698,11 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         // Builtin__typevar
         // invoke_kwsorter?
         >(&getContext(), converter);
+
+    JLIRToStandardTypeConverter stdConverter(&getContext());
+    patterns.insert<ArrayToMemRefOpLowering>(
+        &getContext(), converter, stdConverter);
+
 
     if (failed(applyPartialConversion(
                     getFunction(), target, patterns, &converter)))

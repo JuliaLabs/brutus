@@ -396,12 +396,22 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         assert(rank == 1 && "unimplemented");
         SmallVector<int64_t, 2> shape(rank, -1);
 
-        // just handle a single index for now
+        // just handle a single index for now (FIXME)
         JuliaType indexJuliaType = op.getOperand(2).getType().cast<JuliaType>();
         jl_datatype_t *indexDatatype = indexJuliaType.getDatatype();
         assert(indexDatatype == jl_int64_type || indexDatatype == jl_int32_type);
-        Value newIndex = rewriter.create<ConvertStdOp>(
-            op.getLoc(), rewriter.getIndexType(), operands[2]).getResult();
+        Value newIndex = rewriter.create<SubIOp>(
+            op.getLoc(),
+            rewriter.getIndexType(),
+            rewriter.create<ConvertStdOp>(
+                op.getLoc(),
+                rewriter.getIndexType(),
+                operands[2]).getResult(),
+            rewriter.create<mlir::ConstantOp>(
+                op.getLoc(),
+                rewriter.getIndexType(),
+                rewriter.getIntegerAttr(
+                    rewriter.getIndexType(), 1)).getResult());
 
         Value memref = rewriter.create<ArrayToMemRefOp>(
             op.getLoc(), MemRefType::get(shape, elementType.getValue()),

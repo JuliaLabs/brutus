@@ -447,6 +447,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
     loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
     // canonicalize to remove redundant `ConvertStdOp`s
     loweringToStdPM.addPass(mlir::createCanonicalizerPass());
+    loweringToStdPM.addPass(mlir::createCSEPass());
     LogicalResult loweringToStdResult = loweringToStdPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_STD) {
@@ -464,6 +465,8 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
 
     mlir::PassManager loweringToLLVMPM(&context);
     loweringToLLVMPM.addPass(createJLIRToLLVMLoweringPass());
+    loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
+    loweringToLLVMPM.addPass(mlir::createCSEPass());
     LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_LLVM) {

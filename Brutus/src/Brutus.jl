@@ -46,7 +46,11 @@ function emit(@nospecialize(ft), @nospecialize(tt);
 end
 
 @generated function call(f, args...)
-    fptr, rt, = emit(f, args)
+    result = emit(f, args)
+    if result === nothing
+        error("failed to emit function")
+    end
+    fptr, rt, = result
     convert_type(t) = isprimitivetype(t) ? t : Any
     converted_args = collect(map(convert_type, args))
     return quote
