@@ -4,7 +4,7 @@ import Brutus
 
 emit_optimized(f, tt...) =
     Brutus.emit(typeof(f), tt,
-                emit_llvm=false,
+                emit_fptr=false,
                 dump_options=[Brutus.DumpOptimized])
 
 f(x) = x

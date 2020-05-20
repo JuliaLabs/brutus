@@ -4,7 +4,7 @@ import Brutus
 
 emit_translated(f, tt...) =
     Brutus.emit(typeof(f), tt,
-                emit_llvm=false,
+                emit_fptr=false,
                 dump_options=[Brutus.DumpTranslated])
 
 f(x) = x

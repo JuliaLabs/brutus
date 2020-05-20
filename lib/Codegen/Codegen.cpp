@@ -451,7 +451,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
     LogicalResult loweringToStdResult = loweringToStdPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_STD) {
-        llvm::outs() << "after lowering to Standard dialect:";
+        llvm::outs() << "after lowering to Standard dialect:\n";
         module.dump();
         llvm::outs() << "\n\n";
     }
