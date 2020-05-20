@@ -3,50 +3,49 @@ Brutus
 *Et tu?*
 
 Brutus is a research project that uses MLIR to implement code-generation and
-optimisations for Julia. 
+optimisations for Julia.
 
 
 ## Setting it up
 
 ```
-# Build Julia with LLVM 11 support and MLIR
-git clone https://github.com/JuliaLang/julia
+# Build Julia with LLVM 11 and MLIR
+git clone https://github.com/yhls/julia
 cd julia
-git checkout vc/mlir 
+git checkout yhls/llvm-11-again
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     LLVM_VER=svn \
-    USE_MLIR=1 \
     LLVM_DEBUG=0 \
-    LLVM_GIT_VER="dad6de411227faed9b15cd85d916e96e751b8528" 
+    USE_MLIR=1 \
+    LLVM_GIT_VER="587f81f54a3abab88fe9be5f113c74fc12655ee0"
 cd ..
 
 # Build Brutus
 git clone https://github.com/JuliaLabs/brutus
 cd brutus && mkdir build && cd build
-cmake ../llvm-project/llvm -GNinja \
-      -DLLVM_ENABLE_PROJECTS="mlir" \
-      -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
-      -DLLVM_EXTERNAL_PROJECTS="brutus" \
-      -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR=".." \
-      -DJulia_EXECUTABLE="../../julia/julia"
+cmake .. -GNinja \
+    -DMLIR_DIR="../../julia/usr/lib/cmake/mlir" \
+    -DLLVM_EXTERNAL_LIT="../../julia/usr/tools/lit/lit.py" \
+    -DJulia_EXECUTABLE="../../julia/julia" \
+    -DCMAKE_BUILD_TYPE=Release
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`/../../julia/julia --project=../Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 ninja check-brutus
 ```
 
 
 ### VSCode setting
-Using the `Cmake Tools` extension:
+Using the `Cmake Tools` extension, and with the path to Julia as built above in
+place of `JULIA_PATH`:
 ```json
 {
     "cmake.configureSettings": {
-        "LLVM_ENABLE_PROJECTS": "mlir",
-        "LLVM_TARGETS_TO_BUILD": "host;NVPTX",
-        "LLVM_EXTERNAL_PROJECTS": "brutus",
-        "LLVM_EXTERNAL_BRUTUS_SOURCE_DIR": "${workspaceFolder}",
-        "Julia_EXECUTABLE": "PATH_TO_JULIA_WITH_LLVM_11"
+        "MLIR_DIR": "${JULIA_PATH}/usr/lib/cmake/mlir",
+        "LLVM_EXTERNAL_LIT": "${JULIA_PATH}/usr/tools/lit/lit.py",
+        "Julia_EXECUTABLE": "${JULIA_PATH}/julia",
+        "CMAKE_BUILD_TYPE": "Release"
     },
-    "cmake.sourceDirectory": "${workspaceFolder}/llvm-project/llvm",
+    "cmake.sourceDirectory": "${workspaceFolder}",
     "C_Cpp.default.configurationProvider": "vector-of-bool.cmake-tools"
 }
 ```

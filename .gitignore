@@ -1,2 +1,3 @@
-build/
 .vscode/
+build*/
+Brutus/Manifest.toml

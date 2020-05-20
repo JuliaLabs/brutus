@@ -9,8 +9,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04]
-        julia-commit: [8813fe8f89bc0fb1e3eee6f8333c30131f721715]
-        llvm-commit: [dad6de411227faed9b15cd85d916e96e751b8528]
+        julia-repository: [yhls/julia]
+        julia-commit: [66ca99db161116ee9bea364334cb2b890910225d]
+        llvm-commit: [587f81f54a3abab88fe9be5f113c74fc12655ee0]
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
@@ -23,8 +24,6 @@ jobs:
       # deleted when we finally do check it out
       - name: Checkout Brutus
         uses: actions/checkout@master
-        with:
-          submodules: 'true'
 
       - name: Cache Julia
         id: cache-julia
@@ -49,7 +48,7 @@ jobs:
         uses: actions/checkout@v2
         if: steps.cache-julia.outputs.cache-hit != 'true'
         with:
-          repository: vchuravy/julia
+          repository: ${{ matrix.julia-repository }}
           ref: ${{ matrix.julia-commit }}
           path: julia
 
@@ -58,11 +57,12 @@ jobs:
         run: |
           cd julia
           make -j `nproc` \
-            USE_BINARYBUILDER_LLVM=0 \
-            LLVM_VER=svn \
-            LLVM_DEBUG=0 \
-            LLVM_GIT_VER=${{ matrix.llvm-commit }} \
-            JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
+              USE_BINARYBUILDER_LLVM=0 \
+              LLVM_VER=svn \
+              LLVM_DEBUG=0 \
+              USE_MLIR=1 \
+              LLVM_GIT_VER=${{ matrix.llvm-commit }} \
+              JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
       - name: Check Julia version
         run: ${GITHUB_WORKSPACE}/julia/usr/bin/julia -e "using InteractiveUtils; versioninfo()"
@@ -83,11 +83,14 @@ jobs:
 
       - name: Configure build
         run: |
-          cmake -S llvm-project/llvm -B build \
-                -DCMAKE_C_COMPILER_LAUNCHER=ccache -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
-                -DLLVM_ENABLE_PROJECTS="mlir" -DLLVM_TARGETS_TO_BUILD="host;NVPTX" \
-                -DLLVM_EXTERNAL_PROJECTS="brutus" -DLLVM_EXTERNAL_BRUTUS_SOURCE_DIR="." \
-                -DCMAKE_BUILD_TYPE=Release -DJulia_EXECUTABLE="${GITHUB_WORKSPACE}/julia/usr/bin/julia"
+          cmake -S . -B build \
+              -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+              -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
+              -DMLIR_DIR="${GITHUB_WORKSPACE}/julia/usr/lib/cmake/mlir" \
+              -DLLVM_EXTERNAL_LIT="${GITHUB_WORKSPACE}/julia/usr/tools/lit/lit.py" \
+              -DJulia_EXECUTABLE="${GITHUB_WORKSPACE}/julia/usr/bin/julia" \
+              -DCMAKE_BUILD_TYPE=Release
+
       - name: Build library
         run: cmake --build build --target brutus --parallel `nproc`
 

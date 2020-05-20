@@ -8,5 +8,6 @@ add_mlir_library(
 
   LINK_LIBS PUBLIC
   MLIR
+  MLIRExecutionEngine
 )
 llvm_update_compile_flags(BRUTUSCodegen)
