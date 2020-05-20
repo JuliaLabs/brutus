@@ -1,6 +1,7 @@
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/IR/AffineMap.h"
 #include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;
@@ -122,6 +123,32 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
             i++;
         }
         return success();
+    }
+
+    Value getIndexConstant(ConversionPatternRewriter &rewriter,
+                           Location location,
+                           int64_t value) const {
+        auto op = rewriter.create<mlir::ConstantOp>(
+            location,
+            rewriter.getIndexType(),
+            rewriter.getIntegerAttr(rewriter.getIndexType(), value));
+        return op.getResult();
+    }
+
+    // assumes index is an integer type, not an index type
+    Value decrementIndex(ConversionPatternRewriter &rewriter,
+                         Location location,
+                         Value index) const {
+        // NOTE: this `ConvertStdOp` is used to convert from an MLIR integer to
+        //       an index, unlike most other uses, which involve a Julia type
+        ConvertStdOp convertedIndex = rewriter.create<ConvertStdOp>(
+            location, rewriter.getIndexType(), index);
+        SubIOp subOp = rewriter.create<SubIOp>(
+            location,
+            rewriter.getIndexType(),
+            convertedIndex.getResult(),
+            getIndexConstant(rewriter, location, 1));
+        return subOp.getResult();
     }
 };
 
@@ -393,31 +420,39 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         assert(elementType.hasValue() && "cannot convert Array element type");
 
         unsigned rank = jl_unbox_uint64(jl_tparam1(arrayDatatype));
-        assert(rank == 1 && "unimplemented");
         SmallVector<int64_t, 2> shape(rank, -1);
 
-        // just handle a single index for now (FIXME)
-        JuliaType indexJuliaType = op.getOperand(2).getType().cast<JuliaType>();
-        jl_datatype_t *indexDatatype = indexJuliaType.getDatatype();
-        assert(indexDatatype == jl_int64_type || indexDatatype == jl_int32_type);
-        Value newIndex = rewriter.create<SubIOp>(
-            op.getLoc(),
-            rewriter.getIndexType(),
-            rewriter.create<ConvertStdOp>(
-                op.getLoc(),
-                rewriter.getIndexType(),
-                operands[2]).getResult(),
-            rewriter.create<mlir::ConstantOp>(
-                op.getLoc(),
-                rewriter.getIndexType(),
-                rewriter.getIntegerAttr(
-                    rewriter.getIndexType(), 1)).getResult());
+        SmallVector<Value, 2> indices;
+        if (rank > 1 && op.getNumOperands() == 3) {
+            // linear index, take advantage of lack of bounds checking
+            indices.assign(
+                rank, getIndexConstant(rewriter, op.getLoc(), 0));
+            indices[0] = decrementIndex(rewriter, op.getLoc(), operands[2]);
+        } else {
+            for (unsigned i = 2; i < op.getNumOperands(); i++) {
+                indices.push_back(
+                    decrementIndex(rewriter, op.getLoc(), operands[i]));
+            }
+        }
+
+        // construct `AffineMap` that makes use of all strides in the future
+        // MemRef descriptor, because the default one constructed using
+        // `makeCanonicalStridedLayoutExpr` ignores the stride of the last
+        // dimension, probably because it assumes a row-major layout
+        AffineExpr currentExpr = rewriter.getAffineConstantExpr(0);
+        for (unsigned i = 0; i < rank; i++) {
+            currentExpr = currentExpr
+                + rewriter.getAffineSymbolExpr(i)
+                * rewriter.getAffineDimExpr(i);
+        }
+        AffineMap affineMap = AffineMap::get(rank, rank, currentExpr);
 
         Value memref = rewriter.create<ArrayToMemRefOp>(
-            op.getLoc(), MemRefType::get(shape, elementType.getValue()),
+            op.getLoc(),
+            MemRefType::get(shape, elementType.getValue(), affineMap),
             operands[1]).getResult();
         Value element = rewriter.create<LoadOp>(
-            op.getLoc(), elementType.getValue(), memref, newIndex).getResult();
+            op.getLoc(), elementType.getValue(), memref, indices).getResult();
         rewriter.replaceOpWithNewOp<ConvertStdOp>(op, elementJuliaType, element);
         return success();
     }

@@ -510,12 +510,6 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
             rewriter.getContext(), (jl_datatype_t*)jl_tparam0(jdt));
         unsigned nDims = jl_unbox_long(jl_tparam1(jdt)); // is long the right type?
 
-        Optional<Type> convertedElementType =
-            stdLowering.convertJuliaType(elementType);
-        SmallVector<int64_t, 2> shape(nDims, -1);
-        MemRefType memrefType = MemRefType::get(
-            shape, convertedElementType.getValue());
-
         Value pointerToArray = emitPointerToArray(
             rewriter, op.getLoc(), operands[0]);
         Value pointerToDataField = emitPointerToArrayField(
@@ -531,8 +525,9 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
         Value pointerToNrows = emitPointerToArrayField(
             rewriter, op.getLoc(), pointerToArray, 5);
 
+        // create MemRef descriptor
         MemRefDescriptor memref = MemRefDescriptor::undef(
-            rewriter, op.getLoc(), lowering.convertType(memrefType));
+            rewriter, op.getLoc(), lowering.convertType(op.getType()));
         memref.setAllocatedPtr(rewriter, op.getLoc(), pointerToData);
         memref.setAlignedPtr(rewriter, op.getLoc(), pointerToData);
         memref.setOffset(
@@ -543,6 +538,9 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
                 lowering.int64Type,
                 rewriter.getI64IntegerAttr(0)).getResult());
 
+        // compute strides
+        Value lastSize;
+        Value lastStride;
         for (unsigned i = 0; i < nDims; i++) {
             Value dimension = rewriter.create<LLVM::ConstantOp>(
                 op.getLoc(),
@@ -551,7 +549,21 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
             Value size = emitArraySize(
                 rewriter, op.getLoc(), pointerToNrows, dimension);
             memref.setSize(rewriter, op.getLoc(), i, size);
-            memref.setStride(rewriter, op.getLoc(), i, size);
+
+            Value stride;
+            if (lastStride) {
+                stride = rewriter.create<LLVM::MulOp>(
+                    op.getLoc(), lowering.longType, lastSize, lastStride);
+            } else {
+                stride = rewriter.create<LLVM::ConstantOp>(
+                    op.getLoc(),
+                    lowering.longType,
+                    rewriter.getIntegerAttr(lowering.mlirLongType, 1));
+            }
+            memref.setStride(rewriter, op.getLoc(), i, stride);
+
+            lastSize = size;
+            lastStride = stride;
         }
 
         rewriter.replaceOp(op, {Value(memref)});
