@@ -411,11 +411,15 @@ AffineExpr copied_makeCanonicalStridedLayoutExpr(ArrayRef<int64_t> sizes,
   bool dynamicPoisonBit = false;
   unsigned numDims = 0;
   unsigned nSymbols = 0;
+  llvm::outs() << "a: " << numDims << "\n";
   // Compute the number of symbols and dimensions of the passed exprs.
   for (AffineExpr expr : exprs) {
     expr.walk([&numDims, &nSymbols](AffineExpr d) {
-      if (AffineDimExpr dim = d.dyn_cast<AffineDimExpr>())
+                  if (AffineDimExpr dim = d.dyn_cast<AffineDimExpr>()) {
+        llvm::outs() << "b: " << numDims << "\n";
         numDims = std::max(numDims, dim.getPosition() + 1);
+        llvm::outs() << "c: " << numDims << "\n";
+                  }
       else if (AffineSymbolExpr symbol = d.dyn_cast<AffineSymbolExpr>())
         nSymbols = std::max(nSymbols, symbol.getPosition() + 1);
     });
