@@ -30,7 +30,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: julia/usr
-          key: gcc9-${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
+          key: 1-gcc9-${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
 
       # needed because they're just symlinks in usr/share
       # long term, we will probably want to cache an installed Julia
@@ -38,7 +38,7 @@ jobs:
         uses: actions/cache@v1
         with:
           path: julia/stdlib
-          key: gcc9-${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
+          key: 1-gcc9-${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
 
       - name: Install build dependencies for Julia
         if: steps.cache-julia.outputs.cache-hit != 'true'
@@ -59,9 +59,11 @@ jobs:
           export CC=/usr/bin/gcc-9
           export CXX=/usr/bin/g++-9
           make -j `nproc` \
+              CC=/usr/bin/gcc-9 \
+              CXX=/usr/bin/g++-9 \
               USE_BINARYBUILDER_LLVM=0 \
               LLVM_VER=svn \
-              LLVM_DEBUG=0 \
+              LLVM_DEBUG=2 \
               USE_MLIR=1 \
               LLVM_GIT_VER=${{ matrix.llvm-commit }} \
               JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
@@ -93,38 +95,38 @@ jobs:
               -DMLIR_DIR="${GITHUB_WORKSPACE}/julia/usr/lib/cmake/mlir" \
               -DLLVM_EXTERNAL_LIT="${GITHUB_WORKSPACE}/julia/usr/tools/lit/lit.py" \
               -DJulia_EXECUTABLE="${GITHUB_WORKSPACE}/julia/usr/bin/julia" \
-              -DCMAKE_BUILD_TYPE=Release
+              -DCMAKE_BUILD_TYPE=Debug
 
       - name: Build library
         run: |
           cmake --build build --target brutus --parallel `nproc`
-          # rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/base
-          # rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/test
+          rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/base
+          rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/test
 
-      # - name: archive julia
-      #   uses: actions/upload-artifact@v1
-      #   with:
-      #     name: julia
-      #     path: julia
+      - name: archive julia
+        uses: actions/upload-artifact@v1
+        with:
+          name: julia
+          path: julia
 
-      # - name: archive brutus
-      #   uses: actions/upload-artifact@v1
-      #   with:
-      #     name: brutus
-      #     path: build
+      - name: archive brutus
+        uses: actions/upload-artifact@v1
+        with:
+          name: brutus
+          path: build
 
-      - name: Precompile library
-        run: |
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
-          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
+      # - name: Precompile library
+      #   run: |
+      #     export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
+      #     ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 
-      - name: testing
-        run: |
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
-          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus ${GITHUB_WORKSPACE}/test/Codegen/jlir-lower.jl 2>&1
+      # - name: testing
+      #   run: |
+      #     export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
+      #     ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus ${GITHUB_WORKSPACE}/test/Codegen/jlir-lower.jl 2>&1
 
-      - name: Test Brutus
-        run: |
-          cmake --build build --target check-brutus --parallel `nproc`
-          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
-          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"test"'
+      # - name: Test Brutus
+      #   run: |
+      #     cmake --build build --target check-brutus --parallel `nproc`
+      #     export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
+      #     ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"test"'
