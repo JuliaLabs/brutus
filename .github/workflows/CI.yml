@@ -99,6 +99,11 @@ jobs:
           export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
           ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 
+      - name: testing
+        run: |
+          export LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:${GITHUB_WORKSPACE}/build/lib
+          ${GITHUB_WORKSPACE}/julia/usr/bin/julia --project=Brutus ${GITHUB_WORKSPACE}/test/Codegen/jlir-lower.jl 2>&1 | ${GITHUB_WORKSPACE}/julia/usr/tools/FileCheck ${GITHUB_WORKSPACE}/test/Codegen/jlir-lower.jl
+
       - name: Test Brutus
         run: |
           cmake --build build --target check-brutus --parallel `nproc`
