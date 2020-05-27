@@ -94,7 +94,10 @@ jobs:
               -DCMAKE_BUILD_TYPE=Release
 
       - name: Build library
-        run: cmake --build build --target brutus --parallel `nproc`
+        run: |
+          cmake --build build --target brutus --parallel `nproc`
+          rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/base
+          rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/test
 
       - name: archive julia
         uses: actions/upload-artifact@v1
