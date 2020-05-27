@@ -488,7 +488,7 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         // the following is only necessary because `mlir::getStridesAndOffset`
         // currently only supports `MemRef`s with a single affine map with a
         // single result
-        affineMap.dump();
+        affineMap.print(llvm::outs());
         copied_makeCanonicalStridedLayoutExpr(shape, affineMap.getResults(), rewriter.getContext()); // testing
         affineMap = AffineMap::get(
             rank, rank, makeCanonicalStridedLayoutExpr(
