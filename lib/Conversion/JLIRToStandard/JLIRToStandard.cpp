@@ -404,6 +404,42 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
     }
 };
 
+AffineExpr copied_makeCanonicalStridedLayoutExpr(ArrayRef<int64_t> sizes,
+                                                ArrayRef<AffineExpr> exprs,
+                                                MLIRContext *context) {
+  AffineExpr expr;
+  bool dynamicPoisonBit = false;
+  unsigned numDims = 0;
+  unsigned nSymbols = 0;
+  // Compute the number of symbols and dimensions of the passed exprs.
+  for (AffineExpr expr : exprs) {
+    expr.walk([&numDims, &nSymbols](AffineExpr d) {
+      if (AffineDimExpr dim = d.dyn_cast<AffineDimExpr>())
+        numDims = std::max(numDims, dim.getPosition() + 1);
+      else if (AffineSymbolExpr symbol = d.dyn_cast<AffineSymbolExpr>())
+        nSymbols = std::max(nSymbols, symbol.getPosition() + 1);
+    });
+  }
+  int64_t runningSize = 1;
+  for (auto en : llvm::zip(llvm::reverse(exprs), llvm::reverse(sizes))) {
+    int64_t size = std::get<1>(en);
+    // Degenerate case, no size =-> no stride
+    if (size == 0)
+      continue;
+    AffineExpr dimExpr = std::get<0>(en);
+    AffineExpr stride = dynamicPoisonBit
+                            ? getAffineSymbolExpr(nSymbols++, context)
+                            : getAffineConstantExpr(runningSize, context);
+    expr = expr ? expr + dimExpr * stride : dimExpr * stride;
+    if (size > 0)
+      runningSize *= size;
+    else
+      dynamicPoisonBit = true;
+  }
+  llvm::outs() << "findmehere: " << numDims << " " << nSymbols << "\n";
+  return simplifyAffineExpr(expr, numDims, nSymbols);
+}
+
 struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> {
     using OpAndTypeConversionPattern<Builtin_arrayref>::OpAndTypeConversionPattern;
 
@@ -446,6 +482,7 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         // the following is only necessary because `mlir::getStridesAndOffset`
         // currently only supports `MemRef`s with a single affine map with a
         // single result
+        copied_makeCanonicalStridedLayoutExpr(shape, affineMap.getResults(), rewriter.getContext()); // testing
         affineMap = AffineMap::get(
             rank, rank, makeCanonicalStridedLayoutExpr(
                 shape, affineMap.getResults(), rewriter.getContext()));
