@@ -103,17 +103,17 @@ jobs:
           rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/base
           rm ${GITHUB_WORKSPACE}/julia/usr/share/julia/test
 
-      - name: archive julia
-        uses: actions/upload-artifact@v1
-        with:
-          name: julia
-          path: julia
+      # - name: archive julia
+      #   uses: actions/upload-artifact@v1
+      #   with:
+      #     name: julia
+      #     path: julia
 
-      - name: archive brutus
-        uses: actions/upload-artifact@v1
-        with:
-          name: brutus
-          path: build
+      # - name: archive brutus
+      #   uses: actions/upload-artifact@v1
+      #   with:
+      #     name: brutus
+      #     path: build
 
       # - name: Precompile library
       #   run: |
