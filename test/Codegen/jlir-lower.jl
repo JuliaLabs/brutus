@@ -1,4 +1,4 @@
-# RUN: julia --startup-file=no %s 2>&1 | FileCheck --dump-input=fail %s
+# RUN: julia --startup-file=no %s 2>&1 | FileCheck %s
 import Brutus
 
 emit_lowered(f, tt...) =
