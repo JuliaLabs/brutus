@@ -63,7 +63,7 @@ jobs:
               CXX=/usr/bin/g++-9 \
               USE_BINARYBUILDER_LLVM=0 \
               LLVM_VER=svn \
-              LLVM_DEBUG=2 \
+              LLVM_DEBUG=0 \
               USE_MLIR=1 \
               LLVM_GIT_VER=${{ matrix.llvm-commit }} \
               JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
