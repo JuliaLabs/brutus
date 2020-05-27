@@ -437,6 +437,7 @@ AffineExpr copied_makeCanonicalStridedLayoutExpr(ArrayRef<int64_t> sizes,
       dynamicPoisonBit = true;
   }
   llvm::outs() << "findmehere: " << numDims << " " << nSymbols << "\n";
+  exit(0);
   return simplifyAffineExpr(expr, numDims, nSymbols);
 }
 
