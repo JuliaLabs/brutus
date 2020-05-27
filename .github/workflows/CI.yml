@@ -68,7 +68,7 @@ jobs:
         run: ${GITHUB_WORKSPACE}/julia/usr/bin/julia -e "using InteractiveUtils; versioninfo()"
 
       - name: Install build tools
-        run: sudo apt-get update && sudo apt-get install ccache
+        run: sudo apt-get update && sudo apt-get install ccache gcc-9 g++-9
 
       - name: Prepare timestamp for ccache cache
         id: ccache-cache-timestamp
