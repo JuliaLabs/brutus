@@ -96,11 +96,17 @@ jobs:
       - name: Build library
         run: cmake --build build --target brutus --parallel `nproc`
 
-      - name: archive
+      - name: archive julia
         uses: actions/upload-artifact@v2
         with:
-          name: everything
-          path: ${{ github.workspace }}
+          name: julia
+          path: ${{ github.workspace }}/julia
+
+      - name: archive brutus
+        uses: actions/upload-artifact@v2
+        with:
+          name: brutus
+          path: ${{ github.workspace }}/build
 
       # - name: Precompile library
       #   run: |
