@@ -489,7 +489,7 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         // currently only supports `MemRef`s with a single affine map with a
         // single result
         affineMap.print(llvm::outs());
-        copied_makeCanonicalStridedLayoutExpr(shape, affineMap.getResults(), rewriter.getContext()); // testing
+        // copied_makeCanonicalStridedLayoutExpr(shape, affineMap.getResults(), rewriter.getContext()); // testing
         affineMap = AffineMap::get(
             rank, rank, makeCanonicalStridedLayoutExpr(
                 shape, affineMap.getResults(), rewriter.getContext()));
