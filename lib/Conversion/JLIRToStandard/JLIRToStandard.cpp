@@ -414,6 +414,7 @@ AffineExpr copied_makeCanonicalStridedLayoutExpr(ArrayRef<int64_t> sizes,
   llvm::outs() << "a: " << numDims << "\n";
   // Compute the number of symbols and dimensions of the passed exprs.
   for (AffineExpr expr : exprs) {
+      expr.dump();
     expr.walk([&numDims, &nSymbols](AffineExpr d) {
                   if (AffineDimExpr dim = d.dyn_cast<AffineDimExpr>()) {
         llvm::outs() << "b: " << numDims << "\n";
