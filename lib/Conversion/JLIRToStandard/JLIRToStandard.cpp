@@ -427,7 +427,9 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
             // linear index, take advantage of lack of bounds checking
             indices.assign(
                 rank, getIndexConstant(rewriter, op.getLoc(), 0));
-            indices[0] = decrementIndex(rewriter, op.getLoc(), operands[2]);
+            // change last index instead of first because MemRefs are row-major
+            indices[rank-1] =
+                decrementIndex(rewriter, op.getLoc(), operands[2]);
         } else {
             for (unsigned i = 2; i < op.getNumOperands(); i++) {
                 indices.push_back(
@@ -435,17 +437,18 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
             }
         }
 
-        // construct `AffineMap` that makes use of all strides in the future
-        // MemRef descriptor, because the default one constructed using
-        // `makeCanonicalStridedLayoutExpr` ignores the stride of the last
-        // dimension, probably because it assumes a row-major layout
-        AffineExpr currentExpr = rewriter.getAffineConstantExpr(0);
-        for (unsigned i = 0; i < rank; i++) {
-            currentExpr = currentExpr
-                + rewriter.getAffineSymbolExpr(i)
-                * rewriter.getAffineDimExpr(i);
-        }
-        AffineMap affineMap = AffineMap::get(rank, rank, currentExpr);
+        // reverse order of dimensions because MemRefs are row-major whereas
+        // Julia arrays are column-major
+        SmallVector<unsigned, 2> permutation(
+            llvm::reverse(llvm::seq<unsigned>(0, rank)));
+        AffineMap affineMap = AffineMap::getPermutationMap(
+            permutation, rewriter.getContext());
+        // the following is only necessary because `mlir::getStridesAndOffset`
+        // currently only supports `MemRef`s with a single affine map with a
+        // single result
+        affineMap = AffineMap::get(
+            rank, rank, makeCanonicalStridedLayoutExpr(
+                shape, affineMap.getResults(), rewriter.getContext()));
 
         Value memref = rewriter.create<ArrayToMemRefOp>(
             op.getLoc(),

@@ -538,7 +538,8 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
                 lowering.int64Type,
                 rewriter.getI64IntegerAttr(0)).getResult());
 
-        // compute strides
+        // compute strides, making sure to reverse order of dimensions, because
+        // MemRefs are row-major, whereas Julia arrays are column-major
         Value lastSize;
         Value lastStride;
         for (unsigned i = 0; i < nDims; i++) {
@@ -548,7 +549,7 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
                 rewriter.getIntegerAttr(lowering.mlirLongType, i)).getResult();
             Value size = emitArraySize(
                 rewriter, op.getLoc(), pointerToNrows, dimension);
-            memref.setSize(rewriter, op.getLoc(), i, size);
+            memref.setSize(rewriter, op.getLoc(), nDims - i - 1, size);
 
             Value stride;
             if (lastStride) {
@@ -560,7 +561,7 @@ struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRef
                     lowering.longType,
                     rewriter.getIntegerAttr(lowering.mlirLongType, 1));
             }
-            memref.setStride(rewriter, op.getLoc(), i, stride);
+            memref.setStride(rewriter, op.getLoc(), nDims - i - 1, stride);
 
             lastSize = size;
             lastStride = stride;
