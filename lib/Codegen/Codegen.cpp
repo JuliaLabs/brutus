@@ -403,16 +403,16 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
 
     module.push_back(function);
 
-    // Lastly verify module
-    if (failed(mlir::verify(module))) {
-        module.emitError("module verification failed");
-        return nullptr;
-    }
-
     if (dump_flags & DUMP_TRANSLATED) {
         llvm::outs() << "after translating to MLIR in JLIR dialect:";
         module.dump();
         llvm::outs() << "\n\n";
+    }
+
+    // Lastly verify module
+    if (failed(mlir::verify(module))) {
+        module.emitError("module verification failed");
+        return nullptr;
     }
 
     if (optimize) {
