@@ -165,13 +165,12 @@ emit_lowered(gauss, Int64)
 
 index(A, i) = A[i]
 emit_lowered(index, Array{Int64, 1}, Int64)
-# CHECK: #map0 = affine_map<(d0)[s0] -> (d0 * s0)>
 # CHECK: func @index(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 1}">, %arg2: i64) -> i64
 # CHECK:   %c1 = constant 1 : index
 # CHECK:   %0 = "jlir.convertstd"(%arg2) : (i64) -> index
 # CHECK:   %1 = subi %0, %c1 : index
-# CHECK:   %2 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 1}">) -> memref<?xi64, #map0>
-# CHECK:   %3 = load %2[%1] : memref<?xi64, #map0>
+# CHECK:   %2 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 1}">) -> memref<?xi64>
+# CHECK:   %3 = load %2[%1] : memref<?xi64>
 # CHECK:   return %3 : i64
 #
 # CHECK: llvm.func @index(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"%jl_value_t*">, %arg2: !llvm.i64) -> !llvm.i64
@@ -196,22 +195,20 @@ emit_lowered(index, Array{Int64, 1}, Int64)
 # CHECK:   %18 = llvm.insertvalue %17, %16[4, 0] : !llvm<"{ i64*, i64*, i64, [1 x i64], [1 x i64] }">
 # CHECK:   %19 = llvm.extractvalue %18[1] : !llvm<"{ i64*, i64*, i64, [1 x i64], [1 x i64] }">
 # CHECK:   %20 = llvm.mlir.constant(0 : index) : !llvm.i64
-# CHECK:   %21 = llvm.extractvalue %18[4, 0] : !llvm<"{ i64*, i64*, i64, [1 x i64], [1 x i64] }">
-# CHECK:   %22 = llvm.mul %1, %21 : !llvm.i64
-# CHECK:   %23 = llvm.add %20, %22 : !llvm.i64
-# CHECK:   %24 = llvm.getelementptr %19[%23] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
-# CHECK:   %25 = llvm.load %24 : !llvm<"i64*">
-# CHECK:   llvm.return %25 : !llvm.i64
+# CHECK:   %21 = llvm.mul %1, %0 : !llvm.i64
+# CHECK:   %22 = llvm.add %20, %21 : !llvm.i64
+# CHECK:   %23 = llvm.getelementptr %19[%22] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
+# CHECK:   %24 = llvm.load %23 : !llvm<"i64*">
+# CHECK:   llvm.return %24 : !llvm.i64
 
 emit_lowered(index, Array{Int64, 3}, Int64)
-# CHECK: #map0 = affine_map<(d0, d1, d2)[s0, s1, s2] -> (d0 * s0 + d1 * s1 + d2 * s2)>
 # CHECK: func @index(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: i64) -> i64
 # CHECK:   %c0 = constant 0 : index
 # CHECK:   %c1 = constant 1 : index
 # CHECK:   %0 = "jlir.convertstd"(%arg2) : (i64) -> index
 # CHECK:   %1 = subi %0, %c1 : index
-# CHECK:   %2 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64, #map0>
-# CHECK:   %3 = load %2[%1, %c0, %c0] : memref<?x?x?xi64, #map0>
+# CHECK:   %2 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64>
+# CHECK:   %3 = load %2[%c0, %c0, %1] : memref<?x?x?xi64>
 # CHECK:   return %3 : i64
 #
 # CHECK: llvm.func @index(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"%jl_value_t*">, %arg2: !llvm.i64) -> !llvm.i64
@@ -232,9 +229,9 @@ emit_lowered(index, Array{Int64, 3}, Int64)
 # CHECK:   %14 = llvm.insertvalue %4, %13[2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %15 = llvm.getelementptr %10[%4] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %16 = llvm.load %15 : !llvm<"i64*">
-# CHECK:   %17 = llvm.insertvalue %16, %14[3, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %17 = llvm.insertvalue %16, %14[3, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %18 = llvm.mlir.constant(1 : i64) : !llvm.i64
-# CHECK:   %19 = llvm.insertvalue %18, %17[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %19 = llvm.insertvalue %18, %17[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %20 = llvm.getelementptr %10[%18] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %21 = llvm.load %20 : !llvm<"i64*">
 # CHECK:   %22 = llvm.insertvalue %21, %19[3, 1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
@@ -243,26 +240,24 @@ emit_lowered(index, Array{Int64, 3}, Int64)
 # CHECK:   %25 = llvm.mlir.constant(2 : i64) : !llvm.i64
 # CHECK:   %26 = llvm.getelementptr %10[%25] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %27 = llvm.load %26 : !llvm<"i64*">
-# CHECK:   %28 = llvm.insertvalue %27, %24[3, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %28 = llvm.insertvalue %27, %24[3, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %29 = llvm.mul %21, %23 : !llvm.i64
-# CHECK:   %30 = llvm.insertvalue %29, %28[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %30 = llvm.insertvalue %29, %28[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %31 = llvm.extractvalue %30[1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %32 = llvm.extractvalue %30[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK:   %33 = llvm.mul %2, %32 : !llvm.i64
+# CHECK:   %33 = llvm.mul %0, %32 : !llvm.i64
 # CHECK:   %34 = llvm.add %0, %33 : !llvm.i64
 # CHECK:   %35 = llvm.extractvalue %30[4, 1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %36 = llvm.mul %0, %35 : !llvm.i64
 # CHECK:   %37 = llvm.add %34, %36 : !llvm.i64
-# CHECK:   %38 = llvm.extractvalue %30[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK:   %39 = llvm.mul %0, %38 : !llvm.i64
-# CHECK:   %40 = llvm.add %37, %39 : !llvm.i64
-# CHECK:   %41 = llvm.getelementptr %31[%40] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
-# CHECK:   %42 = llvm.load %41 : !llvm<"i64*">
-# CHECK:   llvm.return %42 : !llvm.i64
+# CHECK:   %38 = llvm.mul %2, %1 : !llvm.i64
+# CHECK:   %39 = llvm.add %37, %38 : !llvm.i64
+# CHECK:   %40 = llvm.getelementptr %31[%39] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
+# CHECK:   %41 = llvm.load %40 : !llvm<"i64*">
+# CHECK:   llvm.return %41 : !llvm.i64
 
 index(A, i, j, k) = A[i, j, k]
 emit_lowered(index, Array{Int64, 3}, Int64, Int64, Int64)
-# CHECK: #map0 = affine_map<(d0, d1, d2)[s0, s1, s2] -> (d0 * s0 + d1 * s1 + d2 * s2)>
 # CHECK: func @index(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: i64, %arg3: i64, %arg4: i64) -> i64
 # CHECK:   %c1 = constant 1 : index
 # CHECK:   %0 = "jlir.convertstd"(%arg2) : (i64) -> index
@@ -271,8 +266,8 @@ emit_lowered(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK:   %3 = subi %2, %c1 : index
 # CHECK:   %4 = "jlir.convertstd"(%arg4) : (i64) -> index
 # CHECK:   %5 = subi %4, %c1 : index
-# CHECK:   %6 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64, #map0>
-# CHECK:   %7 = load %6[%1, %3, %5] : memref<?x?x?xi64, #map0>
+# CHECK:   %6 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64>
+# CHECK:   %7 = load %6[%5, %3, %1] : memref<?x?x?xi64>
 # CHECK:   return %7 : i64
 #
 # CHECK: llvm.func @index(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"%jl_value_t*">, %arg2: !llvm.i64, %arg3: !llvm.i64, %arg4: !llvm.i64) -> !llvm.i64
@@ -294,9 +289,9 @@ emit_lowered(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK:   %15 = llvm.insertvalue %5, %14[2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %16 = llvm.getelementptr %11[%5] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %17 = llvm.load %16 : !llvm<"i64*">
-# CHECK:   %18 = llvm.insertvalue %17, %15[3, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %18 = llvm.insertvalue %17, %15[3, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %19 = llvm.mlir.constant(1 : i64) : !llvm.i64
-# CHECK:   %20 = llvm.insertvalue %19, %18[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %20 = llvm.insertvalue %19, %18[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %21 = llvm.getelementptr %11[%19] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %22 = llvm.load %21 : !llvm<"i64*">
 # CHECK:   %23 = llvm.insertvalue %22, %20[3, 1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
@@ -305,20 +300,19 @@ emit_lowered(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK:   %26 = llvm.mlir.constant(2 : i64) : !llvm.i64
 # CHECK:   %27 = llvm.getelementptr %11[%26] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
 # CHECK:   %28 = llvm.load %27 : !llvm<"i64*">
-# CHECK:   %29 = llvm.insertvalue %28, %25[3, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %29 = llvm.insertvalue %28, %25[3, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %30 = llvm.mul %22, %24 : !llvm.i64
-# CHECK:   %31 = llvm.insertvalue %30, %29[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
+# CHECK:   %31 = llvm.insertvalue %30, %29[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %32 = llvm.extractvalue %31[1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %33 = llvm.mlir.constant(0 : index) : !llvm.i64
 # CHECK:   %34 = llvm.extractvalue %31[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK:   %35 = llvm.mul %1, %34 : !llvm.i64
+# CHECK:   %35 = llvm.mul %3, %34 : !llvm.i64
 # CHECK:   %36 = llvm.add %33, %35 : !llvm.i64
 # CHECK:   %37 = llvm.extractvalue %31[4, 1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
 # CHECK:   %38 = llvm.mul %2, %37 : !llvm.i64
 # CHECK:   %39 = llvm.add %36, %38 : !llvm.i64
-# CHECK:   %40 = llvm.extractvalue %31[4, 2] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK:   %41 = llvm.mul %3, %40 : !llvm.i64
-# CHECK:   %42 = llvm.add %39, %41 : !llvm.i64
-# CHECK:   %43 = llvm.getelementptr %32[%42] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
-# CHECK:   %44 = llvm.load %43 : !llvm<"i64*">
-# CHECK:   llvm.return %44 : !llvm.i64
+# CHECK:   %40 = llvm.mul %1, %0 : !llvm.i64
+# CHECK:   %41 = llvm.add %39, %40 : !llvm.i64
+# CHECK:   %42 = llvm.getelementptr %32[%41] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
+# CHECK:   %43 = llvm.load %42 : !llvm<"i64*">
+# CHECK:   llvm.return %43 : !llvm.i64

@@ -422,34 +422,26 @@ struct ArrayrefOpLowering : public OpAndTypeConversionPattern<Builtin_arrayref> 
         unsigned rank = jl_unbox_uint64(jl_tparam1(arrayDatatype));
         SmallVector<int64_t, 2> shape(rank, -1);
 
+        // indices are reversed because Julia is column-major, but MLIR is
+        // row-major
         SmallVector<Value, 2> indices;
         if (rank > 1 && op.getNumOperands() == 3) {
             // linear index, take advantage of lack of bounds checking
             indices.assign(
                 rank, getIndexConstant(rewriter, op.getLoc(), 0));
-            indices[0] = decrementIndex(rewriter, op.getLoc(), operands[2]);
+            indices[rank-1] = decrementIndex(rewriter, op.getLoc(), operands[2]);
         } else {
-            for (unsigned i = 2; i < op.getNumOperands(); i++) {
-                indices.push_back(
-                    decrementIndex(rewriter, op.getLoc(), operands[i]));
+            indices.assign(rank, nullptr);
+            assert(rank == op.getNumOperands() - 2);
+            for (unsigned i = 0; i < rank; i++) {
+                indices[rank-i-1] = decrementIndex(
+                    rewriter, op.getLoc(), operands[i+2]);
             }
         }
 
-        // construct `AffineMap` that makes use of all strides in the future
-        // MemRef descriptor, because the default one constructed using
-        // `makeCanonicalStridedLayoutExpr` ignores the stride of the last
-        // dimension, probably because it assumes a row-major layout
-        AffineExpr currentExpr = rewriter.getAffineConstantExpr(0);
-        for (unsigned i = 0; i < rank; i++) {
-            currentExpr = currentExpr
-                + rewriter.getAffineSymbolExpr(i)
-                * rewriter.getAffineDimExpr(i);
-        }
-        AffineMap affineMap = AffineMap::get(rank, rank, currentExpr);
-
         Value memref = rewriter.create<ArrayToMemRefOp>(
             op.getLoc(),
-            MemRefType::get(shape, elementType.getValue(), affineMap),
+            MemRefType::get(shape, elementType.getValue()),
             operands[1]).getResult();
         Value element = rewriter.create<LoadOp>(
             op.getLoc(), elementType.getValue(), memref, indices).getResult();
