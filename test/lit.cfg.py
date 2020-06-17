@@ -52,7 +52,8 @@ config.test_exec_root = os.path.join(config.brutus_obj_root, 'test')
 llvm_config.with_environment('PATH', config.llvm_tools_dir, append_path=True)
 
 config.environment["JULIA_PROJECT"] = config.julia_project
-config.environment["LD_LIBRARY_PATH"] = config.llvm_shlib_dir
+config.environment["LD_LIBRARY_PATH"] = os.path.abspath(
+    os.path.join(config.brutus_obj_root, '../lib'))
 tool_dirs = [config.llvm_tools_dir, config.julia_home]
 tools = [
     'julia',

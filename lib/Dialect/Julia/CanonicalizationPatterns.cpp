@@ -14,25 +14,27 @@ namespace JL_I {
 using namespace mlir;
 using namespace jlir;
 
+namespace {
+
 /// Intrinsic rewriter
 struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
     public:
         using OpRewritePattern<CallOp>::OpRewritePattern;
 
-    PatternMatchResult match(CallOp op) const override {
+    LogicalResult match(CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
-            return matchFailure();
+            return failure();
         }
         if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_typeis(value, jl_intrinsic_type)) {
-                return matchSuccess();
+                return success();
             }
         }
-        return matchFailure();
+        return failure();
     }
 
     void rewrite(CallOp op, PatternRewriter &rewriter) const override {
@@ -57,20 +59,20 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
     public:
         using OpRewritePattern<CallOp>::OpRewritePattern;
 
-    PatternMatchResult match(CallOp op) const override {
+    LogicalResult match(CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
-            return matchFailure();
+            return failure();
         }
         if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_isa(value, (jl_value_t*)jl_builtin_type)) {
-                return matchSuccess();
+                return success();
             }
         }
-        return matchFailure();
+        return failure();
     }
 
     void rewrite(CallOp op, PatternRewriter &rewriter) const override {
@@ -89,6 +91,8 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
     }
 };
 
+} // namespace
+
 /// Register our patterns as "canonicalization" patterns on the CallOp so
 /// that they can be picked up by the Canonicalization framework.
 void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
@@ -97,5 +101,35 @@ void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
     results.insert<LowerBuiltinCallPattern>(context);
 }
 
+namespace {
+
+struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
+    using OpRewritePattern<ConvertStdOp>::OpRewritePattern;
+
+    LogicalResult matchAndRewrite(ConvertStdOp op,
+                                  PatternRewriter &rewriter) const override {
+        ConvertStdOp inputOp = dyn_cast_or_null<ConvertStdOp>(
+            op.getOperand().getDefiningOp());
+        if (!inputOp)
+            return failure();
 
 
+        Type originalType = inputOp.getOperand().getType();
+        Type finalType = op.getResult().getType();
+        if (originalType == finalType) {
+            rewriter.replaceOp(op, {inputOp.getOperand()});
+        } else {
+            ConvertStdOp newConvertStdOp = rewriter.create<ConvertStdOp>(
+                op.getLoc(), finalType, inputOp.getOperand());
+            rewriter.replaceOp(op, {newConvertStdOp.getResult()});
+        }
+        return success();
+    }
+};
+
+} // namespace
+
+void ConvertStdOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+                                               MLIRContext *context) {
+    results.insert<SimplifyRedundantConvertStdOps>(context);
+}

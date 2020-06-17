@@ -1,1 +1,1 @@
-add_brutus_dialect(JuliaOps JuliaOps)
+add_mlir_dialect(JuliaOps jlir)
