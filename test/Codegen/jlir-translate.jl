@@ -164,8 +164,8 @@ emit_translated(calls)
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
-# CHECK:   %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Any
-# CHECK:   "jlir.gotoifnot"(%1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Any) -> ()
+# CHECK:   %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Bool
+# CHECK:   "jlir.gotoifnot"(%1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK: ^bb2:
 # CHECK:   %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
 # CHECK:   %3 = "jlir.pi"(%2) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
@@ -233,7 +233,7 @@ emit_translated(hasunreachable, Float64)
 # CHECK:   "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK: ^bb2:
 # CHECK:   %3 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
-# CHECK:   %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir.Any
+# CHECK:   %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir<"Union{}">
 # CHECK:   %5 = "jlir.undef"() : () -> !jlir.Float64
 # CHECK:   "jlir.return"(%5) : (!jlir.Float64) -> ()
 # CHECK: ^bb3:
@@ -242,3 +242,15 @@ emit_translated(hasunreachable, Float64)
 # CHECK:   "jlir.goto"()[^bb4] : () -> ()
 # CHECK: ^bb4:
 # CHECK:   "jlir.return"(%7) : (!jlir.Float64) -> ()
+
+@noinline add(x, y) = x + y
+function caller(x, y)
+    add(x, y)
+end
+emit_translated(caller, Int64, Int64)
+
+# CHECK: func @caller(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 {
+# CHECK:   "jlir.goto"()[^bb1] : () -> ()
+# CHECK: ^bb1:
+# CHECK:   %0 = "jlir.invoke"(%arg1, %arg2) {methodInstance = #jlir<"add(Int64, Int64)">} : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK:   "jlir.return"(%0) : (!jlir.Int64) -> ()
