@@ -14,6 +14,7 @@ namespace jlir {
 struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
     LLVM::LLVMDialect *llvmDialect;
     LLVM::LLVMType voidType;
+    LLVM::LLVMType int1Type;
     LLVM::LLVMType int8Type;
     LLVM::LLVMType int16Type;
     LLVM::LLVMType int32Type;
