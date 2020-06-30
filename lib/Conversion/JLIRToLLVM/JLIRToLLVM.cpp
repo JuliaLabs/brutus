@@ -379,6 +379,18 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     }
 };
 
+struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
+    using OpAndTypeConversionPattern<GotoOp>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(GotoOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        rewriter.replaceOpWithNewOp<LLVM::BrOp>(
+            op, operands, op.getSuccessor(), op.getAttrs());
+        return success();
+    }
+};
+
 struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
     using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
@@ -595,7 +607,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         ConstantOpLowering, // (also JLIRTOStandard)
         ToUndefOpPattern<CallOp>,
         ToUndefOpPattern<InvokeOp>,
-        // GotoOp (JLIRToStandard)
+        GotoOpLowering,
         GotoIfNotOpLowering,
         ReturnOpLowering,
         ToUndefOpPattern<PiOp>,
