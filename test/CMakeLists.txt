@@ -23,4 +23,6 @@ add_lit_testsuite(check-brutus "Running the brutus tests"
   count
   precompile-brutus
   not
+  ARGS
+  -a
   )
