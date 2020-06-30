@@ -126,13 +126,14 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
         // first argument is the `MethodInstance`, second argument is the function
         assert(jl_is_method_instance(args[0]));
         jl_method_instance_t *mi = (jl_method_instance_t*)args[0];
+        mlir::Value callee = emit_value(ctx, loc, args[1]);
 
         // arguments to the `MethodInstance` start from the 3rd argument
         std::vector<mlir::Value> arguments;
         for (unsigned i = 2; i < nargs; ++i) {
             arguments.push_back(emit_value(ctx, loc, args[i]));
         }
-        InvokeOp op = ctx.builder.create<InvokeOp>(loc, mi, arguments, type);
+        InvokeOp op = ctx.builder.create<InvokeOp>(loc, mi, callee, arguments, type);
         return op.getResult();
 
     } else if (head == call_sym) {

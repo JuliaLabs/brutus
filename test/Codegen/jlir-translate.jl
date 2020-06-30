@@ -160,25 +160,27 @@ function calls()
     return f(1, 1)
 end
 emit_translated(calls)
+
 # CHECK: func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
-# CHECK: ^bb1:
-# CHECK:   %0 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
-# CHECK:   %1 = "jlir.invoke"(%0) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir.DataType) -> !jlir.Bool
-# CHECK:   "jlir.gotoifnot"(%1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK: ^bb2:
-# CHECK:   %2 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
-# CHECK:   %3 = "jlir.pi"(%2) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:   "jlir.goto"(%3)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
-# CHECK: ^bb3:
-# CHECK:   %4 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
-# CHECK:   %5 = "jlir.pi"(%4) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
-# CHECK:   "jlir.goto"(%5)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
-# CHECK: ^bb4(%6: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):
-# CHECK:   %7 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK: ^bb1:  // pred: ^bb0
+# CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(Base.rand)()">} : () -> !jlir<"typeof(Base.rand)">
+# CHECK:   %1 = "jlir.constant"() {value = #jlir.Bool} : () -> !jlir.DataType
+# CHECK:   %2 = "jlir.invoke"(%0, %1) {methodInstance = #jlir<"rand(Type{Bool})">} : (!jlir<"typeof(Base.rand)">, !jlir.DataType) -> !jlir.Bool
+# CHECK:   "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK:   %3 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
+# CHECK:   %4 = "jlir.pi"(%3) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
+# CHECK:   "jlir.goto"(%4)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
+# CHECK: ^bb3:  // pred: ^bb1
+# CHECK:   %5 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
+# CHECK:   %6 = "jlir.pi"(%5) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
+# CHECK:   "jlir.goto"(%6)[^bb4] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
+# CHECK: ^bb4(%7: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):
 # CHECK:   %8 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:   %9 = "jlir.call"(%6, %7, %8) : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">, !jlir.Int64, !jlir.Int64) -> !jlir.Any
-# CHECK:   "jlir.return"(%9) : (!jlir.Any) -> ()
+# CHECK:   %9 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK:   %10 = "jlir.call"(%7, %8, %9) : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">, !jlir.Int64, !jlir.Int64) -> !jlir.Any
+# CHECK:   "jlir.return"(%10) : (!jlir.Any) -> ()
 
 struct A
     x
@@ -224,24 +226,25 @@ emit_translated(haspi, Union{Int64, Float64})
 # has the terminator unreachable
 hasunreachable(x::Float64) = sqrt(x)
 emit_translated(hasunreachable, Float64)
-# CHECK: func @hasunreachable(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64
+# CHECK: func @hasunreachable(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
-# CHECK: ^bb1:
+# CHECK: ^bb1:  // pred: ^bb0
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction
 # CHECK:   %1 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Float64
 # CHECK:   %2 = "jlir.call"(%0, %arg1, %1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64, !jlir.Float64) -> !jlir.Bool
 # CHECK:   "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK: ^bb2:
-# CHECK:   %3 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
-# CHECK:   %4 = "jlir.invoke"(%3, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir.Symbol, !jlir.Float64) -> !jlir<"Union{}">
-# CHECK:   %5 = "jlir.undef"() : () -> !jlir.Float64
-# CHECK:   "jlir.return"(%5) : (!jlir.Float64) -> ()
-# CHECK: ^bb3:
-# CHECK:   %6 = "jlir.constant"() {value = #jlir<"#<intrinsic #78 sqrt_llvm>">} : () -> !jlir.Core.IntrinsicFunction
-# CHECK:   %7 = "jlir.call"(%6, %arg1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64) -> !jlir.Float64
+# CHECK: ^bb2:  // pred: ^bb1
+# CHECK:   %3 = "jlir.constant"() {value = #jlir<"typeof(Base.Math.throw_complex_domainerror)()">} : () -> !jlir<"typeof(Base.Math.throw_complex_domainerror)">
+# CHECK:   %4 = "jlir.constant"() {value = #jlir<":sqrt">} : () -> !jlir.Symbol
+# CHECK:   %5 = "jlir.invoke"(%3, %4, %arg1) {methodInstance = #jlir<"throw_complex_domainerror(Symbol, Float64)">} : (!jlir<"typeof(Base.Math.throw_complex_domainerror)">, !jlir.Symbol, !jlir.Float64) -> !jlir<"Union{}">
+# CHECK:   %6 = "jlir.undef"() : () -> !jlir.Float64
+# CHECK:   "jlir.return"(%6) : (!jlir.Float64) -> ()
+# CHECK: ^bb3:  // pred: ^bb1
+# CHECK:   %7 = "jlir.constant"() {value = #jlir<"#<intrinsic #78 sqrt_llvm>">} : () -> !jlir.Core.IntrinsicFunction
+# CHECK:   %8 = "jlir.call"(%7, %arg1) : (!jlir.Core.IntrinsicFunction, !jlir.Float64) -> !jlir.Float64
 # CHECK:   "jlir.goto"()[^bb4] : () -> ()
-# CHECK: ^bb4:
-# CHECK:   "jlir.return"(%7) : (!jlir.Float64) -> ()
+# CHECK: ^bb4:  // pred: ^bb3
+# CHECK:   "jlir.return"(%8) : (!jlir.Float64) -> ()
 
 @noinline add(x, y) = x + y
 function caller(x, y)
@@ -251,6 +254,7 @@ emit_translated(caller, Int64, Int64)
 
 # CHECK: func @caller(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
-# CHECK: ^bb1:
-# CHECK:   %0 = "jlir.invoke"(%arg1, %arg2) {methodInstance = #jlir<"add(Int64, Int64)">} : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK:   "jlir.return"(%0) : (!jlir.Int64) -> ()
+# CHECK: ^bb1:  // pred: ^bb0
+# CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(Main.add)()">} : () -> !jlir<"typeof(Main.add)">
+# CHECK:   %1 = "jlir.invoke"(%0, %arg1, %arg2) {methodInstance = #jlir<"add(Int64, Int64)">} : (!jlir<"typeof(Main.add)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK:   "jlir.return"(%1) : (!jlir.Int64) -> ()

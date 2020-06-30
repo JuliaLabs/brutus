@@ -137,13 +137,15 @@ def InvokeOp : JLIR_Op<"invoke"> {
         TODO
     }];
 
-    let arguments = (ins JLIR_JuliaValueAttr:$methodInstance, Variadic<JLIR_JuliaType>:$arguments);
+    let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
+                         JLIR_JuliaType:$callee,
+                         Variadic<JLIR_JuliaType>:$arguments);
 
     let results = (outs JLIR_JuliaType);
 
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_method_instance_t *methodInstance,"
+                  "jl_method_instance_t *methodInstance, Value callee,"
                   "ArrayRef<Value> arguments, jl_datatype_t *type">
     ];
 }

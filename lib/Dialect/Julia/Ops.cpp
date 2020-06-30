@@ -79,9 +79,10 @@ void CallOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 // InvokeOp
 
 void InvokeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                     jl_method_instance_t *methodInstance,
+                     jl_method_instance_t *methodInstance, mlir::Value callee,
                      ArrayRef<mlir::Value> arguments, jl_datatype_t *type) {
     state.addTypes(JuliaType::get(builder.getContext(), type));
+    state.addOperands(callee);
     state.addOperands(arguments);
     state.addAttribute("methodInstance",
                        JuliaValueAttr::get(builder.getContext(), (jl_value_t*)methodInstance));
