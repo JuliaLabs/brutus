@@ -1,7 +1,5 @@
 module Brutus
 
-import LLVM
-
 function __init__()
     ccall((:brutus_init, "libbrutus"), Cvoid, ())
 end

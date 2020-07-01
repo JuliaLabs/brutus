@@ -14,6 +14,7 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx)
     : LLVMTypeConverter(ctx),
       llvmDialect(ctx->getRegisteredDialect<LLVM::LLVMDialect>()),
       voidType(LLVM::LLVMType::getVoidTy(llvmDialect)),
+      int1Type(LLVM::LLVMType::getInt1Ty(llvmDialect)),
       int8Type(LLVM::LLVMType::getInt8Ty(llvmDialect)),
       int16Type(LLVM::LLVMType::getInt16Ty(llvmDialect)),
       int32Type(LLVM::LLVMType::getInt32Ty(llvmDialect)),
@@ -52,8 +53,9 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx)
 
 LLVM::LLVMType JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
     assert(jl_is_primitivetype(bt));
+    // TODO: jl_bool_type is actually i8, but llvm expects i1
     if (bt == (jl_value_t*)jl_bool_type)
-        return int8Type;
+        return int1Type;
     if (bt == (jl_value_t*)jl_int32_type)
         return int32Type;
     if (bt == (jl_value_t*)jl_int64_type)
@@ -377,6 +379,18 @@ struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
     }
 };
 
+struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
+    using OpAndTypeConversionPattern<GotoOp>::OpAndTypeConversionPattern;
+
+    LogicalResult matchAndRewrite(GotoOp op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        rewriter.replaceOpWithNewOp<LLVM::BrOp>(
+            op, operands, op.getSuccessor(), op.getAttrs());
+        return success();
+    }
+};
+
 struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
     using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
@@ -593,7 +607,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         ConstantOpLowering, // (also JLIRTOStandard)
         ToUndefOpPattern<CallOp>,
         ToUndefOpPattern<InvokeOp>,
-        // GotoOp (JLIRToStandard)
+        GotoOpLowering,
         GotoIfNotOpLowering,
         ReturnOpLowering,
         ToUndefOpPattern<PiOp>,

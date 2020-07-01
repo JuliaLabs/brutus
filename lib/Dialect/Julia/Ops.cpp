@@ -69,7 +69,7 @@ void PiOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 // CallOp
 
 void CallOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                   jl_datatype_t *type, mlir::Value callee, ArrayRef<mlir::Value> arguments) {
+                   mlir::Value callee, ArrayRef<mlir::Value> arguments, jl_datatype_t *type) {
     state.addTypes(JuliaType::get(builder.getContext(), type));
     state.addOperands(callee);
     state.addOperands(arguments);
@@ -79,9 +79,10 @@ void CallOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 // InvokeOp
 
 void InvokeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
-                     jl_method_instance_t *methodInstance,
-                     ArrayRef<mlir::Value> arguments) {
-    state.addTypes(JuliaType::get(builder.getContext(), jl_any_type));
+                     jl_method_instance_t *methodInstance, mlir::Value callee,
+                     ArrayRef<mlir::Value> arguments, jl_datatype_t *type) {
+    state.addTypes(JuliaType::get(builder.getContext(), type));
+    state.addOperands(callee);
     state.addOperands(arguments);
     state.addAttribute("methodInstance",
                        JuliaValueAttr::get(builder.getContext(), (jl_value_t*)methodInstance));

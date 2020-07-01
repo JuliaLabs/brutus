@@ -125,7 +125,7 @@ def CallOp : JLIR_Op<"call"> {
     // Add custom build methods for the generic call operation.
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_datatype_t *type, Value callee, ArrayRef<Value> arguments">
+                  "Value callee, ArrayRef<Value> arguments, jl_datatype_t *type">
     ];
 
     let hasCanonicalizer = 1;
@@ -137,14 +137,16 @@ def InvokeOp : JLIR_Op<"invoke"> {
         TODO
     }];
 
-    let arguments = (ins JLIR_JuliaValueAttr:$methodInstance, Variadic<JLIR_JuliaType>:$arguments);
+    let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
+                         JLIR_JuliaType:$callee,
+                         Variadic<JLIR_JuliaType>:$arguments);
 
     let results = (outs JLIR_JuliaType);
 
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_method_instance_t *methodInstance,"
-                  "ArrayRef<Value> arguments">
+                  "jl_method_instance_t *methodInstance, Value callee,"
+                  "ArrayRef<Value> arguments, jl_datatype_t *type">
     ];
 }
 
