@@ -161,29 +161,10 @@ void handleLLVMError(llvm::Error error) {
                           });
 }
 
-extern "C" {
+mlir::FunctionType emit_ftype(jl_mlirctx_t &ctx,
+                              jl_value_t *ir_code,
+                              jl_value_t *ret_type) {
 
-enum DumpOption {
-    // DUMP_IRCODE       = 0,
-    DUMP_TRANSLATED      = 1,
-    DUMP_OPTIMIZED       = 2,
-    DUMP_LOWERED_TO_STD  = 4,
-    DUMP_LOWERED_TO_LLVM = 8,
-};
-
-ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
-                                         jl_value_t *ret_type,
-                                         char *name,
-                                         char emit_fptr,
-                                         char optimize,
-                                         char dump_flags) {
-    mlir::MLIRContext context;
-    jl_mlirctx_t ctx(&context);
-
-    // 1. Create MLIR builder and module
-    ModuleOp module = ModuleOp::create(ctx.builder.getUnknownLoc());
-
-    // 2. Function prototype
     jl_array_t *argtypes = (jl_array_t*)jl_get_field(ir_code, "argtypes");
     size_t nargs = jl_array_dim0(argtypes);
     // FIXME: Handle varargs
@@ -195,9 +176,17 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
             JuliaType::get(ctx.context, (jl_datatype_t*)jl_arrayref(argtypes, i)));
     }
     mlir::Type ret = (mlir::Type) JuliaType::get(ctx.context, (jl_datatype_t*)ret_type);
-    mlir::FunctionType ftype = ctx.builder.getFunctionType(args, llvm::makeArrayRef(ret));
+    return ctx.builder.getFunctionType(args, llvm::makeArrayRef(ret));
+}
 
-    // Setup debug-information
+mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
+                           jl_value_t *ir_code,
+                           mlir::FunctionType ftype,
+                           mlir::Type ret,
+                           jl_value_t* ret_type,
+                           char* name) {
+
+    // 1. Setup debug-information
     std::vector<mlir::Location> locations;
     // `location_indices` is used to convert statement index to location index
     jl_array_t *location_indices = (jl_array_t*) jl_get_field(ir_code, "lines");
@@ -309,7 +298,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
 
     // Insert a goto node from the entry block to Julia's first block
     int current_block = 1;
-    ctx.builder.create<GotoOp>(mlir::UnknownLoc::get(&context), bbs[current_block], emit_branchargs(0, current_block, locations[0]));
+    ctx.builder.create<GotoOp>(mlir::UnknownLoc::get(ctx.context), bbs[current_block], emit_branchargs(0, current_block, locations[0]));
     ctx.builder.setInsertionPointToStart(bbs[current_block]);
 
     // Process stmts in order
@@ -320,7 +309,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
         jl_datatype_t *type = (jl_datatype_t*)jl_arrayref(types, i);
         int linetable_index = jl_unbox_int32(jl_arrayref(location_indices, i)); // linetable_index is 1-indexed
         mlir::Location loc = (linetable_index == 0) ?
-            mlir::UnknownLoc::get(&context) : locations[linetable_index-1];
+            mlir::UnknownLoc::get(ctx.context) : locations[linetable_index-1];
 
         bool is_terminator = false;
 
@@ -400,7 +389,38 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
                 ctx.builder.setInsertionPointToStart(bbs[current_block]);
         }
     }
+    return function;
+}
 
+extern "C" {
+
+enum DumpOption {
+    // DUMP_IRCODE       = 0,
+    DUMP_TRANSLATED      = 1,
+    DUMP_OPTIMIZED       = 2,
+    DUMP_LOWERED_TO_STD  = 4,
+    DUMP_LOWERED_TO_LLVM = 8,
+};
+
+ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
+                                         jl_value_t *ret_type,
+                                         char *name,
+                                         char emit_fptr,
+                                         char optimize,
+                                         char dump_flags) {
+    mlir::MLIRContext context;
+    jl_mlirctx_t ctx(&context);
+
+    // 1. Create MLIR builder and module
+    ModuleOp module = ModuleOp::create(ctx.builder.getUnknownLoc());
+
+    // 2. Function prototype
+    mlir::FunctionType ftype = emit_ftype(ctx, ir_code, ret_type);
+    // TODO: Fixup singular return
+    mlir::Type ret = ftype.getResult(0);
+
+    // 3. Emit function
+    mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
     module.push_back(function);
 
     if (dump_flags & DUMP_TRANSLATED) {
