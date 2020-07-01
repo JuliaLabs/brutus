@@ -43,7 +43,7 @@ function emit(@nospecialize(ft), @nospecialize(tt);
     end
 
     worklist = [IR]
-    methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, DataType}}(
+    methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, Any}}(
         entry_mi => (IR, rt)
     )
 
