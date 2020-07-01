@@ -12,6 +12,19 @@ end
     DumpLoweredToLLVM = 8
 end
 
+function find_invokes(IR)
+    callees = Core.MethodInstance[]
+    for stmt in IR.stmts
+        if stmt isa Expr
+            if stmt.head == :invoke
+                mi = stmt.args[1]
+                push!(callees, mi)
+            end
+        end
+    end
+    return callees
+end
+
 # Emit MLIR IR to stdout
 function emit(@nospecialize(ft), @nospecialize(tt);
               emit_fptr::Bool=true,
@@ -19,15 +32,32 @@ function emit(@nospecialize(ft), @nospecialize(tt);
               dump_options::Vector{DumpOption}=DumpOption[])
     name = (ft <: Function) ? nameof(ft.instance) : nameof(ft)
 
-    # get first IRCode matching signature
-    matches = code_ircode_by_signature(Tuple{ft, tt...})
-    @assert length(matches) > 0 "no method instances matching given signature"
-    IR, rt = first(matches)
+    # get first method instance matching signature
+    entry_mi = get_methodinstance(Tuple{ft, tt...})
+    IR, rt = code_ircode(entry_mi)
 
     if DumpIRCode in dump_options
         println("return type: ", rt)
         println("IRCode:\n")
         println(IR)
+    end
+
+    worklist = [IR]
+    methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, DataType}}(
+        entry_mi => (IR, rt)
+    )
+
+    while !isempty(worklist)
+        code = pop!(worklist)
+        callees = find_invokes(code)
+        for callee in callees
+            if !haskey(methods, callee)
+                _code, _rt = code_ircode(callee)
+
+                methods[callee] = (_code, _rt)
+                push!(worklist, _code)
+            end
+        end
     end
 
     # generate LLVM bitcode and load it
@@ -64,6 +94,18 @@ end
         ccall($fptr, Cvoid, (Ptr{Ptr{Cvoid}},), arg_pointers)
         arg_pointers[end][]
     end
+end
+
+function get_methodinstance(@nospecialize(sig);
+                            world=Base.get_world_counter(),
+                            interp=Core.Compiler.NativeInterpreter(world))
+    ms = Base._methods_by_ftype(sig, 1, Base.get_world_counter())
+    @assert length(ms) == 1
+    m = ms[1]
+    mi = ccall(:jl_specializations_get_linfo,
+               Ref{Core.MethodInstance}, (Any, Any, Any),
+               m[3], m[1], m[2])
+    return mi
 end
 
 function code_ircode_by_signature(@nospecialize(sig);
