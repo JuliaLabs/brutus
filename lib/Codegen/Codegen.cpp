@@ -32,6 +32,23 @@ public:
       : builder(context), context(context) { }
 };
 
+std::string mi_name(jl_method_instance_t *mi) {
+    ios_t str_;
+    ios_mem(&str_, 10000);
+    JL_STREAM* str = (JL_STREAM*)&str_;
+
+    // jl_printf(str, "%s.", jl_symbol_name(mi->def.method->module->name));
+    // // doesn't work well with call overloading
+    // jl_static_show_func_sig(str, mi->specTypes);
+    jl_static_show(str, mi->specTypes);
+    str_.buf[str_.size] = '\0';
+
+    std::string s(str_.buf);
+    ios_close(&str_);
+
+    return s;
+}
+
 mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
                         mlir::Value value, jl_datatype_t *expected_type) {
     // widen the type of the value with a PiOp if its type is a subtype of the
@@ -184,7 +201,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                            mlir::FunctionType ftype,
                            mlir::Type ret,
                            jl_value_t* ret_type,
-                           char* name) {
+                           std::string name) {
 
     // 1. Setup debug-information
     std::vector<mlir::Location> locations;
@@ -397,19 +414,21 @@ extern "C" {
 enum DumpOption {
     // DUMP_IRCODE       = 0,
     DUMP_TRANSLATED      = 1,
-    DUMP_OPTIMIZED       = 2,
+    DUMP_CANONICALIZED   = 2,
     DUMP_LOWERED_TO_STD  = 4,
     DUMP_LOWERED_TO_LLVM = 8,
 };
 
-ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
-                                         jl_value_t *ret_type,
-                                         char *name,
+ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
+                                         jl_method_instance_t *entry_mi,
                                          char emit_fptr,
-                                         char optimize,
                                          char dump_flags) {
     mlir::MLIRContext context;
     jl_mlirctx_t ctx(&context);
+
+    jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t*)entry_mi);
+    jl_value_t *ir_code = jl_fieldref(entry, 0);
+    jl_value_t *ret_type = jl_fieldref(entry, 1);
 
     // 1. Create MLIR builder and module
     ModuleOp module = ModuleOp::create(ctx.builder.getUnknownLoc());
@@ -420,6 +439,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
     mlir::Type ret = ftype.getResult(0);
 
     // 3. Emit function
+    std::string name = mi_name(entry_mi);
     mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
     module.push_back(function);
 
@@ -435,29 +455,27 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
         return nullptr;
     }
 
-    if (optimize) {
-        mlir::PassManager pm(&context);
-        // Apply any generic pass manager command line options and run the
-        // pipeline.
-        // FIXME: The next line currently seqfaults
-        // applyPassManagerCLOptions(pm);
+    // canonicalize
 
-        mlir::OpPassManager &optPM = pm.nest<mlir::FuncOp>();
-        optPM.addPass(mlir::createCanonicalizerPass());
-        optPM.addPass(mlir::createCSEPass());
+    mlir::PassManager canonicalizePM(&context);
+    // Apply any generic pass manager command line options and run the
+    // pipeline.
+    // FIXME: The next line currently seqfaults
+    // applyPassManagerCLOptions(canonicalizePM);
+    mlir::OpPassManager &canonicalizeOpPM = canonicalizePM.nest<mlir::FuncOp>();
+    canonicalizeOpPM.addPass(mlir::createCanonicalizerPass());
+    canonicalizeOpPM.addPass(mlir::createCSEPass());
+    LogicalResult canonicalizeResult = canonicalizePM.run(module);;
 
-        LogicalResult result = pm.run(module);;
+    if (dump_flags & DUMP_CANONICALIZED) {
+        llvm::outs() << "after canonicalizing:";
+        module.dump();
+        llvm::outs() << "\n\n";
+    }
 
-        if (dump_flags & DUMP_OPTIMIZED) {
-            llvm::outs() << "after optimizing:";
-            module.dump();
-            llvm::outs() << "\n\n";
-        }
-
-        if (mlir::failed(result)) {
-            module.emitError("module optimization failed");
-            return nullptr;
-        }
+    if (mlir::failed(canonicalizeResult)) {
+        module.emitError("module canonicalization failed");
+        return nullptr;
     }
 
     // lower to Standard dialect

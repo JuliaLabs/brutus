@@ -5,18 +5,18 @@ import Brutus
 emit_optimized(f, tt...) =
     Brutus.emit(typeof(f), tt,
                 emit_fptr=false,
-                dump_options=[Brutus.DumpOptimized])
+                dump_options=[Brutus.DumpCanonicalized])
 
 f(x) = x
 emit_optimized(f, Int64)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.f), Int64}"(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.return"(%arg1) : (!jlir.Int64) -> ()
 
 f() = nothing
 emit_optimized(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -24,7 +24,7 @@ emit_optimized(f)
 
 f() = return
 emit_optimized(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -32,7 +32,7 @@ emit_optimized(f)
 
 f() = return 2
 emit_optimized(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
@@ -56,7 +56,7 @@ end
 # 7 4 ─      return %3
 ###
 emit_optimized(labels, Int64)
-# CHECK: func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.labels), Int64}"(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
@@ -79,7 +79,7 @@ function branches(c)
     end
 end
 emit_optimized(branches, Bool)
-# CHECK: func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
+# CHECK: func @"Tuple{typeof(Main.branches), Bool}"(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
@@ -97,7 +97,7 @@ function loop(N)
     return acc
 end
 emit_optimized(loop, Int64)
-# CHECK: func @loop(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -143,7 +143,7 @@ function calls()
     return f(1, 1)
 end
 emit_optimized(calls)
-# CHECK: func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any {
+# CHECK: func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:  // pred: ^bb0
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(Base.rand)()">} : () -> !jlir<"typeof(Base.rand)">
@@ -169,7 +169,7 @@ end
 (a::A)(y) = a.x + y
 a = A(10)
 emit_optimized(a, Int64)
-# CHECK: func @A(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
+# CHECK: func @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<":x">} : () -> !jlir.Symbol
@@ -184,7 +184,7 @@ function haspi(x::Union{Int64, Float64})
     end
 end
 emit_optimized(haspi, Union{Int64, Float64})
-# CHECK: func @haspi(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
+# CHECK: func @"Tuple{typeof(Main.haspi), Union{Float64, Int64}}"(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.Int64} : () -> !jlir.DataType

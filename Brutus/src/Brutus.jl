@@ -7,7 +7,7 @@ end
 @enum DumpOption::UInt8 begin
     DumpIRCode        = 0
     DumpTranslated    = 1
-    DumpOptimized     = 2
+    DumpCanonicalized = 2
     DumpLoweredToStd  = 4
     DumpLoweredToLLVM = 8
 end
@@ -28,7 +28,6 @@ end
 # Emit MLIR IR to stdout
 function emit(@nospecialize(ft), @nospecialize(tt);
               emit_fptr::Bool=true,
-              optimize::Bool=true,
               dump_options::Vector{DumpOption}=DumpOption[])
     name = (ft <: Function) ? nameof(ft.instance) : nameof(ft)
 
@@ -64,8 +63,8 @@ function emit(@nospecialize(ft), @nospecialize(tt);
     dump_flags = reduce(|, map(UInt8, dump_options), init=0)
     fptr = ccall((:brutus_codegen, "libbrutus"),
                  Ptr{Nothing},
-                 (Any, Any, Cstring, Cuchar, Cuchar, Cuchar),
-                 IR, rt, name, emit_fptr, optimize, dump_flags)
+                 (Any, Any, Cuchar, Cuchar),
+                 methods, entry_mi, emit_fptr, dump_flags)
     if convert(Int, fptr) == 0
         return nothing
     end
