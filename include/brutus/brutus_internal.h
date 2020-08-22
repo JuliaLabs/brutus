@@ -17,6 +17,7 @@ extern jl_value_t *argument_type;
 extern jl_value_t *const_type;
 extern jl_value_t *gotoifnot_type;
 extern jl_value_t *return_node_type;
+extern jl_value_t *getindex_func;
 
 #ifdef __cplusplus
 } // end extern "C"

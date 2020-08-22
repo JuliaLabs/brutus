@@ -12,11 +12,9 @@ extern "C" {
 typedef void (*ExecutionEngineFPtrResult)(void **);
 
 void brutus_init();
-ExecutionEngineFPtrResult brutus_codegen(jl_value_t *ir_code,
-                                         jl_value_t *ret_type,
-                                         char *name,
+ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
+                                         jl_method_instance_t *entry_mi,
                                          char emit_fptr,
-                                         char optimize,
                                          char dump_flags);
 
 #ifdef __cplusplus

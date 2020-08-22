@@ -12,19 +12,20 @@ jl_value_t *argument_type;
 jl_value_t *const_type;
 jl_value_t *gotoifnot_type;
 jl_value_t *return_node_type;
+jl_function_t *getindex_func;
 
 void brutus_init() {
     // lookup session static data
     invoke_sym = jl_symbol("invoke");
     call_sym = jl_symbol("call");
-    jl_module_t *core_module = (jl_module_t*)jl_get_global(
-        jl_main_module, jl_symbol("Core"));
     jl_module_t *compiler_module = (jl_module_t*)jl_get_global(
-        core_module, jl_symbol("Compiler"));
+        jl_core_module, jl_symbol("Compiler"));
     argument_type = jl_get_global(compiler_module, jl_symbol("Argument"));
     const_type = jl_get_global(compiler_module, jl_symbol("Const"));
     gotoifnot_type = jl_get_global(compiler_module, jl_symbol("GotoIfNot"));
     return_node_type = jl_get_global(compiler_module, jl_symbol("ReturnNode"));
+    getindex_func = (jl_function_t*)jl_get_global(
+        jl_base_module, jl_symbol("getindex"));
 
     mlir::registerAllDialects();
     // Register dialect

@@ -9,14 +9,14 @@ emit_translated(f, tt...) =
 
 f(x) = x
 emit_translated(f, Int64)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.f), Int64}"(%arg0: !jlir<"typeof(Main.f)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.return"(%arg1) : (!jlir.Int64) -> ()
 
 f() = nothing
 emit_translated(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -24,7 +24,7 @@ emit_translated(f)
 
 f() = return
 emit_translated(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Nothing
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
@@ -32,7 +32,7 @@ emit_translated(f)
 
 f() = return 2
 emit_translated(f)
-# CHECK: func @f(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 {
+# CHECK: func @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
@@ -56,7 +56,7 @@ end
 # 7 4 ─      return %3
 ###
 emit_translated(labels, Int64)
-# CHECK: func @labels(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.labels), Int64}"(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
@@ -81,7 +81,7 @@ function branches(c)
     end
 end
 emit_translated(branches, Bool)
-# CHECK: func @branches(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
+# CHECK: func @"Tuple{typeof(Main.branches), Bool}"(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
@@ -100,7 +100,7 @@ function loop(N)
     return acc
 end
 emit_translated(loop, Int64)
-# CHECK: func @loop(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
+# CHECK: func @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir.Core.IntrinsicFunction
@@ -161,7 +161,7 @@ function calls()
 end
 emit_translated(calls)
 
-# CHECK: func @calls(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
+# CHECK: func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Any
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:  // pred: ^bb0
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(Base.rand)()">} : () -> !jlir<"typeof(Base.rand)">
@@ -188,7 +188,7 @@ end
 (a::A)(y) = a.x + y
 a = A(10)
 emit_translated(a, Int64)
-# CHECK: func @A(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
+# CHECK: func @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(getfield)()">} : () -> !jlir<"typeof(getfield)">
@@ -204,7 +204,7 @@ function haspi(x::Union{Int64, Float64})
     end
 end
 emit_translated(haspi, Union{Int64, Float64})
-# CHECK: func @haspi(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
+# CHECK: func @"Tuple{typeof(Main.haspi), Union{Float64, Int64}}"(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}">
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(isa)()">} : () -> !jlir<"typeof(isa)">
@@ -226,7 +226,7 @@ emit_translated(haspi, Union{Int64, Float64})
 # has the terminator unreachable
 hasunreachable(x::Float64) = sqrt(x)
 emit_translated(hasunreachable, Float64)
-# CHECK: func @hasunreachable(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64 {
+# CHECK: func @"Tuple{typeof(Main.hasunreachable), Float64}"(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:  // pred: ^bb0
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction
@@ -252,7 +252,7 @@ function caller(x, y)
 end
 emit_translated(caller, Int64, Int64)
 
-# CHECK: func @caller(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 {
+# CHECK: func @"Tuple{typeof(Main.caller), Int64, Int64}"(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 {
 # CHECK:   "jlir.goto"()[^bb1] : () -> ()
 # CHECK: ^bb1:  // pred: ^bb0
 # CHECK:   %0 = "jlir.constant"() {value = #jlir<"typeof(Main.add)()">} : () -> !jlir<"typeof(Main.add)">
