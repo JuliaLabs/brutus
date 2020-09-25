@@ -15,11 +15,6 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
     JLIRToStandardTypeConverter(MLIRContext *ctx);
     Optional<Type> convertJuliaType(JuliaType t);
     Type convertBitstype(jl_datatype_t *jdt);
-
-    Operation *materializeConversion(PatternRewriter &rewriter,
-                                     Type resultType,
-                                     ArrayRef<Value> inputs,
-                                     Location loc) override;
 };
 
 struct JLIRToStandardLoweringPass

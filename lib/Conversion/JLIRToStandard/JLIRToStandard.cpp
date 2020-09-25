@@ -29,6 +29,15 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
         }
         return success();
     });
+
+    addMaterialization([&](PatternRewriter &rewriter,
+                           Type resultType, ValueRange inputs,
+                           Location loc) -> Optional<Value> {
+        // HACK
+        assert(inputs.size() == 2 && inputs.back().getType().isa<NoneType>());
+
+        return rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
+    });
 }
 
 // returns `None` if the Julia type could not be converted to an MLIR builtin type
@@ -68,17 +77,6 @@ Type JLIRToStandardTypeConverter::convertBitstype(jl_datatype_t *jdt) {
         return FloatType::getF64(ctx);
     int nb = jl_datatype_size(jdt);
     return IntegerType::get(nb * 8, ctx);
-}
-
-Operation
-*JLIRToStandardTypeConverter::materializeConversion(PatternRewriter &rewriter,
-                                                    Type resultType,
-                                                    ArrayRef<Value> inputs,
-                                                    Location loc) {
-    // HACK
-    assert(inputs.size() == 2 && inputs.back().getType().isa<NoneType>());
-
-    return rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
 }
 
 namespace {
