@@ -731,7 +731,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
 
 
     if (failed(applyPartialConversion(
-                    getFunction(), target, patterns, &converter)))
+                    getFunction(), target, patterns)))
         signalPassFailure();
 }
 

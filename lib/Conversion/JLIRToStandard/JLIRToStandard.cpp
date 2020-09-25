@@ -608,7 +608,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         >(&getContext(), converter);
 
     if (failed(applyPartialConversion(
-                    getFunction(), target, patterns, &converter)))
+                    getFunction(), target, patterns)))
         signalPassFailure();
 
     // HACK: Remove dummy `NoneType` function/block arguments. This is done
@@ -635,7 +635,7 @@ void JLIRToStandardLoweringPass::runOnFunction() {
     OwningRewritePatternList hackPatterns;
     populateFuncOpTypeConversionPattern(hackPatterns, &getContext(), converter);
     if (failed(applyPartialConversion(
-                    getFunction(), hackTarget, hackPatterns, &converter)))
+                    getFunction(), hackTarget, hackPatterns)))
         signalPassFailure();
 }
 
