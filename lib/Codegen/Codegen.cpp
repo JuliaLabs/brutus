@@ -215,12 +215,15 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
             // LineInfoNode(mod::Module, method::Any, file::Symbol, line::Int, inlined_at::Int)
             jl_value_t *locinfo = jl_array_ptr_ref(linetable, i);
             assert(jl_typeis(locinfo, jl_lineinfonode_type));
-            jl_value_t *method = jl_fieldref_noalloc(locinfo, 0);
+            jl_module_t *module = (jl_module_t*)jl_fieldref_noalloc(locinfo, 0);
+            jl_value_t *method = jl_fieldref_noalloc(locinfo, 1);
+            jl_sym_t *filesym = (jl_sym_t*)jl_fieldref_noalloc(locinfo, 2);
+            size_t line = jl_unbox_long(jl_fieldref(locinfo, 3));
+            size_t inlined_at = jl_unbox_long(jl_fieldref(locinfo, 4));
+
             if (jl_is_method_instance(method))
                 method = ((jl_method_instance_t*)method)->def.value;
-            llvm::StringRef file = jl_symbol_name((jl_sym_t*)jl_fieldref_noalloc(locinfo, 1));
-            size_t line       = jl_unbox_long(jl_fieldref(locinfo, 2));
-            size_t inlined_at = jl_unbox_long(jl_fieldref(locinfo, 3));
+            llvm::StringRef file = jl_symbol_name(filesym);
 
             if (file.empty())
                 file = "<missing>";
