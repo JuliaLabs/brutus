@@ -36,7 +36,7 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
         // HACK
         assert(inputs.size() == 2 && inputs.back().getType().isa<NoneType>());
 
-        return rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
+        return (Value) rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
     });
 }
 

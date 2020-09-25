@@ -202,11 +202,12 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                            mlir::Type ret,
                            jl_value_t* ret_type,
                            std::string name) {
+    jl_value_t *irstream = jl_get_field(ir_code, "stmts");
 
     // 1. Setup debug-information
     std::vector<mlir::Location> locations;
     // `location_indices` is used to convert statement index to location index
-    jl_array_t *location_indices = (jl_array_t*) jl_get_field(ir_code, "lines");
+    jl_array_t *location_indices = (jl_array_t*) jl_get_field(irstream, "line");
     {
         jl_array_t *linetable = (jl_array_t*) jl_get_field(ir_code, "linetable");
         size_t nlocs = jl_array_len(linetable);
@@ -263,8 +264,8 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
     }
 
     // 4. Setup conversion
-    jl_array_t *stmts = (jl_array_t*)jl_get_field(ir_code, "stmts");
-    jl_array_t *types = (jl_array_t*)jl_get_field(ir_code, "types");
+    jl_array_t *stmts = (jl_array_t*)jl_get_field(irstream, "inst");
+    jl_array_t *types = (jl_array_t*)jl_get_field(irstream, "type");
     size_t nstmts = jl_array_dim0(stmts);
     ctx.values.resize(nstmts);
     std::copy(entryBlock->args_begin(), entryBlock->args_end(), std::back_inserter(ctx.arguments));
