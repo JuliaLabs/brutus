@@ -23,7 +23,6 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
         llvm::Optional<Type> converted = convertJuliaType(t);
         if (converted.hasValue()) {
             results.push_back(converted.getValue());
-            results.push_back(NoneType::get(ctx));
         } else {
             results.push_back(t);
         }
@@ -34,9 +33,9 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
                            Type resultType, ValueRange inputs,
                            Location loc) -> Optional<Value> {
         // HACK
-        assert(inputs.size() == 2 && inputs.back().getType().isa<NoneType>());
-
-        return (Value) rewriter.create<ConvertStdOp>(loc, resultType, inputs.front());
+        assert(inputs.size() == 1);
+        ConvertStdOp op = rewriter.create<ConvertStdOp>(loc, resultType, inputs[0]);
+        return op.getResult();
     });
 }
 
