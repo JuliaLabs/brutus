@@ -58,3 +58,9 @@ file( APPEND ${JLRUN} "export LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib\n")
 file( APPEND ${JLRUN} "export JULIA_PROJECT=${BRUTUS_SOURCE_DIR}/Brutus\n")
 file( APPEND ${JLRUN} "${Julia_EXECUTABLE}\n")
 execute_process( COMMAND chmod +x ${JLRUN})
+
+
+set(FISHENV "${CMAKE_BINARY_DIR}/env.fish")
+file( WRITE  ${FISHENV} "set -x -g LD_LIBRARY_PATH ${CMAKE_BINARY_DIR}/lib\n")
+file( APPEND ${FISHENV} "set -x -g JULIA_PROJECT ${BRUTUS_SOURCE_DIR}/Brutus\n")
+file( APPEND ${FISHENV} "alias julia='${Julia_EXECUTABLE}'\n")
