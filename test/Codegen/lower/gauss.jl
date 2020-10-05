@@ -1,88 +1,4 @@
-# RUN: julia --startup-file=no %s 2>&1 | FileCheck %s
-import Brutus
-
-emit_lowered(f, tt...) =
-    Brutus.emit(typeof(f), tt,
-                emit_fptr=false, # TODO: change to true when ready
-                dump_options=[Brutus.DumpLoweredToStd,
-                              Brutus.DumpLoweredToLLVM])
-
-emit_lowered(identity, Bool)
-# CHECK: func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: i1) -> i1
-# CHECK:   return %arg1 : i1
-# CHECK: llvm.func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i1) -> !llvm.i1
-# CHECK:   llvm.return %arg1 : !llvm.i1
-emit_lowered(identity, Nothing)
-# CHECK: func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing
-# CHECK:   "jlir.return"(%arg1) : (!jlir.Nothing) -> ()
-# CHECK: llvm.func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"%jl_value_t*">) -> !llvm<"%jl_value_t*">
-# CHECK:   llvm.return %arg1 : !llvm<"%jl_value_t*">
-emit_lowered(identity, Any)
-# CHECK: func @"Tuple{typeof(Base.identity), Any}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Any) -> !jlir.Any
-# CHECK:   "jlir.return"(%arg1) : (!jlir.Any) -> ()
-# CHECK: llvm.func @"Tuple{typeof(Base.identity), Any}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"%jl_value_t*">) -> !llvm<"%jl_value_t*">
-# CHECK:   llvm.return %arg1 : !llvm<"%jl_value_t*">
-
-add(x, y) = x + y
-emit_lowered(add, Int64, Int64)
-# CHECK: func @"Tuple{typeof(Main.add), Int64, Int64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: i64, %arg2: i64) -> i64
-# CHECK:   %0 = addi %arg1, %arg2 : i64
-# CHECK:   return %0 : i64
-# CHECK: llvm.func @"Tuple{typeof(Main.add), Int64, Int64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i64, %arg2: !llvm.i64) -> !llvm.i64
-# CHECK:   %0 = llvm.add %arg1, %arg2 : !llvm.i64
-# CHECK:   llvm.return %0 : !llvm.i64
-emit_lowered(add, Float64, Float64)
-# CHECK: func @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: f64, %arg2: f64) -> f64
-# CHECK:   %0 = addf %arg1, %arg2 : f64
-# CHECK:   return %0 : f64
-# CHECK: llvm.func @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.double, %arg2: !llvm.double) -> !llvm.double
-# CHECK:   %0 = llvm.fadd %arg1, %arg2 : !llvm.double
-# CHECK:   llvm.return %0 : !llvm.double
-
-sle_int(x, y) = Base.sle_int(x, y)
-emit_lowered(sle_int, Int64, Int64)
-# CHECK: func @"Tuple{typeof(Main.sle_int), Int64, Int64}"(%arg0: !jlir<"typeof(Main.sle_int)">, %arg1: i64, %arg2: i64) -> i1
-# CHECK:   %0 = cmpi "sle", %arg1, %arg2 : i64
-# CHECK:   return %0 : i1
-# CHECK: llvm.func @"Tuple{typeof(Main.sle_int), Int64, Int64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i64, %arg2: !llvm.i64) -> !llvm.i1
-# CHECK:   %0 = llvm.icmp "sle" %arg1, %arg2 : !llvm.i64
-# CHECK:   llvm.return %0 : !llvm.i1
-
-ne(x, y) = x != y
-emit_lowered(ne, Float64, Float64)
-# CHECK: func @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !jlir<"typeof(Main.ne)">, %arg1: f64, %arg2: f64) -> i1
-# CHECK:   %0 = cmpf "une", %arg1, %arg2 : f64
-# CHECK:   return %0 : i1
-# CHECK: llvm.func @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.double, %arg2: !llvm.double) -> !llvm.i1
-# CHECK:   %0 = llvm.fcmp "une" %arg1, %arg2 : !llvm.double
-# CHECK:   llvm.return %0 : !llvm.i1
-
-symbol() = :testing
-emit_lowered(symbol)
-# CHECK: func @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol
-# CHECK:   %0 = "jlir.constant"() {value = #jlir<":testing">} : () -> !jlir.Symbol
-# CHECK:   "jlir.return"(%0) : (!jlir.Symbol) -> ()
-# CHECK: llvm.func @"Tuple{typeof(Main.symbol)}"(%arg0: !llvm<"%jl_value_t*">) -> !llvm<"%jl_value_t*"> {
-# CHECK:   %0 = llvm.mlir.constant({{[0-9]+}} : i64) : !llvm.i64
-# CHECK:   %1 = llvm.inttoptr %0 : !llvm.i64 to !llvm<"%jl_value_t*">
-# CHECK:   llvm.return %1 : !llvm<"%jl_value_t*">
-
-select(c) = 1 + (c ? 2 : 3)
-emit_lowered(select, Bool)
-# CHECK: func @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: i1) -> i64
-# CHECK:   %c2_i64 = constant 2 : i64
-# CHECK:   %c3_i64 = constant 3 : i64
-# CHECK:   %c1_i64 = constant 1 : i64
-# CHECK:   %0 = select %arg1, %c2_i64, %c3_i64 : i64
-# CHECK:   %1 = addi %0, %c1_i64 : i64
-# CHECK:   return %1 : i64
-# CHECK: llvm.func @"Tuple{typeof(Main.select), Bool}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i1) -> !llvm.i64
-# CHECK:   %0 = llvm.mlir.constant(2 : i64) : !llvm.i64
-# CHECK:   %1 = llvm.mlir.constant(3 : i64) : !llvm.i64
-# CHECK:   %2 = llvm.mlir.constant(1 : i64) : !llvm.i64
-# CHECK:   %3 = llvm.select %arg1, %0, %1 : !llvm.i1, !llvm.i64
-# CHECK:   %4 = llvm.add %3, %2 : !llvm.i64
-# CHECK:   llvm.return %4 : !llvm.i64
+# RUN: julia -e "import Brutus; Brutus.lit(:emit_lowered)" --startup-file=no %s 2>&1 | FileCheck %s
 
 function gauss(N)
     acc = 0
@@ -91,12 +7,12 @@ function gauss(N)
     end
     return acc
 end
-emit_lowered(gauss, Int64)
+emit(gauss, Int64)
 # CHECK: func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !jlir<"typeof(Main.gauss)">, %arg1: i64) -> i64
 # CHECK:   %c1_i64 = constant 1 : i64
 # CHECK:   %c0_i64 = constant 0 : i64
-# CHECK:   %false = constant 0 : i1
-# CHECK:   %true = constant 1 : i1
+# CHECK:   %false = constant false
+# CHECK:   %true = constant true 
 # CHECK:   %0 = cmpi "sle", %c1_i64, %arg1 : i64
 # CHECK:   %1 = select %0, %arg1, %c0_i64 : i64
 # CHECK:   %2 = "jlir.convertstd"(%1) : (i64) -> !jlir.Int64
@@ -164,7 +80,7 @@ emit_lowered(gauss, Int64)
 # CHECK:   llvm.return %23 : !llvm.i64
 
 index(A, i) = A[i]
-emit_lowered(index, Array{Int64, 1}, Int64)
+emit(index, Array{Int64, 1}, Int64)
 # CHECK: func @"Tuple{typeof(Main.index), Array{Int64, 1}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 1}">, %arg2: i64) -> i64
 # CHECK:   %c1 = constant 1 : index
 # CHECK:   %0 = "jlir.convertstd"(%arg2) : (i64) -> index
@@ -201,7 +117,7 @@ emit_lowered(index, Array{Int64, 1}, Int64)
 # CHECK:   %24 = llvm.load %23 : !llvm<"i64*">
 # CHECK:   llvm.return %24 : !llvm.i64
 
-emit_lowered(index, Array{Int64, 3}, Int64)
+emit(index, Array{Int64, 3}, Int64)
 # CHECK: func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: i64) -> i64
 # CHECK:   %c0 = constant 0 : index
 # CHECK:   %c1 = constant 1 : index
@@ -257,7 +173,7 @@ emit_lowered(index, Array{Int64, 3}, Int64)
 # CHECK:   llvm.return %41 : !llvm.i64
 
 index(A, i, j, k) = A[i, j, k]
-emit_lowered(index, Array{Int64, 3}, Int64, Int64, Int64)
+emit(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK: func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64, Int64, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: i64, %arg3: i64, %arg4: i64) -> i64
 # CHECK:   %c1 = constant 1 : index
 # CHECK:   %0 = "jlir.convertstd"(%arg2) : (i64) -> index

@@ -145,4 +145,6 @@ function code_ircode(mi::Core.Compiler.MethodInstance;
     return ir => Core.Compiler.widenconst(result.result)
 end
 
+include("reflection.jl")
+
 end # module
