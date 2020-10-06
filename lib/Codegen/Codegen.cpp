@@ -448,9 +448,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     module.push_back(function);
 
     if (dump_flags & DUMP_TRANSLATED) {
-        llvm::outs() << "after translating to MLIR in JLIR dialect:";
+        llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
         module.dump();
-        llvm::outs() << "\n\n";
+        llvm::dbgs() << "\n\n";
     }
 
     // Lastly verify module
@@ -472,9 +472,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     LogicalResult canonicalizeResult = canonicalizePM.run(module);;
 
     if (dump_flags & DUMP_CANONICALIZED) {
-        llvm::outs() << "after canonicalizing:";
+        llvm::dbgs() << "after canonicalizing:";
         module.dump();
-        llvm::outs() << "\n\n";
+        llvm::dbgs() << "\n\n";
     }
 
     if (mlir::failed(canonicalizeResult)) {
@@ -493,9 +493,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     LogicalResult loweringToStdResult = loweringToStdPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_STD) {
-        llvm::outs() << "after lowering to Standard dialect:\n";
+        llvm::dbgs() << "after lowering to Standard dialect:\n";
         module.dump();
-        llvm::outs() << "\n\n";
+        llvm::dbgs() << "\n\n";
     }
 
     if (mlir::failed(loweringToStdResult)) {
@@ -512,9 +512,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
 
     if (dump_flags & DUMP_LOWERED_TO_LLVM) {
-        llvm::outs() << "after lowering to LLVM dialect:";
+        llvm::dbgs() << "after lowering to LLVM dialect:";
         module.dump();
-        llvm::outs() << "\n\n";
+        llvm::dbgs() << "\n\n";
     }
 
     if (mlir::failed(loweringToLLVMResult)) {
