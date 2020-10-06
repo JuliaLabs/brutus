@@ -8,12 +8,17 @@ function branches(c)
     end
 end
 emit(branches, Bool)
-# CHECK: func @"Tuple{typeof(Main.branches), Bool}"(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool
-# CHECK:   "jlir.goto"()[^bb1] : () -> ()
-# CHECK: ^bb1:
-# CHECK:   "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK: ^bb2:
-# CHECK:   "jlir.return"(%arg1) : (!jlir.Bool) -> ()
-# CHECK: ^bb3:
-# CHECK:   %0 = "jlir.not_int"(%arg1) : (!jlir.Bool) -> !jlir.Bool
-# CHECK:   "jlir.return"(%0) : (!jlir.Bool) -> ()
+
+
+# CHECK: module {
+# CHECK-NEXT:   func @"Tuple{typeof(Main.branches), Bool}"(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb2:  // pred: ^bb1
+# CHECK-NEXT:     "jlir.return"(%arg1) : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb3:  // pred: ^bb1
+# CHECK-NEXT:     %0 = "jlir.not_int"(%arg1) : (!jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.return"(%0) : (!jlir.Bool) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }

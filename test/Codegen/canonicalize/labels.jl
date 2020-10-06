@@ -18,17 +18,22 @@ end
 # 7 4 ─      return %3
 ###
 emit(labels, Int64)
-# CHECK: func @"Tuple{typeof(Main.labels), Int64}"(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64
-# CHECK:   "jlir.goto"()[^bb1] : () -> ()
-# CHECK: ^bb1:
-# CHECK:   "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
-# CHECK: ^bb2(%0: !jlir.Int64):
-# CHECK:   %1 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:   %2 = "jlir.add_int"(%0, %1) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK:   %3 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
-# CHECK:   %4 = "jlir.slt_int"(%2, %3) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:   "jlir.gotoifnot"(%4)[^bb4, ^bb3] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK: ^bb3:
-# CHECK:   "jlir.goto"(%2)[^bb2] : (!jlir.Int64) -> ()
-# CHECK: ^bb4:
-# CHECK:   "jlir.return"(%2) : (!jlir.Int64) -> ()
+
+
+# CHECK: module {
+# CHECK-NEXT:   func @"Tuple{typeof(Main.labels), Int64}"(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64 {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     "jlir.goto"(%arg1)[^bb2] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb2(%0: !jlir.Int64):  // 2 preds: ^bb1, ^bb3
+# CHECK-NEXT:     %1 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %2 = "jlir.add_int"(%0, %1) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %3 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
+# CHECK-NEXT:     %4 = "jlir.slt_int"(%2, %3) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%4)[^bb4, ^bb3] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb3:  // pred: ^bb2
+# CHECK-NEXT:     "jlir.goto"(%2)[^bb2] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb4:  // pred: ^bb2
+# CHECK-NEXT:     "jlir.return"(%2) : (!jlir.Int64) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
