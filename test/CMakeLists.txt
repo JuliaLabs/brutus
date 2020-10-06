@@ -13,16 +13,25 @@ add_custom_target(precompile-brutus
     VERBATIM
 )
 
-
-add_lit_testsuite(check-brutus "Running the brutus tests"
-  ${CMAKE_CURRENT_BINARY_DIR}
-  #LIT ${LLVM_LIT}
-  DEPENDS
+set(BRUTUS_TEST_DEPENDS
   FileCheck 
   brutus
   count
   precompile-brutus
   not
+)
+
+
+add_lit_testsuite(check-brutus "Running the brutus tests"
+  ${CMAKE_CURRENT_BINARY_DIR}
+  #LIT ${LLVM_LIT}
+  DEPENDS
+  ${BRUTUS_TEST_DEPENDS}
   ARGS
   -a
+  )
+
+add_lit_testsuites(BRUTUS
+  ${CMAKE_CURRENT_SOURCE_DIR}
+  DEPENDS ${BRUTUS_TEST_DEPENDS}
   )
