@@ -18,8 +18,6 @@ def JLIR_Dialect : Dialect {
 }
 
 def JLIR_JuliaType : Type<CPred<"$_self.isa<JuliaType>()">, "JLIR Julia type">;
-// Allow partial lowering to Standard
-def JLIR_Type : AnyTypeOf<[JLIR_JuliaType, AnyType]>;
 
 def JLIR_JuliaValueAttr : Attr<CPred<"$_self.isa<JuliaValueAttr>()">,
                                "JLIR Julia Value attribute"> {
@@ -39,8 +37,8 @@ class JLIR_Op<string mnemonic, list<OpTrait> traits = []> :
 class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
     JLIR_Op<mnemonic, traits> {
 
-    let arguments = (ins Variadic<JLIR_Type>:$arguments);
-    let results = (outs JLIR_Type);
+    let arguments = (ins Variadic<JLIR_JuliaType>:$arguments);
+    let results = (outs JLIR_JuliaType);
 
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
@@ -51,15 +49,15 @@ class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
 class JLIR_ArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
-    let arguments = (ins JLIR_Type:$rhs, JLIR_Type:$lhs);
-    let results = (outs JLIR_Type);
+    let arguments = (ins JLIR_JuliaType:$rhs, JLIR_JuliaType:$lhs);
+    let results = (outs JLIR_JuliaType);
 }
 
 class JLIR_UnaryArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
-    let arguments = (ins JLIR_Type:$arg);
-    let results = (outs JLIR_Type);
+    let arguments = (ins JLIR_JuliaType:$arg);
+    let results = (outs JLIR_JuliaType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -75,7 +73,7 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
         unimplemented
     }];
 
-    let results = (outs JLIR_Type);
+    let results = (outs JLIR_JuliaType);
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_datatype_t *type = jl_any_type">
@@ -88,7 +86,7 @@ def UndefOp : JLIR_Op<"undef"> {
         TODO
     }];
 
-    let results = (outs JLIR_Type);
+    let results = (outs JLIR_JuliaType);
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state">
     ];
@@ -101,7 +99,7 @@ def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
     }];
 
     let arguments = (ins JLIR_JuliaValueAttr:$value);
-    let results = (outs JLIR_Type);
+    let results = (outs JLIR_JuliaType);
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "jl_value_t *value, jl_datatype_t *type = jl_any_type">
@@ -119,10 +117,10 @@ def CallOp : JLIR_Op<"call"> {
 
     // The generic call operation takes a symbol reference attribute as the
     // callee, and inputs for the call.
-    let arguments = (ins JLIR_Type:$callee, Variadic<JLIR_Type>:$arguments);
+    let arguments = (ins JLIR_JuliaType:$callee, Variadic<JLIR_JuliaType>:$arguments);
 
     // The generic call operation returns a single value of TensorType.
-    let results = (outs JLIR_Type);
+    let results = (outs JLIR_JuliaType);
 
     // Add custom build methods for the generic call operation.
     let builders = [
@@ -140,10 +138,10 @@ def InvokeOp : JLIR_Op<"invoke"> {
     }];
 
     let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
-                         JLIR_Type:$callee,
-                         Variadic<JLIR_Type>:$arguments);
+                         JLIR_JuliaType:$callee,
+                         Variadic<JLIR_JuliaType>:$arguments);
 
-    let results = (outs JLIR_Type);
+    let results = (outs JLIR_JuliaType);
 
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
@@ -158,7 +156,7 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
         TODO
     }];
 
-    let arguments = (ins Variadic<JLIR_Type>:$operands);
+    let arguments = (ins Variadic<JLIR_JuliaType>:$operands);
     let successors = (successor AnySuccessor:$dest);
 
     let builders = [
@@ -174,9 +172,9 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
         TODO
     }];
 
-    let arguments = (ins JLIR_Type:$condition,
-                     Variadic<JLIR_Type>:$branchOperands,
-                     Variadic<JLIR_Type>:$fallthroughOperands);
+    let arguments = (ins JLIR_JuliaType:$condition,
+                     Variadic<JLIR_JuliaType>:$branchOperands,
+                     Variadic<JLIR_JuliaType>:$fallthroughOperands);
     let successors = (successor AnySuccessor:$branchDest, AnySuccessor:$fallthroughDest);
 
     let builders = [
@@ -208,7 +206,7 @@ def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
 
     // The return operation takes an optional input operand to return. This
     // value must match the return type of the enclosing function.
-    let arguments = (ins JLIR_Type:$input);
+    let arguments = (ins JLIR_JuliaType:$input);
 
     // Invoke a static verify method to verify this return operation.
     let verifier = [{ return ::verify(*this); }];
@@ -220,8 +218,8 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
         TODO
     }];
 
-    let arguments = (ins JLIR_Type:$input);
-    let results = (outs JLIR_Type);
+    let arguments = (ins JLIR_JuliaType:$input);
+    let results = (outs JLIR_JuliaType);
     let builders = [
         OpBuilder<"OpBuilder &builder, OperationState &state,"
                   "Value value, jl_datatype_t *type">
@@ -246,7 +244,7 @@ def ArrayToMemRefOp : JLIR_Op<"arraytomemref"> {
         TODO
     }];
 
-    let arguments = (ins JLIR_Type:$a);
+    let arguments = (ins JLIR_JuliaType:$a);
     let results = (outs AnyMemRef);
 }
 

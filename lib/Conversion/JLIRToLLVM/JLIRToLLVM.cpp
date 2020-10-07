@@ -132,10 +132,10 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::INTT(LLVM::LLVMType t) {
 namespace {
 
 template <typename SourceOp>
-struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
+struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
     JLIRToLLVMTypeConverter &lowering;
 
-    JLIRToStdConversionPattern(MLIRContext *ctx,
+    OpAndTypeConversionPattern(MLIRContext *ctx,
                                JLIRToLLVMTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(ctx), lowering(lowering) {}
 
@@ -225,8 +225,8 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
 // `ToLLVMOpPattern`, `ToUnaryLLVMOpPattern`, and `ToTernaryLLVMOpPattern`
 
 template <typename SourceOp, typename LLVMOp>
-struct ToLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
-    using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
@@ -241,8 +241,8 @@ struct ToLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
 };
 
 template <typename SourceOp, typename LLVMOp>
-struct ToUnaryLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
-    using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+struct ToUnaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
@@ -258,8 +258,8 @@ struct ToUnaryLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
 };
 
 template <typename SourceOp, typename LLVMOp>
-struct ToTernaryLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
-    using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
@@ -278,8 +278,8 @@ struct ToTernaryLLVMOpPattern : public JLIRToStdConversionPattern<SourceOp> {
 };
 
 template <typename SourceOp>
-struct ToUndefOpPattern : public JLIRToStdConversionPattern<SourceOp> {
-    using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp> {
+    using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(SourceOp op,
                                   ArrayRef<Value> operands,
@@ -293,8 +293,8 @@ struct ToUndefOpPattern : public JLIRToStdConversionPattern<SourceOp> {
     }
 };
 
-struct ConvertStdOpLowering : public JLIRToStdConversionPattern<ConvertStdOp> {
-    using JLIRToStdConversionPattern<ConvertStdOp>::JLIRToStdConversionPattern;
+struct ConvertStdOpLowering : public OpAndTypeConversionPattern<ConvertStdOp> {
+    using OpAndTypeConversionPattern<ConvertStdOp>::OpAndTypeConversionPattern;
 
     LogicalResult
     matchAndRewrite(ConvertStdOp op,
@@ -306,8 +306,8 @@ struct ConvertStdOpLowering : public JLIRToStdConversionPattern<ConvertStdOp> {
     }
 };
 
-struct ConstantOpLowering : public JLIRToStdConversionPattern<ConstantOp> {
-    using JLIRToStdConversionPattern<ConstantOp>::JLIRToStdConversionPattern;
+struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
+    using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(ConstantOp op,
                                   ArrayRef<Value> operands,
@@ -366,8 +366,8 @@ struct ConstantOpLowering : public JLIRToStdConversionPattern<ConstantOp> {
     }
 };
 
-struct GotoIfNotOpLowering : public JLIRToStdConversionPattern<GotoIfNotOp> {
-    using JLIRToStdConversionPattern<GotoIfNotOp>::JLIRToStdConversionPattern;
+struct GotoIfNotOpLowering : public OpAndTypeConversionPattern<GotoIfNotOp> {
+    using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(GotoIfNotOp op,
                                   ArrayRef<Value> operands,
@@ -379,8 +379,8 @@ struct GotoIfNotOpLowering : public JLIRToStdConversionPattern<GotoIfNotOp> {
     }
 };
 
-struct GotoOpLowering : public JLIRToStdConversionPattern<GotoOp> {
-    using JLIRToStdConversionPattern<GotoOp>::JLIRToStdConversionPattern;
+struct GotoOpLowering : public OpAndTypeConversionPattern<GotoOp> {
+    using OpAndTypeConversionPattern<GotoOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(GotoOp op,
                                   ArrayRef<Value> operands,
@@ -391,8 +391,8 @@ struct GotoOpLowering : public JLIRToStdConversionPattern<GotoOp> {
     }
 };
 
-struct ReturnOpLowering : public JLIRToStdConversionPattern<ReturnOp> {
-    using JLIRToStdConversionPattern<ReturnOp>::JLIRToStdConversionPattern;
+struct ReturnOpLowering : public OpAndTypeConversionPattern<ReturnOp> {
+    using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(ReturnOp op,
                                   ArrayRef<Value> operands,
@@ -402,8 +402,8 @@ struct ReturnOpLowering : public JLIRToStdConversionPattern<ReturnOp> {
     }
 };
 
-struct NotIntOpLowering : public JLIRToStdConversionPattern<Intrinsic_not_int> {
-    using JLIRToStdConversionPattern<Intrinsic_not_int>::JLIRToStdConversionPattern;
+struct NotIntOpLowering : public OpAndTypeConversionPattern<Intrinsic_not_int> {
+    using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(Intrinsic_not_int op,
                                   ArrayRef<Value> operands,
@@ -430,8 +430,8 @@ struct NotIntOpLowering : public JLIRToStdConversionPattern<Intrinsic_not_int> {
     }
 };
 
-struct IsOpLowering : public JLIRToStdConversionPattern<Builtin_is> {
-    using JLIRToStdConversionPattern<Builtin_is>::JLIRToStdConversionPattern;
+struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
+    using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_is op,
                                   ArrayRef<Value> operands,
@@ -474,8 +474,8 @@ struct IsOpLowering : public JLIRToStdConversionPattern<Builtin_is> {
 
 // NOTE: doesn't produce correct value for dimensions greater than the number of
 //       dimensions of the array (and doesn't produce error if dimension is 0)
-struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize> {
-    using JLIRToStdConversionPattern<Builtin_arraysize>::JLIRToStdConversionPattern;
+struct ArraysizeOpLowering : public OpAndTypeConversionPattern<Builtin_arraysize> {
+    using OpAndTypeConversionPattern<Builtin_arraysize>::OpAndTypeConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_arraysize op,
                                   ArrayRef<Value> operands,
@@ -506,13 +506,13 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
     }
 };
 
-struct ArrayToMemRefOpLowering : public JLIRToStdConversionPattern<ArrayToMemRefOp> {
+struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRefOp> {
     JLIRToStandardTypeConverter &stdLowering;
 
     ArrayToMemRefOpLowering(MLIRContext *ctx,
                             JLIRToLLVMTypeConverter &lowering,
                             JLIRToStandardTypeConverter &stdLowering)
-        : JLIRToStdConversionPattern<ArrayToMemRefOp>(ctx, lowering),
+        : OpAndTypeConversionPattern<ArrayToMemRefOp>(ctx, lowering),
           stdLowering(stdLowering) {}
 
     LogicalResult matchAndRewrite(ArrayToMemRefOp op,
