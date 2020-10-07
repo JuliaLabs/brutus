@@ -8,7 +8,7 @@ emit(symbol)
 # CHECK: module {
 # CHECK-NEXT:   func @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol {
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<":testing">} : () -> !jlir.Symbol
-# CHECK-NEXT:     "jlir.return"(%0) : (!jlir.Symbol) -> ()
+# CHECK-NEXT:     return %0 : !jlir.Symbol
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 

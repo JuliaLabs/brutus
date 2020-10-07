@@ -6,7 +6,7 @@ emit(identity, Nothing)
 
 # CHECK: module {
 # CHECK-NEXT:   func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing {
-# CHECK-NEXT:     "jlir.return"(%arg1) : (!jlir.Nothing) -> ()
+# CHECK-NEXT:     return %arg1 : !jlir.Nothing
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 

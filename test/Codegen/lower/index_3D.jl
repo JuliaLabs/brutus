@@ -9,16 +9,15 @@ emit(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK: module {
 # CHECK-NEXT:   func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64, Int64, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: i64, %arg3: i64, %arg4: i64) -> i64 {
 # CHECK-NEXT:     %c1 = constant 1 : index
-# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg1) : (!jlir<"Array{Int64, 3}">) -> !jlir<"Array{Int64, 3}">
-# CHECK-NEXT:     %1 = "jlir.convertstd"(%arg2) : (i64) -> index
-# CHECK-NEXT:     %2 = subi %1, %c1 : index
-# CHECK-NEXT:     %3 = "jlir.convertstd"(%arg3) : (i64) -> index
-# CHECK-NEXT:     %4 = subi %3, %c1 : index
-# CHECK-NEXT:     %5 = "jlir.convertstd"(%arg4) : (i64) -> index
-# CHECK-NEXT:     %6 = subi %5, %c1 : index
-# CHECK-NEXT:     %7 = "jlir.arraytomemref"(%0) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64>
-# CHECK-NEXT:     %8 = load %7[%6, %4, %2] : memref<?x?x?xi64>
-# CHECK-NEXT:     return %8 : i64
+# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg2) : (i64) -> index
+# CHECK-NEXT:     %1 = subi %0, %c1 : index
+# CHECK-NEXT:     %2 = "jlir.convertstd"(%arg3) : (i64) -> index
+# CHECK-NEXT:     %3 = subi %2, %c1 : index
+# CHECK-NEXT:     %4 = "jlir.convertstd"(%arg4) : (i64) -> index
+# CHECK-NEXT:     %5 = subi %4, %c1 : index
+# CHECK-NEXT:     %6 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 3}">) -> memref<?x?x?xi64>
+# CHECK-NEXT:     %7 = load %6[%5, %3, %1] : memref<?x?x?xi64>
+# CHECK-NEXT:     return %7 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 

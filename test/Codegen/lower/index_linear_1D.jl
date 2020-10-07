@@ -9,12 +9,11 @@ emit(index, Array{Int64, 1}, Int64)
 # CHECK: module {
 # CHECK-NEXT:   func @"Tuple{typeof(Main.index), Array{Int64, 1}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 1}">, %arg2: i64) -> i64 {
 # CHECK-NEXT:     %c1 = constant 1 : index
-# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg1) : (!jlir<"Array{Int64, 1}">) -> !jlir<"Array{Int64, 1}">
-# CHECK-NEXT:     %1 = "jlir.convertstd"(%arg2) : (i64) -> index
-# CHECK-NEXT:     %2 = subi %1, %c1 : index
-# CHECK-NEXT:     %3 = "jlir.arraytomemref"(%0) : (!jlir<"Array{Int64, 1}">) -> memref<?xi64>
-# CHECK-NEXT:     %4 = load %3[%2] : memref<?xi64>
-# CHECK-NEXT:     return %4 : i64
+# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg2) : (i64) -> index
+# CHECK-NEXT:     %1 = subi %0, %c1 : index
+# CHECK-NEXT:     %2 = "jlir.arraytomemref"(%arg1) : (!jlir<"Array{Int64, 1}">) -> memref<?xi64>
+# CHECK-NEXT:     %3 = load %2[%1] : memref<?xi64>
+# CHECK-NEXT:     return %3 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
