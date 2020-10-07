@@ -108,22 +108,30 @@ struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
 
     LogicalResult matchAndRewrite(ConvertStdOp op,
                                   PatternRewriter &rewriter) const override {
+        // 1. Check if input = output type
+        Type resultType = op.getResult().getType();
+        Type inputType = op.getOperand().getType();
+        if (resultType == inputType) {
+            rewriter.replaceOp(op, {op.getOperand()});
+            return success();
+        }
+        
+        // 2. Check if we have a chain of convert ops
         ConvertStdOp inputOp = dyn_cast_or_null<ConvertStdOp>(
             op.getOperand().getDefiningOp());
         if (!inputOp)
             return failure();
 
-
+        // if the chain roundtrips elimnate it.
         Type originalType = inputOp.getOperand().getType();
-        Type finalType = op.getResult().getType();
-        if (originalType == finalType) {
+        if (originalType == resultType) {
             rewriter.replaceOp(op, {inputOp.getOperand()});
-        } else {
-            ConvertStdOp newConvertStdOp = rewriter.create<ConvertStdOp>(
-                op.getLoc(), finalType, inputOp.getOperand());
-            rewriter.replaceOp(op, {newConvertStdOp.getResult()});
+            return success();
         }
-        return success();
+
+        // 3. Shortcut the input op.
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, resultType, inputOp.getOperand());
+        return success(); 
     }
 };
 
