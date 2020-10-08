@@ -238,7 +238,7 @@ def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
     let hasCanonicalizer = 1;
 }
 
-def ArrayToMemRefOp : JLIR_Op<"arraytomemref"> {
+def ArrayToMemRefOp : JLIR_Op<"arraytomemref", [NoSideEffect]> {
     let summary = "Array to MemRef conversion operation";
     let description = [{
         TODO

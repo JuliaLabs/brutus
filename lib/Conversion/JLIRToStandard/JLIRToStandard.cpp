@@ -82,9 +82,10 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
                                JLIRToStandardTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(lowering, ctx){}
 
-    Value convertValue(ConversionPatternRewriter &rewriter,
-                       Location location,
-                       Value value) const {
+    Value 
+    convertValue(ConversionPatternRewriter &rewriter,
+                Location location,
+                Value value) const {
 
         auto converter = this->typeConverter;
         JuliaType from = value.getType().template dyn_cast<JuliaType>();
@@ -109,6 +110,37 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
             newOperands[i] = this->convertValue(rewriter, location, operand);
             i++;
         }
+    }
+
+    Optional<Value>
+    convertArray(ConversionPatternRewriter &rewriter,
+                 Location loc,
+                 Value value) const {
+        auto converter = this->typeConverter;
+        JuliaType arrayType = value.getType().template dyn_cast<JuliaType>();
+
+        if (!arrayType)
+            return None;
+        
+        jl_datatype_t *arrayDatatype = arrayType.getDatatype();
+
+        if (!jl_is_array_type(arrayDatatype))
+            return None;
+
+        JuliaType elJLType = JuliaType::get(
+            rewriter.getContext(), (jl_datatype_t*)jl_tparam0(arrayDatatype));
+        Type elType = converter->convertType(elJLType);
+        if (!elType) {
+            failure();
+        }
+        unsigned rank = jl_unbox_uint64(jl_tparam1(arrayDatatype));
+        SmallVector<int64_t, 2> shape(rank, -1);
+
+        ArrayToMemRefOp memref = rewriter.create<ArrayToMemRefOp>(
+            loc,
+            MemRefType::get(shape, elType),
+            value);
+        return memref.getResult();
     }
 
     Value getIndexConstant(ConversionPatternRewriter &rewriter,
@@ -321,6 +353,7 @@ struct IsOpLowering : public JLIRToStdConversionPattern<Builtin_is> {
             rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
 
         assert(operands.size() == 2);
+
         jl_value_t *jt1 = (jl_value_t*)op.getOperand(0).getType()
             .cast<JuliaType>().getDatatype();
         jl_value_t *jt2 = (jl_value_t*)op.getOperand(1).getType()
@@ -351,22 +384,19 @@ struct ArrayrefOpLowering : public JLIRToStdConversionPattern<Builtin_arrayref> 
     LogicalResult matchAndRewrite(Builtin_arrayref op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        JuliaType arrayType = op.getOperand(1).getType().cast<JuliaType>();
-        jl_datatype_t *arrayDatatype = arrayType.getDatatype();
-        assert(jl_is_array_type(arrayDatatype));
+        // TODO: boundschecking
+        // arrayref(bool, array, indices...)
+        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[1]);
 
-        JuliaType elJLType = JuliaType::get(
-            rewriter.getContext(), (jl_datatype_t*)jl_tparam0(arrayDatatype));
-        Type elType = this->typeConverter->convertType(elJLType);
-        if (!elType) {
-            failure();
-        }
-        unsigned rank = jl_unbox_uint64(jl_tparam1(arrayDatatype));
-        SmallVector<int64_t, 2> shape(rank, -1);
-
+        if (!memref.hasValue())
+            return failure();
+        
+        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
+        
         // indices are reversed because Julia is column-major, but MLIR is
         // row-major
         SmallVector<Value, 2> indices;
+        int64_t rank = memrefType.getRank();
         if (rank > 1 && op.getNumOperands() == 3) {
             // linear index, take advantage of lack of bounds checking
             indices.assign(
@@ -381,13 +411,78 @@ struct ArrayrefOpLowering : public JLIRToStdConversionPattern<Builtin_arrayref> 
             }
         }
 
-        Value memref = rewriter.create<ArrayToMemRefOp>(
-            op.getLoc(),
-            MemRefType::get(shape, elType),
-            operands[1]).getResult();
-        Value element = rewriter.create<LoadOp>(
-            op.getLoc(), elType, memref, indices).getResult();
-        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, elJLType, element);
+        LoadOp loadOp = rewriter.create<LoadOp>(op.getLoc(), memrefType.getElementType(), memref.getValue(), indices);
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), loadOp.getResult());
+        return success();
+    }
+};
+
+struct ArraysetOpLowering : public JLIRToStdConversionPattern<Builtin_arrayset> {
+    using JLIRToStdConversionPattern<Builtin_arrayset>::JLIRToStdConversionPattern;
+
+    LogicalResult matchAndRewrite(Builtin_arrayset op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        // TODO: boundschecking
+        // arrayset(bool, array, val, indices...)
+        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[1]);
+        Value val = operands[2];
+
+        if (!memref.hasValue())
+            return failure();
+        
+        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
+        
+        // indices are reversed because Julia is column-major, but MLIR is
+        // row-major
+        SmallVector<Value, 2> indices;
+        int64_t rank = memrefType.getRank();
+        if (rank > 1 && op.getNumOperands() == 4) {
+            // linear index, take advantage of lack of bounds checking
+            indices.assign(
+                rank, getIndexConstant(rewriter, op.getLoc(), 0));
+            indices[rank-1] = decrementIndex(rewriter, op.getLoc(), operands[3]);
+        } else {
+            indices.assign(rank, nullptr);
+            assert(rank == op.getNumOperands() - 3);
+            for (unsigned i = 0; i < rank; i++) {
+                indices[rank-i-1] = decrementIndex(
+                    rewriter, op.getLoc(), operands[i+3]);
+            }
+        }
+
+        StoreOp storeOp = rewriter.create<StoreOp>(op.getLoc(), val, memref.getValue(), indices);
+        rewriter.replaceOp(op, operands[1]);
+        return success();
+    }
+};
+
+struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize> {
+    using JLIRToStdConversionPattern<Builtin_arraysize>::JLIRToStdConversionPattern;
+
+    LogicalResult matchAndRewrite(Builtin_arraysize op,
+                                  ArrayRef<Value> operands,
+                                  ConversionPatternRewriter &rewriter) const override {
+        // TODO: Boundschecking
+        // arraysize(array, ndim)
+        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[0]);
+
+        if (!memref.hasValue())
+            return failure();
+
+        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
+        
+        // indices are reversed because Julia is column-major, but MLIR is
+        // row-major
+        auto rank = getIndexConstant(rewriter, op.getLoc(), memrefType.getRank());
+
+        Type indexType = rewriter.getIndexType();
+
+        ConvertStdOp index = rewriter.create<ConvertStdOp>(op.getLoc(), indexType, operands[1]);
+        SubIOp subOp = rewriter.create<SubIOp>(op.getLoc(), indexType, rank, index);
+
+        DimOp dimOp = rewriter.create<DimOp>(op.getLoc(), memref.getValue(), subOp.getResult());
+        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), dimOp.getResult());
         return success();
     }
 };
@@ -423,11 +518,11 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         return isFuncOpLegal(op, converter);
     });
 
+    // Only partial lowering occurs at this stage.
+    target.addLegalOp<Builtin_is>();
+
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
     patterns.insert<
-        // TESTING
-        ArrayrefOpLowering,
-
         // ConvertStdOp    (JLIRToLLVM)
         // UnimplementedOp (JLIRToLLVM)
         // UndefOp         (JLIRToLLVM)
@@ -537,10 +632,10 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         // Builtin_getfield
         // Builtin_setfield
         // Builtin_fieldtype
-        // Builtin_arrayref
+        ArrayrefOpLowering, // Builtin_arrayref
         // Builtin_const_arrayref
-        // Builtin_arrayset
-        // Builtin_arraysize
+        ArraysetOpLowering, // Builtin_arrayset
+        ArraysizeOpLowering, // Builtin_arraysize
         // Builtin_apply_type
         // Builtin_applicable
         // Builtin_invoke ?
