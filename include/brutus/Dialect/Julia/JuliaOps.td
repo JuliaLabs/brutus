@@ -17,7 +17,13 @@ def JLIR_Dialect : Dialect {
     let cppNamespace = "jlir";
 }
 
-def JLIR_JuliaType : Type<CPred<"$_self.isa<JuliaType>()">, "JLIR Julia type">;
+//===----------------------------------------------------------------------===//
+// Dialect types                                                              //
+//===----------------------------------------------------------------------===//
+
+
+def JLIR_JuliaType : DialectType<JLIR_Dialect, CPred<"$_self.isa<JuliaType>()">, "JLIR Julia type">;
+
 
 def JLIR_JuliaValueAttr : Attr<CPred<"$_self.isa<JuliaValueAttr>()">,
                                "JLIR Julia Value attribute"> {
