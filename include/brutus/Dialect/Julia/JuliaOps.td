@@ -24,12 +24,13 @@ def JLIR_Dialect : Dialect {
 
 def JLIR_JuliaType : DialectType<JLIR_Dialect, CPred<"$_self.isa<JuliaType>()">, "JLIR Julia type">;
 
-
 def JLIR_JuliaValueAttr : Attr<CPred<"$_self.isa<JuliaValueAttr>()">,
                                "JLIR Julia Value attribute"> {
     let storageType = [{ JuliaValueAttr }];
     let returnType = [{ jl_value_t * }];
 }
+
+def JLIR_IsJLArrayTypePred : CPred<"jl_is_array_type($_self.cast<JuliaType>().getDatatype())">;
 
 // Base class for JLIR dialect operations. This operation inherits from the base
 // `Op` class in OpBase.td, and provides:
