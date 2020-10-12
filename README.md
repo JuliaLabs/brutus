@@ -10,15 +10,15 @@ optimisations for Julia.
 
 ```
 # Build Julia with LLVM 11 and MLIR
-git clone https://github.com/yhls/julia
+git clone https://github.com/JuliaLang/julia
 cd julia
-git checkout yhls/llvm-11-again
+git checkout master
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     LLVM_VER=svn \
     LLVM_DEBUG=0 \
     USE_MLIR=1 \
-    LLVM_GIT_VER="587f81f54a3abab88fe9be5f113c74fc12655ee0"
+    LLVM_GIT_VER="llvmorg-11.0.0"
 cd ..
 
 # Build Brutus
