@@ -42,6 +42,15 @@ Optional<Type> JLIRToStandardTypeConverter::convertJuliaType(JuliaType t) {
         return None;
     } else if (jl_is_primitivetype(jdt)) {
         return convertBitstype(jdt);
+    } else if (jl_is_array_type(jdt)) {
+        JuliaType elJLType = JuliaType::get(t.getContext(), (jl_datatype_t*)jl_tparam0(jdt));
+        Optional<Type> elType = convertJuliaType(elJLType);
+        if (!elType.hasValue()) {
+            return None;
+        }
+        unsigned rank = jl_unbox_uint64(jl_tparam1(jdt));
+        SmallVector<int64_t, 2> shape(rank, -1);
+        return MemRefType::get(shape, elType.getValue());
     } else if (jl_is_structtype(jdt)
                && !(jdt->layout && jl_is_layout_opaque(jdt->layout))) {
         // bool is_tuple = jl_is_tuple_type(jt);
@@ -384,36 +393,37 @@ struct ArrayrefOpLowering : public JLIRToStdConversionPattern<Builtin_arrayref> 
     LogicalResult matchAndRewrite(Builtin_arrayref op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // TODO: boundschecking
-        // arrayref(bool, array, indices...)
-        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[1]);
+        SmallVector<Value, 4> newOperands(operands.size());
+        this->convertOperands(rewriter, op.getLoc(), operands, newOperands);
 
-        if (!memref.hasValue())
-            return failure();
+        // arrayref(i1, Array, indices...)
+        Value memref = newOperands[1];
         
-        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
-        
-        // indices are reversed because Julia is column-major, but MLIR is
-        // row-major
-        SmallVector<Value, 2> indices;
-        int64_t rank = memrefType.getRank();
-        if (rank > 1 && op.getNumOperands() == 3) {
-            // linear index, take advantage of lack of bounds checking
-            indices.assign(
-                rank, getIndexConstant(rewriter, op.getLoc(), 0));
-            indices[rank-1] = decrementIndex(rewriter, op.getLoc(), operands[2]);
-        } else {
-            indices.assign(rank, nullptr);
-            assert(rank == op.getNumOperands() - 2);
-            for (unsigned i = 0; i < rank; i++) {
-                indices[rank-i-1] = decrementIndex(
-                    rewriter, op.getLoc(), operands[i+2]);
+        if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {
+            // indices are reversed because Julia is column-major, but MLIR is
+            // row-major
+            SmallVector<Value, 2> indices;
+            int64_t rank = memrefType.getRank();
+
+            if (rank > 1 && op.getNumOperands() == 3) {
+                // linear index, take advantage of lack of bounds checking
+                indices.assign(
+                    rank, getIndexConstant(rewriter, op.getLoc(), 0));
+                indices[rank-1] = decrementIndex(rewriter, op.getLoc(), newOperands[2]);
+            } else {
+                indices.assign(rank, nullptr);
+                assert(rank == op.getNumOperands() - 2);
+                for (unsigned i = 0; i < rank; i++) {
+                    indices[rank-i-1] = decrementIndex(
+                        rewriter, op.getLoc(), newOperands[i+2]);
+                }
             }
-        }
 
-        LoadOp loadOp = rewriter.create<LoadOp>(op.getLoc(), memrefType.getElementType(), memref.getValue(), indices);
-        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), loadOp.getResult());
-        return success();
+            LoadOp loadOp = rewriter.create<LoadOp>(op.getLoc(), memrefType.getElementType(), memref, indices);
+            rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), loadOp.getResult());
+            return success();
+        }
+        return failure();
     }
 };
 
@@ -423,37 +433,36 @@ struct ArraysetOpLowering : public JLIRToStdConversionPattern<Builtin_arrayset> 
     LogicalResult matchAndRewrite(Builtin_arrayset op,
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
-        // TODO: boundschecking
-        // arrayset(bool, array, val, indices...)
-        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[1]);
-        Value val = operands[2];
+        SmallVector<Value, 4> newOperands(operands.size());
+        this->convertOperands(rewriter, op.getLoc(), operands, newOperands);
 
-        if (!memref.hasValue())
-            return failure();
+        // arrayset(i1, Array, val, indices...)
+        Value memref = newOperands[1];
         
-        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
-        
-        // indices are reversed because Julia is column-major, but MLIR is
-        // row-major
-        SmallVector<Value, 2> indices;
-        int64_t rank = memrefType.getRank();
-        if (rank > 1 && op.getNumOperands() == 4) {
-            // linear index, take advantage of lack of bounds checking
-            indices.assign(
-                rank, getIndexConstant(rewriter, op.getLoc(), 0));
-            indices[rank-1] = decrementIndex(rewriter, op.getLoc(), operands[3]);
-        } else {
-            indices.assign(rank, nullptr);
-            assert(rank == op.getNumOperands() - 3);
-            for (unsigned i = 0; i < rank; i++) {
-                indices[rank-i-1] = decrementIndex(
-                    rewriter, op.getLoc(), operands[i+3]);
+        if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {
+            // indices are reversed because Julia is column-major, but MLIR is
+            // row-major
+            SmallVector<Value, 2> indices;
+            int64_t rank = memrefType.getRank();
+            if (rank > 1 && op.getNumOperands() == 4) {
+                // linear index, take advantage of lack of bounds checking
+                indices.assign(
+                    rank, getIndexConstant(rewriter, op.getLoc(), 0));
+                indices[rank-1] = decrementIndex(rewriter, op.getLoc(), newOperands[3]);
+            } else {
+                indices.assign(rank, nullptr);
+                assert(rank == op.getNumOperands() - 3);
+                for (unsigned i = 0; i < rank; i++) {
+                    indices[rank-i-1] = decrementIndex(
+                        rewriter, op.getLoc(), newOperands[i+3]);
+                }
             }
-        }
 
-        StoreOp storeOp = rewriter.create<StoreOp>(op.getLoc(), val, memref.getValue(), indices);
-        rewriter.replaceOp(op, operands[1]);
-        return success();
+            StoreOp storeOp = rewriter.create<StoreOp>(op.getLoc(), newOperands[2], memref, indices);
+            rewriter.replaceOp(op, operands[1]);
+            return success();
+        }
+        return failure();
     }
 };
 
@@ -464,26 +473,27 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
                                   ArrayRef<Value> operands,
                                   ConversionPatternRewriter &rewriter) const override {
         // TODO: Boundschecking
+        SmallVector<Value, 4> newOperands(operands.size());
+        this->convertOperands(rewriter, op.getLoc(), operands, newOperands);
+
         // arraysize(array, ndim)
-        Optional<Value> memref = convertArray(rewriter, op.getLoc(), operands[0]);
-
-        if (!memref.hasValue())
-            return failure();
-
-        MemRefType memrefType = memref.getValue().getType().cast<MemRefType>();
+        Value memref = newOperands[0];
         
-        // indices are reversed because Julia is column-major, but MLIR is
-        // row-major
-        auto rank = getIndexConstant(rewriter, op.getLoc(), memrefType.getRank());
+        if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {        
+            // indices are reversed because Julia is column-major, but MLIR is
+            // row-major
+            auto rank = getIndexConstant(rewriter, op.getLoc(), memrefType.getRank());
 
-        Type indexType = rewriter.getIndexType();
+            Type indexType = rewriter.getIndexType();
 
-        ConvertStdOp index = rewriter.create<ConvertStdOp>(op.getLoc(), indexType, operands[1]);
-        SubIOp subOp = rewriter.create<SubIOp>(op.getLoc(), indexType, rank, index);
+            ConvertStdOp index = rewriter.create<ConvertStdOp>(op.getLoc(), indexType, newOperands[1]);
+            SubIOp subOp = rewriter.create<SubIOp>(op.getLoc(), indexType, rank, index);
 
-        DimOp dimOp = rewriter.create<DimOp>(op.getLoc(), memref.getValue(), subOp.getResult());
-        rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), dimOp.getResult());
-        return success();
+            DimOp dimOp = rewriter.create<DimOp>(op.getLoc(), memref, subOp.getResult());
+            rewriter.replaceOpWithNewOp<ConvertStdOp>(op, op.getResult().getType(), dimOp.getResult());
+            return success();
+        }
+        return failure();
     }
 };
 
