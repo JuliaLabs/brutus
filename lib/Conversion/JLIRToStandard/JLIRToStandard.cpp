@@ -522,7 +522,6 @@ void JLIRToStandardLoweringPass::runOnFunction() {
 
     target.addLegalDialect<StandardOpsDialect>();
     target.addLegalOp<ConvertStdOp>();
-    target.addLegalOp<ArrayToMemRefOp>();
     target.addLegalOp<UnimplementedOp>();
     target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
         return isFuncOpLegal(op, converter);

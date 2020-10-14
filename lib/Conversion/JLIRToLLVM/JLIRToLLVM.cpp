@@ -471,121 +471,8 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
         return failure();
     }
 };
-
-// NOTE: doesn't produce correct value for dimensions greater than the number of
-//       dimensions of the array (and doesn't produce error if dimension is 0)
-struct ArraysizeOpLowering : public OpAndTypeConversionPattern<Builtin_arraysize> {
-    using OpAndTypeConversionPattern<Builtin_arraysize>::OpAndTypeConversionPattern;
-
-    LogicalResult matchAndRewrite(Builtin_arraysize op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        Value pointerToArray = emitPointerToArray(
-            rewriter, op.getLoc(), operands[0]);
-        Value pointerToNrows = emitPointerToArrayField(
-            rewriter, op.getLoc(), pointerToArray, 5);
-
-        // compute 0-indexed dimension number
-        Value dimension = rewriter.create<LLVM::SubOp>(
-            op.getLoc(),
-            // will this type be correct on all platforms?
-            // (`jl_arraysize` uses `long`)
-            lowering.longType,
-            operands[1], // dimension number, 1-indexed
-            rewriter.create<LLVM::ConstantOp>(
-                op.getLoc(),
-                lowering.longType,
-                rewriter.getIntegerAttr(lowering.mlirLongType, 1))
-            ).getResult();
-
-        Value size = emitArraySize(
-            rewriter, op.getLoc(), pointerToNrows, dimension);
-
-        rewriter.replaceOp(op, size);
-        return success();
-    }
-};
-
-struct ArrayToMemRefOpLowering : public OpAndTypeConversionPattern<ArrayToMemRefOp> {
-    JLIRToStandardTypeConverter &stdLowering;
-
-    ArrayToMemRefOpLowering(MLIRContext *ctx,
-                            JLIRToLLVMTypeConverter &lowering,
-                            JLIRToStandardTypeConverter &stdLowering)
-        : OpAndTypeConversionPattern<ArrayToMemRefOp>(ctx, lowering),
-          stdLowering(stdLowering) {}
-
-    LogicalResult matchAndRewrite(ArrayToMemRefOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        jl_datatype_t *jdt =
-            op.getOperand().getType().cast<JuliaType>().getDatatype();
-        JuliaType elementType = JuliaType::get(
-            rewriter.getContext(), (jl_datatype_t*)jl_tparam0(jdt));
-        unsigned nDims = jl_unbox_long(jl_tparam1(jdt)); // is long the right type?
-
-        Value pointerToArray = emitPointerToArray(
-            rewriter, op.getLoc(), operands[0]);
-        Value pointerToDataField = emitPointerToArrayField(
-            rewriter, op.getLoc(), pointerToArray, 0);
-        Value pointerToData = rewriter.create<LLVM::BitcastOp>(
-            op.getLoc(),
-            lowering.int64Type.getPointerTo(),
-            rewriter.create<LLVM::LoadOp>(
-                op.getLoc(),
-                lowering.int8Type.getPointerTo(),
-                pointerToDataField).getResult());
-
-        Value pointerToNrows = emitPointerToArrayField(
-            rewriter, op.getLoc(), pointerToArray, 5);
-
-        // create MemRef descriptor
-        MemRefDescriptor memref = MemRefDescriptor::undef(
-            rewriter, op.getLoc(), lowering.convertType(op.getType()));
-        memref.setAllocatedPtr(rewriter, op.getLoc(), pointerToData);
-        memref.setAlignedPtr(rewriter, op.getLoc(), pointerToData);
-        memref.setOffset(
-            rewriter,
-            op.getLoc(),
-            rewriter.create<LLVM::ConstantOp>(
-                op.getLoc(),
-                lowering.int64Type,
-                rewriter.getI64IntegerAttr(0)).getResult());
-
-        // compute strides
-        Value lastSize;
-        Value lastStride;
-        for (unsigned i = 0; i < nDims; i++) {
-            Value dimension = rewriter.create<LLVM::ConstantOp>(
-                op.getLoc(),
-                lowering.longType,
-                rewriter.getIntegerAttr(lowering.mlirLongType, i)).getResult();
-            Value size = emitArraySize(
-                rewriter, op.getLoc(), pointerToNrows, dimension);
-            memref.setSize(rewriter, op.getLoc(), nDims - i - 1, size);
-
-            Value stride;
-            if (lastStride) {
-                stride = rewriter.create<LLVM::MulOp>(
-                    op.getLoc(), lowering.longType, lastSize, lastStride);
-            } else {
-                stride = rewriter.create<LLVM::ConstantOp>(
-                    op.getLoc(),
-                    lowering.longType,
-                    rewriter.getIntegerAttr(lowering.mlirLongType, 1));
-            }
-            memref.setStride(rewriter, op.getLoc(), nDims - i - 1, stride);
-
-            lastSize = size;
-            lastStride = stride;
-        }
-
-        rewriter.replaceOp(op, {Value(memref)});
-        return success();
-    }
-};
-
 } // namespace
+
 
 // TODO: maybe values that convert to void should not be removed--pass a
 //       pointer?
@@ -713,7 +600,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         // Builtin_arrayref
         // Builtin_const_arrayref
         // Builtin_arrayset
-        ArraysizeOpLowering, // Builtin_arraysize
+        // Builtin_arraysize
         // Builtin_apply_type
         // Builtin_applicable
         // Builtin_invoke ?
@@ -724,11 +611,6 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         // Builtin__typevar
         // invoke_kwsorter?
         >(&getContext(), converter);
-
-    JLIRToStandardTypeConverter stdConverter(&getContext());
-    patterns.insert<ArrayToMemRefOpLowering>(
-        &getContext(), converter, stdConverter);
-
 
     if (failed(applyPartialConversion(
                     getFunction(), target, patterns)))
