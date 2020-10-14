@@ -6,7 +6,9 @@ cd(joinpath(@__DIR__, "..", "test"))
 tests = map(realpath, readlines(`find . -name "*.jl"`))
 julia = joinpath(Sys.BINDIR, Base.julia_exename())
 
-for test in tests
+import Base.Threads: @threads
+
+@threads for test in tests
     runlines = String[]
     content = String[]
     open(test, "r") do io
