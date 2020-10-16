@@ -533,7 +533,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     if (dump_flags & DUMP_TRANSLATE_TO_LLVM) {
         auto Mod = mlir::translateModuleToLLVMIR(module);
         llvm::dbgs() << "after lowering to LLVM IR:";
-        Mod->print(llvm::dbgs())
+        Mod->print(llvm::dbgs(), nullptr);
         llvm::dbgs() << "\n\n";
     }
 
