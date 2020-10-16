@@ -10,6 +10,7 @@ end
     DumpCanonicalized = 2
     DumpLoweredToStd  = 4
     DumpLoweredToLLVM = 8
+    DumpTranslateToLLVM = 16
 end
 
 function find_invokes(IR)

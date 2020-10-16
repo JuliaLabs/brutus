@@ -17,6 +17,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Target/LLVMIR.h"
 
 using namespace mlir;
 using namespace mlir::jlir;
@@ -421,6 +422,7 @@ enum DumpOption {
     DUMP_CANONICALIZED   = 2,
     DUMP_LOWERED_TO_STD  = 4,
     DUMP_LOWERED_TO_LLVM = 8,
+    DUMP_TRANSLATE_TO_LLVM = 16,
 };
 
 ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
@@ -528,11 +530,18 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
         return nullptr;
     }
 
+    if (dump_flags & DUMP_TRANSLATE_TO_LLVM) {
+        auto Mod = mlir::translateModuleToLLVMIR(module);
+        llvm::dbgs() << "after lowering to LLVM IR:";
+        Mod->print(llvm::dbgs())
+        llvm::dbgs() << "\n\n";
+    }
+
     if (!emit_fptr) {
         return nullptr;
     }
 
-    // see mlir/lib/Support/JitRunner.cpp
+    // see mlir/lib/ExecutionEngine/JitRunner.cpp
 
     Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
         llvm::CodeGenOpt::Aggressive;
