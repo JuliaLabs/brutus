@@ -19,6 +19,8 @@
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Target/LLVMIR.h"
 
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
+
 using namespace mlir;
 using namespace mlir::jlir;
 
@@ -106,7 +108,7 @@ mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
         auto op = ctx.builder.create<UnimplementedOp>(loc, type);
         return op.getResult();
     } else {
-        auto op = ctx.builder.create<ConstantOp>(loc, value, type);
+        auto op = ctx.builder.create<jlir::ConstantOp>(loc, value, type);
         return op.getResult();
     }
 }
@@ -160,7 +162,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
         for (unsigned i = 1; i < nargs; ++i) {
             arguments.push_back(emit_value(ctx, loc, args[i]));
         }
-        auto op = ctx.builder.create<CallOp>(loc, callee, arguments, type);
+        auto op = ctx.builder.create<jlir::CallOp>(loc, callee, arguments, type);
         return op.getResult();
 
     } else {
@@ -349,7 +351,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 // unreachable terminator, so return undef
                 value = ctx.builder.create<UndefOp>(loc, ret);
             }
-            ctx.builder.create<ReturnOp>(loc, value);
+            ctx.builder.create<jlir::ReturnOp>(loc, value);
             is_terminator = true;
 
         } else if (jl_is_gotonode(stmt)) {
@@ -429,7 +431,11 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
                                          jl_method_instance_t *entry_mi,
                                          char emit_fptr,
                                          char dump_flags) {
-    mlir::MLIRContext context;
+    mlir::MLIRContext context(/*loadAllDialects*/ false);
+    // Load our Dialect in this MLIR Context
+    context.getOrLoadDialect<JLIRDialect>();
+    context.getOrLoadDialect<StandardOpsDialect>();
+
     jl_mlirctx_t ctx(&context);
 
     jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t*)entry_mi);
@@ -531,10 +537,12 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     }
 
     if (dump_flags & DUMP_TRANSLATE_TO_LLVM) {
-        auto Mod = mlir::translateModuleToLLVMIR(module);
+        llvm::LLVMContext llvmContext;
+        auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
         llvm::dbgs() << "after lowering to LLVM IR:";
         Mod->print(llvm::dbgs(), nullptr);
         llvm::dbgs() << "\n\n";
+        return nullptr;
     }
 
     if (!emit_fptr) {

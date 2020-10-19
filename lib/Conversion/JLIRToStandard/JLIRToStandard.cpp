@@ -21,18 +21,30 @@ JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
         return success();
     });
 
-    // Materialize the cast for one-to-one conversions.
-    addMaterialization([&](PatternRewriter &rewriter,
-                           Type resultType, ValueRange inputs,
-                           Location loc) -> Optional<Value> {
+    addSourceMaterialization([&](OpBuilder &builder,
+                                 Type resultType, ValueRange inputs,
+                                 Location loc) -> Optional<Value> {
         if (inputs.size() == 1) {
             Value in = inputs.front();
-            ConvertStdOp op = rewriter.create<ConvertStdOp>(loc, resultType, in);
+            ConvertStdOp op = builder.create<ConvertStdOp>(loc, resultType, in);
             return op.getResult();
         } else {
             return None;
         }
     });
+
+    addTargetMaterialization([&](OpBuilder &builder,
+                                 Type resultType, ValueRange inputs,
+                                 Location loc) -> Optional<Value> {
+        if (inputs.size() == 1) {
+            Value in = inputs.front();
+            ConvertStdOp op = builder.create<ConvertStdOp>(loc, resultType, in);
+            return op.getResult();
+        } else {
+            return None;
+        }
+    });
+    // addArgumentMaterialization(callback);
 }
 
 // returns `None` if the Julia type could not be converted to an MLIR builtin type
