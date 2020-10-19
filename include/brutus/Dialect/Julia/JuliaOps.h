@@ -70,8 +70,6 @@ class JuliaType
 public:
     using Base::Base;
 
-    static bool kindof(unsigned kind) { return kind == JLIRTypes::JuliaType; }
-
     static JuliaType get(mlir::MLIRContext *context, jl_datatype_t *datatype) {
         // unwrap Core.Compiler.Const
         if (jl_isa((jl_value_t*)datatype, const_type)) {
@@ -79,7 +77,7 @@ public:
                 jl_get_field((jl_value_t*)datatype, "val"));
         }
 
-        return Base::get(context, JLIRTypes::JuliaType, datatype);
+        return Base::get(context, datatype);
     }
 
     jl_datatype_t *getDatatype() {
