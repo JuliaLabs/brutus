@@ -63,11 +63,11 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
     // if (llvmcall && (bt == (jl_value_t*)jl_float16_type))
     //     return LLVM::LLVMType::getHalfTy(llvmDialect);
     if (bt == (jl_value_t*)jl_float32_type)
-        return LLVM::LLVMType::getFloatTy(llvmDialect);
+        return LLVM::LLVMType::getFloatTy(&getContext());
     if (bt == (jl_value_t*)jl_float64_type)
-        return LLVM::LLVMType::getDoubleTy(llvmDialect);
+        return LLVM::LLVMType::getDoubleTy(&getContext());
     int nb = jl_datatype_size(bt);
-    return LLVM::LLVMType::getIntNTy(llvmDialect, nb * 8);
+    return LLVM::LLVMType::getIntNTy(&getContext(), nb * 8);
 }
 
 LLVM::LLVMType JLIRToLLVMTypeConverter::julia_struct_to_llvm(jl_value_t *jt) {
@@ -124,9 +124,9 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::INTT(LLVM::LLVMType t) {
         return int16Type;
     }
 
-    unsigned nbits = t.getUnderlyingType()->getPrimitiveSizeInBits();
+    unsigned nbits = t.getPrimitiveSizeInBits();
     assert(t != voidType && nbits > 0);
-    return LLVM::LLVMType::getIntNTy(llvmDialect, nbits);
+    return LLVM::LLVMType::getIntNTy(&getContext(), nbits);
 }
 
 namespace {
@@ -149,7 +149,7 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
         LLVM::LLVMType t = a.getType().dyn_cast<LLVM::LLVMType>();
 
         if (t.isIntegerTy() || t.isPointerTy()
-            || t.getUnderlyingType()->isFloatingPointTy()) {
+            || t.isFloatingPointTy()) {
 
             LLVM::LLVMType t_int = lowering.INTT(t);
             if (t != t_int) {
@@ -329,9 +329,8 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
             memcpy(bits, value, nb);
 
             Attribute value_attribute;
-            llvm::Type *underlying_llvm_type = llvm_type.getUnderlyingType();
-            if (underlying_llvm_type->isFloatingPointTy()) {
-                APFloat fval(underlying_llvm_type->getFltSemantics(), val);
+            if (llvm_type.isFloatingPointTy()) {
+                APFloat fval(llvm_type.cast<FloatType>().getFloatSemantics(), val);
                 if (julia_type == jl_float32_type) {
                     value_attribute = rewriter.getFloatAttr(
                         rewriter.getF32Type(), fval);
@@ -480,13 +479,17 @@ struct IsOpLowering : public OpAndTypeConversionPattern<Builtin_is> {
 //       f(x::Bool) = x ? nothing : 100
 
 void JLIRToLLVMLoweringPass::runOnFunction() {
-    ConversionTarget target(getContext());
-    target.addLegalDialect<LLVM::LLVMDialect>();
-
     OwningRewritePatternList patterns;
-    JLIRToLLVMTypeConverter converter(&getContext());
-    populateStdToLLVMConversionPatterns(converter, patterns);
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+
+    const LowerToLLVMOptions options = {
+        /*useBarePtrCallConv = */ false,
+        /*emitCWrappers = */ true,
+        /*indexBitwidth = */ kDeriveIndexBitwidthFromDataLayout,
+        /*useAlignedAlloc = */ true,
+    };
+
+    JLIRToLLVMTypeConverter converter(&getContext(), options);
+
     patterns.insert<
         ConvertStdOpLowering,
         ToUndefOpPattern<UnimplementedOp>,
@@ -612,6 +615,11 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
         // invoke_kwsorter?
         >(&getContext(), converter);
 
+
+
+    populateStdToLLVMConversionPatterns(converter, patterns);
+
+    LLVMConversionTarget target(getContext());
     if (failed(applyPartialConversion(
                     getFunction(), target, patterns)))
         signalPassFailure();

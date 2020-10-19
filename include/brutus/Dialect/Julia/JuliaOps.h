@@ -1,9 +1,9 @@
 #ifndef JL_DIALECT_JLIR_H
 #define JL_DIALECT_JLIR_H
 
-#include "mlir/Interfaces/SideEffectInterfaces.h"
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Function.h"
+#include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "julia.h"
 #include "brutus/brutus_internal.h"
@@ -41,13 +41,6 @@ public:
 };
 
 /// JLIR Types
-
-namespace JLIRTypes {
-enum Kind {
-    // TODO: reserve own range of type kinds?
-    JuliaType = mlir::Type::FIRST_PRIVATE_EXPERIMENTAL_0_TYPE
-};
-}
 
 class JuliaTypeStorage : public mlir::TypeStorage {
 public:
@@ -95,12 +88,6 @@ public:
     }
 };
 
-namespace JLIRAttributes {
-enum Kind {
-    JuliaValueAttr = mlir::Attribute::FIRST_PRIVATE_EXPERIMENTAL_0_ATTR
-};
-}
-
 class JuliaValueAttrStorage : public mlir::AttributeStorage {
 public:
     JuliaValueAttrStorage(jl_value_t *value) : value(value) {}
@@ -129,12 +116,8 @@ class JuliaValueAttr : public mlir::Attribute::AttrBase<
 public:
     using Base::Base;
 
-    static bool kindof(unsigned kind) {
-        return kind == JLIRAttributes::JuliaValueAttr;
-    }
-
     static JuliaValueAttr get(mlir::MLIRContext *context, jl_value_t *value) {
-        return Base::get(context, JLIRAttributes::JuliaValueAttr, value);
+        return Base::get(context, value);
     }
 
     jl_value_t *getValue() {
@@ -142,12 +125,13 @@ public:
     }
 };
 
+} // end namespace jlir
+} // end namespace mlir
+
 /// Include the auto-generated header file containing the declarations of the
-/// toy operations.
+/// JuliaIR operations.
 #define GET_OP_CLASSES
 #include "brutus/Dialect/Julia/JuliaOps.h.inc"
 
-} // end namespace jlir
-} // end namespace mlir
 
 #endif // JL_DIALECT_JLIR_H

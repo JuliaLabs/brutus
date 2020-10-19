@@ -9,7 +9,7 @@ using namespace mlir::jlir;
 
 /// Dialect creation, the instance will be owned by the context. This is the
 /// point of registration of custom types and operations for the dialect.
-JLIRDialect::JLIRDialect(mlir::MLIRContext *ctx) : mlir::Dialect("jlir", ctx) {
+JLIRDialect::JLIRDialect(mlir::MLIRContext *ctx) : mlir::Dialect("jlir", ctx, TypeID::get<JLIRDialect>()) {
     addOperations<
 #define GET_OP_LIST
 #include "brutus/Dialect/Julia/JuliaOps.cpp.inc"

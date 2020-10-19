@@ -14,7 +14,7 @@ include "mlir/Interfaces/SideEffectInterfaces.td"
 // can define our operations.
 def JLIR_Dialect : Dialect {
     let name = "jlir";
-    let cppNamespace = "jlir";
+    let cppNamespace = "::mlir::jlir";
 }
 
 //===----------------------------------------------------------------------===//
