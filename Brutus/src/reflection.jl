@@ -18,7 +18,7 @@ emit_llvm(f, tt...) =
     emit(typeof(f), tt,
          emit_fptr=false, # TODO: change to true when ready
          dump_options=[Brutus.DumpLoweredToLLVM,
-                       Brutus.DumpTranslateToLLVM]
+                       Brutus.DumpTranslateToLLVM])
 
 function lit(emit_sym)
     @assert length(ARGS) == 1
