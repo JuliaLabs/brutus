@@ -17,15 +17,16 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
     Type convertBitstype(jl_datatype_t *jdt);
 };
 
-struct JLIRToStandardLoweringPass
-    : public PassWrapper<JLIRToStandardLoweringPass, FunctionPass> {
-
-    static bool isFuncOpLegal(FuncOp op, JLIRToStandardTypeConverter &converter);
-    void runOnFunction() final;
-};
+/// Collect the patterns to convert from the JLIR dialect to Standard The
+/// conversion patterns capture the LLVMTypeConverter and the LowerToLLVMOptions
+/// by reference meaning the references have to remain alive during the entire
+/// pattern lifetime.
+void populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns,
+                                         MLIRContext &context,
+                                         JLIRToStandardTypeConverter &converter);
 
 /// Create a pass to convert JLIR operations to the Standard dialect.
-std::unique_ptr<Pass> createJLIRToStandardLoweringPass();
+std::unique_ptr<OperationPass<ModuleOp>> createJLIRToStandardLoweringPass();
 
 } // namespace jlir
 } // namespace mlir

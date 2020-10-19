@@ -5,7 +5,7 @@
 #include "mlir/IR/StandardTypes.h"
 
 using namespace mlir;
-using namespace jlir;
+using namespace mlir::jlir;
 
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
@@ -508,42 +508,12 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
         return failure();
     }
 };
-
 } // namespace
 
-bool JLIRToStandardLoweringPass::isFuncOpLegal(
-    FuncOp op, JLIRToStandardTypeConverter &converter) {
-    // function is illegal if any of its input or result types can but haven't
-    // been converted
-    FunctionType ft = op.getType().cast<FunctionType>();
-    for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
-        for (Type t : ts) {
-            if (JuliaType jt = t.dyn_cast<JuliaType>()) {
-                if (converter.convertJuliaType(jt).hasValue())
-                    return false;
-            }
-        }
-    }
-    return true;
-}
-
-void JLIRToStandardLoweringPass::runOnFunction() {
-    ConversionTarget target(getContext());
-    JLIRToStandardTypeConverter converter(&getContext());
-    OwningRewritePatternList patterns;
-
-    target.addLegalDialect<StandardOpsDialect>();
-    target.addLegalOp<ConvertStdOp>();
-    target.addLegalOp<UnimplementedOp>();
-    target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
-        return isFuncOpLegal(op, converter);
-    });
-
-    // Only partial lowering occurs at this stage.
-    target.addLegalOp<Builtin_is>();
-
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
-    patterns.insert<
+void mlir::jlir::populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns, 
+                                         MLIRContext &context,
+                                         JLIRToStandardTypeConverter &converter) {
+     patterns.insert<
         // ConvertStdOp    (JLIRToLLVM)
         // UnimplementedOp (JLIRToLLVM)
         // UndefOp         (JLIRToLLVM)
@@ -665,14 +635,60 @@ void JLIRToStandardLoweringPass::runOnFunction() {
         ToStdOpPattern<Builtin_ifelse, SelectOp> // (also JLIRToLLVM)
         // Builtin__typevar
         // invoke_kwsorter?
-        >(&getContext(), converter);
+        >(&context, converter);
+}
+
+namespace {
+struct JLIRToStandardLoweringPass
+    : public PassWrapper<JLIRToStandardLoweringPass, OperationPass<ModuleOp>> {
+
+    static bool isFuncOpLegal(FuncOp op, JLIRToStandardTypeConverter &converter);
+    void runOnOperation() override;
+};
+} // namespace
+
+bool JLIRToStandardLoweringPass::isFuncOpLegal(
+    FuncOp op, JLIRToStandardTypeConverter &converter) {
+    // function is illegal if any of its input or result types can but haven't
+    // been converted
+    FunctionType ft = op.getType().cast<FunctionType>();
+    for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
+        for (Type t : ts) {
+            if (JuliaType jt = t.dyn_cast<JuliaType>()) {
+                if (converter.convertJuliaType(jt).hasValue())
+                    return false;
+            }
+        }
+    }
+    return true;
+}
+
+void JLIRToStandardLoweringPass::runOnOperation() {
+    auto module = getOperation();
+    ConversionTarget target(getContext());
+    JLIRToStandardTypeConverter converter(&getContext());
+
+    target.addLegalDialect<StandardOpsDialect>();
+    target.addLegalOp<ConvertStdOp>();
+    target.addLegalOp<UnimplementedOp>();
+    // Only partial lowering occurs at this stage.
+    target.addLegalOp<Builtin_is>();
+
+    OwningRewritePatternList patterns;
+    populateJLIRToStdConversionPatterns(patterns, getContext(), converter);
+
+    target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
+        return isFuncOpLegal(op, converter);
+    });
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+   
 
     if (failed(applyPartialConversion(
-                    getFunction(), target, patterns)))
+                    module, target, patterns)))
         signalPassFailure();
 
 }
 
-std::unique_ptr<Pass> mlir::jlir::createJLIRToStandardLoweringPass() {
+std::unique_ptr<OperationPass<ModuleOp>> mlir::jlir::createJLIRToStandardLoweringPass() {
     return std::make_unique<JLIRToStandardLoweringPass>();
 }
