@@ -10,25 +10,25 @@
 using namespace mlir;
 using namespace jlir;
 
-JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx)
-    : LLVMTypeConverter(ctx),
-      llvmDialect(ctx->getRegisteredDialect<LLVM::LLVMDialect>()),
-      voidType(LLVM::LLVMType::getVoidTy(llvmDialect)),
-      int1Type(LLVM::LLVMType::getInt1Ty(llvmDialect)),
-      int8Type(LLVM::LLVMType::getInt8Ty(llvmDialect)),
-      int16Type(LLVM::LLVMType::getInt16Ty(llvmDialect)),
-      int32Type(LLVM::LLVMType::getInt32Ty(llvmDialect)),
-      int64Type(LLVM::LLVMType::getInt64Ty(llvmDialect)),
+JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOptions options)
+    : LLVMTypeConverter(ctx, options),
+      llvmDialect(ctx->getOrLoadDialect<LLVM::LLVMDialect>()),
+      voidType(LLVM::LLVMType::getVoidTy(ctx)),
+      int1Type(LLVM::LLVMType::getInt1Ty(ctx)),
+      int8Type(LLVM::LLVMType::getInt8Ty(ctx)),
+      int16Type(LLVM::LLVMType::getInt16Ty(ctx)),
+      int32Type(LLVM::LLVMType::getInt32Ty(ctx)),
+      int64Type(LLVM::LLVMType::getInt64Ty(ctx)),
       sizeType((sizeof(size_t) == 8)? int64Type : int32Type),
       longType((sizeof(long) == 8)? int64Type : int32Type),
       mlirLongType((sizeof(long) == 8)?
                    IntegerType::get(64, ctx) : IntegerType::get(32, ctx)),
       jlvalueType(LLVM::LLVMType::createStructTy(
-                      llvmDialect, Optional<StringRef>("jl_value_t"))),
+                      ctx, Optional<StringRef>("jl_value_t"))),
       pjlvalueType(jlvalueType.getPointerTo()),
       jlarrayType(
           LLVM::LLVMType::createStructTy(
-              llvmDialect,
+              ctx,
               llvm::makeArrayRef({
                       int8Type.getPointerTo(), // data
                       sizeType, // length
