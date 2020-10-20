@@ -483,7 +483,7 @@ void JLIRToLLVMLoweringPass::runOnFunction() {
 
     const LowerToLLVMOptions options = {
         /*useBarePtrCallConv = */ false,
-        /*emitCWrappers = */ true,
+        /*emitCWrappers = */ false,
         /*indexBitwidth = */ kDeriveIndexBitwidthFromDataLayout,
         /*useAlignedAlloc = */ true,
     };
