@@ -494,6 +494,7 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
 
     // llvm::DebugFlag = true;
     mlir::PassManager loweringToStdPM(&context);
+    loweringToStdPM.addPass(createJLIREmitWrapperPass());
     loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
     // canonicalize to remove redundant `ConvertStdOp`s
     loweringToStdPM.addPass(mlir::createCanonicalizerPass());
