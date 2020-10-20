@@ -55,7 +55,7 @@ emit(gauss, Int64)
 # CHECK-NEXT: }
 
 # CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i64) -> !llvm.i64 {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"jl_value_t", ()>>, %arg1: !llvm.i64) -> !llvm.i64 {
 # CHECK-NEXT:     %0 = llvm.mlir.constant({{[0-9]+}} : i64) : !llvm.i64
 # CHECK-NEXT:     %1 = llvm.mlir.constant({{[0-9]+}} : i64) : !llvm.i64
 # CHECK-NEXT:     %2 = llvm.mlir.constant(false) : !llvm.i1

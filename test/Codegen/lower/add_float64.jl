@@ -13,7 +13,7 @@ emit(add, Float64, Float64)
 # CHECK-NEXT: }
 
 # CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.double, %arg2: !llvm.double) -> !llvm.double {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !llvm.ptr<struct<"jl_value_t", ()>>, %arg1: !llvm.double, %arg2: !llvm.double) -> !llvm.double {
 # CHECK-NEXT:     %0 = llvm.fadd %arg1, %arg2 : !llvm.double
 # CHECK-NEXT:     llvm.return %0 : !llvm.double
 # CHECK-NEXT:   }

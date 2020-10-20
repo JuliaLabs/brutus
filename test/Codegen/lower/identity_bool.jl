@@ -11,7 +11,7 @@ emit(identity, Bool)
 # CHECK-NEXT: }
 
 # CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm.i1) -> !llvm.i1 {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm.ptr<struct<"jl_value_t", ()>>, %arg1: !llvm.i1) -> !llvm.i1 {
 # CHECK-NEXT:     llvm.return %arg1 : !llvm.i1
 # CHECK-NEXT:   }
 # CHECK-NEXT: }

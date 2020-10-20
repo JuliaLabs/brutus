@@ -21,23 +21,33 @@ emit(index, Array{Int64, 3}, Int64, Int64, Int64)
 # CHECK-NEXT: }
 
 # CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64, Int64, Int64}"(%arg0: !llvm<"%jl_value_t*">, %arg1: !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">, %arg2: !llvm.i64, %arg3: !llvm.i64, %arg4: !llvm.i64) -> !llvm.i64 {
-# CHECK-NEXT:     %0 = llvm.mlir.constant(1 : index) : !llvm.i64
-# CHECK-NEXT:     %1 = llvm.sub %arg2, %0 : !llvm.i64
-# CHECK-NEXT:     %2 = llvm.sub %arg3, %0 : !llvm.i64
-# CHECK-NEXT:     %3 = llvm.sub %arg4, %0 : !llvm.i64
-# CHECK-NEXT:     %4 = llvm.extractvalue %arg1[1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK-NEXT:     %5 = llvm.mlir.constant(0 : index) : !llvm.i64
-# CHECK-NEXT:     %6 = llvm.extractvalue %arg1[4, 0] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK-NEXT:     %7 = llvm.mul %3, %6 : !llvm.i64
-# CHECK-NEXT:     %8 = llvm.add %5, %7 : !llvm.i64
-# CHECK-NEXT:     %9 = llvm.extractvalue %arg1[4, 1] : !llvm<"{ i64*, i64*, i64, [3 x i64], [3 x i64] }">
-# CHECK-NEXT:     %10 = llvm.mul %2, %9 : !llvm.i64
-# CHECK-NEXT:     %11 = llvm.add %8, %10 : !llvm.i64
-# CHECK-NEXT:     %12 = llvm.mul %1, %0 : !llvm.i64
-# CHECK-NEXT:     %13 = llvm.add %11, %12 : !llvm.i64
-# CHECK-NEXT:     %14 = llvm.getelementptr %4[%13] : (!llvm<"i64*">, !llvm.i64) -> !llvm<"i64*">
-# CHECK-NEXT:     %15 = llvm.load %14 : !llvm<"i64*">
-# CHECK-NEXT:     llvm.return %15 : !llvm.i64
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64, Int64, Int64}"(%arg0: !llvm.ptr<struct<"jl_value_t", ()>>, %arg1: !llvm.ptr<i64>, %arg2: !llvm.ptr<i64>, %arg3: !llvm.i64, %arg4: !llvm.i64, %arg5: !llvm.i64, %arg6: !llvm.i64, %arg7: !llvm.i64, %arg8: !llvm.i64, %arg9: !llvm.i64, %arg10: !llvm.i64, %arg11: !llvm.i64, %arg12: !llvm.i64) -> !llvm.i64 {
+# CHECK-NEXT:     %0 = llvm.mlir.undef : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %1 = llvm.insertvalue %arg1, %0[0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %2 = llvm.insertvalue %arg2, %1[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %3 = llvm.insertvalue %arg3, %2[2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %4 = llvm.insertvalue %arg4, %3[3, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %5 = llvm.insertvalue %arg7, %4[4, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %6 = llvm.insertvalue %arg5, %5[3, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %7 = llvm.insertvalue %arg8, %6[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %8 = llvm.insertvalue %arg6, %7[3, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %9 = llvm.insertvalue %arg9, %8[4, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %10 = llvm.mlir.constant(1 : index) : !llvm.i64
+# CHECK-NEXT:     %11 = llvm.sub %arg10, %10 : !llvm.i64
+# CHECK-NEXT:     %12 = llvm.sub %arg11, %10 : !llvm.i64
+# CHECK-NEXT:     %13 = llvm.sub %arg12, %10 : !llvm.i64
+# CHECK-NEXT:     %14 = llvm.extractvalue %9[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %15 = llvm.mlir.constant(0 : index) : !llvm.i64
+# CHECK-NEXT:     %16 = llvm.extractvalue %9[4, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %17 = llvm.mul %13, %16 : !llvm.i64
+# CHECK-NEXT:     %18 = llvm.add %15, %17 : !llvm.i64
+# CHECK-NEXT:     %19 = llvm.extractvalue %9[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %20 = llvm.mul %12, %19 : !llvm.i64
+# CHECK-NEXT:     %21 = llvm.add %18, %20 : !llvm.i64
+# CHECK-NEXT:     %22 = llvm.mul %11, %10 : !llvm.i64
+# CHECK-NEXT:     %23 = llvm.add %21, %22 : !llvm.i64
+# CHECK-NEXT:     %24 = llvm.getelementptr %14[%23] : (!llvm.ptr<i64>, !llvm.i64) -> !llvm.ptr<i64>
+# CHECK-NEXT:     %25 = llvm.load %24 : !llvm.ptr<i64>
+# CHECK-NEXT:     llvm.return %25 : !llvm.i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
