@@ -577,8 +577,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
         return nullptr;
     }
 
+    std::string cabi_name = "ciface_" + name;
     ExecutionEngine *engine = expectedEngine.get().release();
-    auto expectedFPtr = engine->lookup(name);
+    auto expectedFPtr = engine->lookup(cabi_name);
     if (!expectedFPtr) {
         handleLLVMError(expectedFPtr.takeError());
         return nullptr;
