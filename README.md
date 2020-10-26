@@ -18,7 +18,7 @@ make -j `nproc` \
     LLVM_VER=svn \
     LLVM_DEBUG=0 \
     USE_MLIR=1 \
-    LLVM_GIT_VER="llvmorg-11.0.0"
+    LLVM_GIT_VER="094e9f4779eb9b5c6a49014f2f80b8cbb833572f" 
 cd ..
 
 # Build Brutus
