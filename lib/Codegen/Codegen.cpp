@@ -455,6 +455,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
     module.push_back(function);
 
+    // 4. Set `emit_c_interface`
+    function.setAttr("llvm.emit_c_interface", UnitAttr::get(ctx.context));
+
     if (dump_flags & DUMP_TRANSLATED) {
         llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
         module.dump();
