@@ -23,11 +23,10 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
       longType((sizeof(long) == 8)? int64Type : int32Type),
       mlirLongType((sizeof(long) == 8)?
                    IntegerType::get(64, ctx) : IntegerType::get(32, ctx)),
-      jlvalueType(LLVM::LLVMType::createStructTy(
-                      ctx, Optional<StringRef>("jl_value_t"))),
+      jlvalueType(LLVM::LLVMType::getStructTy(ctx)), // TODO: Add name
       pjlvalueType(jlvalueType.getPointerTo()),
       jlarrayType(
-          LLVM::LLVMType::createStructTy(
+          LLVM::LLVMType::getStructTy(
               ctx,
               llvm::makeArrayRef({
                       int8Type.getPointerTo(), // data
@@ -36,8 +35,7 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
                       int16Type, // elsize
                       int32Type, // offset
                       sizeType // nrows
-                  }),
-              {"jl_array_t"})),
+                  }))),
       pjlarrayType(jlarrayType.getPointerTo()) {
 
     static_assert(sizeof(jl_array_flags_t) == sizeof(int16_t));

@@ -447,38 +447,6 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
     }
 };
 
-// Based off `lib/Transforms/DialectConversion.cpp`
-struct FuncOpSignatureConversion : public OpConversionPattern<FuncOp> {
-  FuncOpSignatureConversion(MLIRContext *ctx, TypeConverter &converter)
-      : OpConversionPattern(converter, ctx) {}
-
-  /// Hook for derived classes to implement combined matching and rewriting.
-  LogicalResult
-  matchAndRewrite(FuncOp funcOp, ArrayRef<Value> operands,
-                  ConversionPatternRewriter &rewriter) const override {
-    FunctionType type = funcOp.getType();
-
-    if (funcOp.getAttr("jlir.wrapper"))
-        return success();
-
-    // Convert the original function types.
-    TypeConverter::SignatureConversion result(type.getNumInputs());
-    SmallVector<Type, 1> newResults;
-    if (failed(typeConverter->convertSignatureArgs(type.getInputs(), result)) ||
-        failed(typeConverter->convertTypes(type.getResults(), newResults)) ||
-        failed(rewriter.convertRegionTypes(&funcOp.getBody(), *typeConverter,
-                                           &result)))
-      return failure();
-
-    // Update the function signature in-place.
-    rewriter.updateRootInPlace(funcOp, [&] {
-      funcOp.setType(FunctionType::get(result.getConvertedTypes(), newResults,
-                                       funcOp.getContext()));
-    });
-    return success();
-  }
-};
-
 struct CallOpConversionPattern : public JLIRToStdConversionPattern<mlir::CallOp> {
     using JLIRToStdConversionPattern<mlir::CallOp>::JLIRToStdConversionPattern;
 
@@ -628,42 +596,6 @@ void mlir::jlir::populateJLIRToStdConversionPatterns(OwningRewritePatternList &p
 }
 
 namespace {
-    struct JLIREmitWrapperPass
-    : public PassWrapper<JLIREmitWrapperPass, OperationPass<ModuleOp>> {
-
-    void runOnOperation() override;
-};
-} // namespace
-
-void JLIREmitWrapperPass::runOnOperation() {
-    auto module = getOperation();
-
-    // Create wrapper
-    module.walk([&](FuncOp funcOp) {
-        if (funcOp.getAttr("jlir.wrapper"))
-            return;
-        OpBuilder builder(funcOp.getContext());
-        auto wrapper = builder.create<FuncOp>(
-            funcOp.getLoc(), llvm::formatv("br_{0}", funcOp.getName()).str(),
-            funcOp.getType());
-
-        wrapper.setAttr("jlir.wrapper", builder.getBoolAttr(true));
-
-        OpBuilder::InsertionGuard guard(builder);
-        builder.setInsertionPointToStart(wrapper.addEntryBlock());
-        auto call = builder.create<mlir::CallOp>(funcOp.getLoc(), funcOp, wrapper.getArguments());
-        builder.create<mlir::ReturnOp>(funcOp.getLoc(), call.getResults());
-
-        module.push_back(wrapper);
-    });
-}
-
-std::unique_ptr<OperationPass<ModuleOp>> mlir::jlir::createJLIREmitWrapperPass() {
-    return std::make_unique<JLIREmitWrapperPass>();
-}
-
-
-namespace {
 struct JLIRToStandardLoweringPass
     : public PassWrapper<JLIRToStandardLoweringPass, OperationPass<ModuleOp>> {
 
@@ -675,29 +607,11 @@ struct JLIRToStandardLoweringPass
 
 bool JLIRToStandardLoweringPass::isFuncOpLegal(
     FuncOp op, JLIRToStandardTypeConverter &converter) {
-    if (op.getAttr("jlir.wrapper"))
-        return true;
 
+    FunctionType ft = op.getType().cast<FunctionType>();
     // function is illegal if any of its input or result types can but haven't
     // been converted
-    FunctionType ft = op.getType().cast<FunctionType>();
-    for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
-        for (Type t : ts) {
-            if (JuliaType jt = t.dyn_cast<JuliaType>()) {
-                if (converter.convertJuliaType(jt).hasValue())
-                    return false;
-            }
-        }
-    }
-    return true;
-}
 
-bool JLIRToStandardLoweringPass::isCallOpLegal(
-    mlir::CallOp op, JLIRToStandardTypeConverter &converter) {
-
-    // CallOp is illegal if any of its input or result types can but haven't
-    // been converted
-    FunctionType ft = op.getCalleeType();
     for (ArrayRef<Type> ts : {ft.getInputs(), ft.getResults()}) {
         for (Type t : ts) {
             if (JuliaType jt = t.dyn_cast<JuliaType>()) {
@@ -726,11 +640,7 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
-    target.addDynamicallyLegalOp<mlir::CallOp>([this, &converter](mlir::CallOp op) {
-        return isCallOpLegal(op, converter);
-    });
-    patterns.insert<CallOpConversionPattern>(&getContext(), converter);
-    patterns.insert<FuncOpSignatureConversion>(&getContext(), converter);
+    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
 
     if (failed(applyPartialConversion(
                     module, target, patterns)))

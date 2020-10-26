@@ -25,9 +25,6 @@ void populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns,
                                          MLIRContext &context,
                                          JLIRToStandardTypeConverter &converter);
 
-/// Create a pass to create a wrapper with `br` abi
-std::unique_ptr<OperationPass<ModuleOp>> createJLIREmitWrapperPass();
-
 /// Create a pass to convert JLIR operations to the Standard dialect.
 std::unique_ptr<OperationPass<ModuleOp>> createJLIRToStandardLoweringPass();
 
