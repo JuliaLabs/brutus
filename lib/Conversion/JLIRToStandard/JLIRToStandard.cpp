@@ -413,7 +413,8 @@ struct ArraysetOpLowering : public JLIRToStdConversionPattern<Builtin_arrayset> 
                 }
             }
 
-            rewriter.replaceOpWithNewOp<StoreOp>(op, operands[2], memref, indices);
+            rewriter.create<StoreOp>(op.getLoc(), operands[2], memref, indices);
+            rewriter.replaceOp(op, operands[1]);
             return success();
         }
         return failure();
