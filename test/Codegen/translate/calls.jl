@@ -9,7 +9,7 @@ emit(calls)
 
 
 # CHECK: module {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 {
+# CHECK-NEXT:   func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.unimplemented"() : () -> !jlir.Int16

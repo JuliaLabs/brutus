@@ -12,7 +12,7 @@ emit(gauss, Int64)
 
 
 # CHECK: module {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !jlir<"typeof(Main.gauss)">, %arg1: i64) -> i64 {
+# CHECK-NEXT:   func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !jlir<"typeof(Main.gauss)">, %arg1: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c1_i64 = constant 1 : i64
 # CHECK-NEXT:     %c0_i64 = constant 0 : i64
 # CHECK-NEXT:     %false = constant false
@@ -55,7 +55,7 @@ emit(gauss, Int64)
 # CHECK-NEXT: }
 
 # CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"jl_value_t", ()>>, %arg1: !llvm.i64) -> !llvm.i64 {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<()>>, %arg1: !llvm.i64) -> !llvm.i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = llvm.mlir.constant({{[0-9]+}} : i64) : !llvm.i64
 # CHECK-NEXT:     %1 = llvm.mlir.constant({{[0-9]+}} : i64) : !llvm.i64
 # CHECK-NEXT:     %2 = llvm.mlir.constant(false) : !llvm.i1
@@ -85,5 +85,9 @@ emit(gauss, Int64)
 # CHECK-NEXT:     llvm.cond_br %22, ^bb3(%19, %20, %15 : !llvm.i64, !llvm.i64, !llvm.i64), ^bb7(%15 : !llvm.i64)
 # CHECK-NEXT:   ^bb7(%23: !llvm.i64):  // 2 preds: ^bb2, ^bb6
 # CHECK-NEXT:     llvm.return %23 : !llvm.i64
+# CHECK-NEXT:   }
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<()>>, %arg1: !llvm.i64) -> !llvm.i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     %0 = llvm.call @"Tuple{typeof(Main.gauss), Int64}"(%arg0, %arg1) : (!llvm.ptr<struct<()>>, !llvm.i64) -> !llvm.i64
+# CHECK-NEXT:     llvm.return %0 : !llvm.i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }

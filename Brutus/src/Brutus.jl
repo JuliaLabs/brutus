@@ -89,7 +89,7 @@ function Base.convert(::Type{MemrefDescriptor{T, N}}, arr::Array{T, N}) where {T
     aligned   = pointer(arr)
     offset    = Int64(0)
     size      = Base.size(arr)
-    strides   = cumprod(size)
+    strides   = (1, cumprod(size)[1:end-1]...)
 
     # colum-major to row-major
     size = reverse(size)
