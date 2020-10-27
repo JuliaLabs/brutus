@@ -9,7 +9,7 @@ emit(a, Int64)
 
 
 # CHECK: module {
-# CHECK-NEXT:   func @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any {
+# CHECK-NEXT:   func @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"typeof(getfield)()">} : () -> !jlir<"typeof(getfield)">

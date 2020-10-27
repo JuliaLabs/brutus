@@ -1,6 +1,8 @@
 using Brutus
 using Test
 
+@testset "Brutus" begin
+
 @test Brutus.call(identity, 1) == identity(1)
 @test Brutus.call(identity, 3.141592653) == identity(3.141592653)
 # @test Brutus.call(identity, pi) == identity(pi)
@@ -34,6 +36,20 @@ end
 index(A, i) = A[i]
 index(A, i, j) = A[i, j]
 index(A, i, j, k) = A[i, j, k]
+
+@testset "3D indexing" begin
+    thunk = Brutus.thunk(index, Tuple{Array{Int,3}, Int, Int, Int})
+
+    arr = Int[i*j*k for i in 1:3, j in 1:5, k in 1:7]
+    for i in 1:3
+        for j in 1:5
+            for k in 1:7
+                @test arr[i,j,k] == thunk(arr, i, j, k)
+            end
+        end
+    end
+end
+
 function customsum(A)
     acc = 0
     for i in CartesianIndices(A)
@@ -50,5 +66,6 @@ for array in [rand(Int64, 2, 3), rand(Int64, 2, 3)]
         @test Brutus.call(index, array, i...) == index(array, i...)
     end
     @test Brutus.call(customsum, array) == customsum(array)
+end
 end
 # TODO: arrays with floating point elements

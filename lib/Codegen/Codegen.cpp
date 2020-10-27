@@ -17,6 +17,9 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
+#include "mlir/Target/LLVMIR.h"
+
+#include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 using namespace mlir;
 using namespace mlir::jlir;
@@ -105,7 +108,7 @@ mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
         auto op = ctx.builder.create<UnimplementedOp>(loc, type);
         return op.getResult();
     } else {
-        auto op = ctx.builder.create<ConstantOp>(loc, value, type);
+        auto op = ctx.builder.create<jlir::ConstantOp>(loc, value, type);
         return op.getResult();
     }
 }
@@ -159,7 +162,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
         for (unsigned i = 1; i < nargs; ++i) {
             arguments.push_back(emit_value(ctx, loc, args[i]));
         }
-        auto op = ctx.builder.create<CallOp>(loc, callee, arguments, type);
+        auto op = ctx.builder.create<jlir::CallOp>(loc, callee, arguments, type);
         return op.getResult();
 
     } else {
@@ -348,7 +351,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 // unreachable terminator, so return undef
                 value = ctx.builder.create<UndefOp>(loc, ret);
             }
-            ctx.builder.create<ReturnOp>(loc, value);
+            ctx.builder.create<jlir::ReturnOp>(loc, value);
             is_terminator = true;
 
         } else if (jl_is_gotonode(stmt)) {
@@ -421,13 +424,18 @@ enum DumpOption {
     DUMP_CANONICALIZED   = 2,
     DUMP_LOWERED_TO_STD  = 4,
     DUMP_LOWERED_TO_LLVM = 8,
+    DUMP_TRANSLATE_TO_LLVM = 16,
 };
 
 ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
                                          jl_method_instance_t *entry_mi,
                                          char emit_fptr,
                                          char dump_flags) {
-    mlir::MLIRContext context;
+    mlir::MLIRContext context(/*loadAllDialects*/ false);
+    // Load our Dialect in this MLIR Context
+    context.getOrLoadDialect<JLIRDialect>();
+    context.getOrLoadDialect<StandardOpsDialect>();
+
     jl_mlirctx_t ctx(&context);
 
     jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t*)entry_mi);
@@ -446,6 +454,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
     std::string name = mi_name(entry_mi);
     mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
     module.push_back(function);
+
+    // 4. Set `emit_c_interface`
+    function.setAttr("llvm.emit_c_interface", UnitAttr::get(ctx.context));
 
     if (dump_flags & DUMP_TRANSLATED) {
         llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
@@ -528,11 +539,20 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
         return nullptr;
     }
 
+    if (dump_flags & DUMP_TRANSLATE_TO_LLVM) {
+        llvm::LLVMContext llvmContext;
+        auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
+        llvm::dbgs() << "after lowering to LLVM IR:";
+        Mod->print(llvm::dbgs(), nullptr);
+        llvm::dbgs() << "\n\n";
+        return nullptr;
+    }
+
     if (!emit_fptr) {
         return nullptr;
     }
 
-    // see mlir/lib/Support/JitRunner.cpp
+    // see mlir/lib/ExecutionEngine/JitRunner.cpp
 
     Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
         llvm::CodeGenOpt::Aggressive;
@@ -557,8 +577,9 @@ ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
         return nullptr;
     }
 
+    std::string cabi_name = "ciface_" + name;
     ExecutionEngine *engine = expectedEngine.get().release();
-    auto expectedFPtr = engine->lookup(name);
+    auto expectedFPtr = engine->lookup(cabi_name);
     if (!expectedFPtr) {
         handleLLVMError(expectedFPtr.takeError());
         return nullptr;

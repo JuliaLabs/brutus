@@ -6,7 +6,7 @@ emit(hasunreachable, Float64)
 
 
 # CHECK: module {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.hasunreachable), Float64}"(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64 {
+# CHECK-NEXT:   func @"Tuple{typeof(Main.hasunreachable), Float64}"(%arg0: !jlir<"typeof(Main.hasunreachable)">, %arg1: !jlir.Float64) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #33 lt_float>">} : () -> !jlir.Core.IntrinsicFunction

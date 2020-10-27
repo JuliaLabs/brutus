@@ -10,6 +10,7 @@ end
     DumpCanonicalized = 2
     DumpLoweredToStd  = 4
     DumpLoweredToLLVM = 8
+    DumpTranslateToLLVM = 16
 end
 
 function find_invokes(IR)
@@ -72,27 +73,75 @@ function emit(@nospecialize(ft), @nospecialize(tt);
     return fptr, rt
 end
 
-@generated function call(f, args...)
-    result = emit(f, args)
+###
+# Call Interface
+###
+
+struct MemrefDescriptor{T, N}
+    allocated :: Ptr{T}
+    aligned   :: Ptr{T}
+    offset    :: Int64
+    size      :: NTuple{N, Int64}
+    strides   :: NTuple{N, Int64}
+end
+function Base.convert(::Type{MemrefDescriptor{T, N}}, arr::Array{T, N}) where {T, N}
+    allocated = pointer(arr)
+    aligned   = pointer(arr)
+    offset    = Int64(0)
+    size      = Base.size(arr)
+    strides   = (1, cumprod(size)[1:end-1]...)
+
+    # colum-major to row-major
+    size = reverse(size)
+    strides = reverse(strides)
+
+    MemrefDescriptor{T, N}(allocated, aligned, offset, size, strides)
+end
+
+struct Thunk{F, RT, TT}
+    f::F
+    ptr::Ptr{Cvoid}
+end
+
+function thunk(f::F, tt::TT=Tuple{}) where {F<:Base.Callable, TT<:Type}
+    # TODO: Use GPUCompiler.cached_compilation
+    result = emit(F, (tt.parameters...,))
     if result === nothing
         error("failed to emit function")
     end
     fptr, rt, = result
-    convert_type(t) = isprimitivetype(t) ? t : Any
-    converted_args = collect(map(convert_type, args))
-    return quote
-        arg_pointers = Ref[
-            Base.unsafe_convert(Ptr{Cvoid}, Ref{$(convert_type(f))}(f))]
-        for i in 1:length(args)
-            push!(arg_pointers,
-                  Base.unsafe_convert(
-                      Ptr{Cvoid}, Ref{$converted_args[i]}(args[i])))
-        end
-        push!(arg_pointers, Ref{$(convert_type(rt))}())
-        # ccall(:jl_breakpoint, Cvoid, (Ptr{Ptr{Cvoid}},), arg_pointers)
-        ccall($fptr, Cvoid, (Ptr{Ptr{Cvoid}},), arg_pointers)
-        arg_pointers[end][]
+    Thunk{F, rt, tt}(f, fptr)
+end
+
+# Need to pass struct as pointer, to match cifacme ABI
+abi(::Type{<:Array{T, N}}) where {T, N} = Ref{MemrefDescriptor{T, N}} 
+function abi(T::DataType)
+    if isprimitivetype(T)
+        return T
+    else
+        return Any
     end
+end
+
+@inline (thunk::Thunk)(args...) = __call(thunk, args)
+
+@generated function __call(thunk::Thunk{f, RT, TT}, args::TT) where {f, RT, TT}
+    nargs = map(abi, (args.parameters...,))
+    _args = (:(args[$i]) for i in 1:length(nargs))
+
+    # Insert function type up-front
+    nargs = (Any, nargs...)
+
+    expr = quote
+        ccall(:jl_breakpoint, Cvoid, (Any,), thunk.ptr)
+        ccall(thunk.ptr, $(abi(RT)), ($(nargs...),), thunk.f, $(_args...))::RT
+    end
+    return expr
+end
+
+function call(f::F, args...) where F
+    TT = Tuple{map(Core.Typeof, args)...}
+    return thunk(f, TT)(args...)
 end
 
 function get_methodinstance(@nospecialize(sig);

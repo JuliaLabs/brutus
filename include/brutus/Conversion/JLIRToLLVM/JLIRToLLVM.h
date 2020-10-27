@@ -27,7 +27,7 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
     LLVM::LLVMType jlarrayType;
     LLVM::LLVMType pjlarrayType;
 
-    JLIRToLLVMTypeConverter(MLIRContext *ctx);
+    JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOptions options);
     LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt);
     LLVM::LLVMType julia_struct_to_llvm(jl_value_t *jt);
     LLVM::LLVMType julia_type_to_llvm(jl_value_t *jt);
@@ -36,6 +36,10 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
 
 struct JLIRToLLVMLoweringPass
     : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
+
+    void getDependentDialects(DialectRegistry &registry) const override {
+        registry.insert<LLVM::LLVMDialect>();
+    }
 
     void runOnFunction() final;
 };

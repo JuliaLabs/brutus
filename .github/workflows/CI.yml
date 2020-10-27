@@ -10,8 +10,8 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         julia-repository: [JuliaLang/julia]
-        julia-commit: [8c03bf7ebf0e08c385aede65f9388247945d8fbb]
-        llvm-commit: [176249bd6732a8044d457092ed932768724a6f06] # LLVM 11
+        julia-commit: [5921fe8ecf176296b4aa7704371cb7f0c583e45e]
+        llvm-commit: [094e9f4779eb9b5c6a49014f2f80b8cbb833572f] # LLVM 12
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
