@@ -448,24 +448,6 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
     }
 };
 
-struct CallOpConversionPattern : public JLIRToStdConversionPattern<mlir::CallOp> {
-    using JLIRToStdConversionPattern<mlir::CallOp>::JLIRToStdConversionPattern;
-
-    LogicalResult matchAndRewrite(mlir::CallOp op,
-                                  ArrayRef<Value> operands,
-                                  ConversionPatternRewriter &rewriter) const override {
-        FunctionType type = op.getCalleeType();
-
-        SmallVector<Type, 1> convertedResults;
-        if (failed(typeConverter->convertTypes(type.getResults(), convertedResults))) {
-            return failure();
-        }
-
-        rewriter.replaceOpWithNewOp<mlir::CallOp>(op, op.callee(), convertedResults, operands);
-        return success();
-    }
-};
-
 } // namespace
 
 void mlir::jlir::populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns, 

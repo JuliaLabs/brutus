@@ -1,7 +1,7 @@
 module Brutus
 
 function __init__()
-    ccall((:brutus_init, "libbrutus"), Cvoid, ())
+    ccall((:brutus_init, "libbrutus"), Cvoid, (Any,), @__MODULE__)
 end
 
 @enum DumpOption::UInt8 begin
@@ -84,6 +84,7 @@ struct MemrefDescriptor{T, N}
     size      :: NTuple{N, Int64}
     strides   :: NTuple{N, Int64}
 end
+
 function Base.convert(::Type{MemrefDescriptor{T, N}}, arr::Array{T, N}) where {T, N}
     allocated = pointer(arr)
     aligned   = pointer(arr)
@@ -133,7 +134,6 @@ end
     nargs = (Any, nargs...)
 
     expr = quote
-        ccall(:jl_breakpoint, Cvoid, (Any,), thunk.ptr)
         ccall(thunk.ptr, $(abi(RT)), ($(nargs...),), thunk.f, $(_args...))::RT
     end
     return expr

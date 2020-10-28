@@ -11,7 +11,7 @@ extern "C" {
 
 typedef void (*ExecutionEngineFPtrResult)(void **);
 
-void brutus_init();
+void brutus_init(jl_module_t* brutus);
 ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
                                          jl_method_instance_t *entry_mi,
                                          char emit_fptr,
