@@ -9,10 +9,10 @@ optimisations for Julia.
 ## Setting it up
 
 ```
-# Build Julia with LLVM 11 and MLIR
+# Build Julia with LLVM 12 and MLIR
 git clone https://github.com/JuliaLang/julia
 cd julia
-git checkout master
+git checkout e3da30c21747f5dbd9c9c59a825bf3435e32aad2
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     LLVM_VER=svn \
