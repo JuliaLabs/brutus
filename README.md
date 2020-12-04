@@ -11,6 +11,8 @@ optimisations for Julia.
 ```shell
 #!/bin/bash
 
+# Creates a development directory under `brutus_dev` in the current working directory.
+
 JULIA_COMMIT_HEAD=e3da30c21747f5dbd9c9c59a825bf3435e32aad2
 LLVM_COMMIT_HEAD=094e9f4779eb9b5c6a49014f2f80b8cbb833572f
 DEV_DIR=brutus_dev
