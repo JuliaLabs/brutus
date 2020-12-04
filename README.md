@@ -18,34 +18,25 @@ DEVPATH=$(pwd)/$DEV_DIR
 JULIA_PATH="$DEVPATH/julia"
 
 # Create development dir.
-printf "\u001b[34m\e[1mMaking $DEV_DIR dir.\u001b[0m\n"
 mkdir $DEV_DIR
-printf "\u001b[34m\e[1mEntering $DEV_DIR dir.\u001b[0m\n"
 cd $DEV_DIR
 
 # Build a development version of Julia with LLVM 12 and MLIR.
-printf "\u001b[34m\e[1mCloning Julia into julia.\u001b[0m\n"
 git clone https://github.com/JuliaLang/julia
-printf "\u001b[34m\e[1mEntering julia dir.\u001b[0m\n"
 cd julia
 git checkout $JULIA_COMMIT_HEAD
-printf "\u001b[34m\e[1mBuilding dev version of Julia.\u001b[0m\n"
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     LLVM_VER=svn \
     LLVM_DEBUG=2 \
     USE_MLIR=1 \
     LLVM_GIT_VER="$LLVM_COMMIT_HEAD"
-printf "\u001b[34m\e[1mFinished building dev version of Julia.\u001b[0m\n"
-printf "Exiting julia dir."
 cd ..
 
 # Build brutus.
 git clone https://github.com/JuliaLabs/brutus
-printf "\u001b[34m\e[1mEntering brutus dir.\u001b[0m\n"
 cd brutus
 mkdir build
-printf "\u001b[34m\e[1mEntering brutus/build dir.\u001b[0m\n"
 cd build
 cmake .. -GNinja \
     -DMLIR_DIR="${JULIA_PATH}/usr/lib/cmake/mlir" \
