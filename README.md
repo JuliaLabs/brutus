@@ -14,8 +14,8 @@ optimisations for Julia.
 JULIA_COMMIT_HEAD=e3da30c21747f5dbd9c9c59a825bf3435e32aad2
 LLVM_COMMIT_HEAD=094e9f4779eb9b5c6a49014f2f80b8cbb833572f
 DEV_DIR=brutus_dev
-DEVPATH=$(pwd)/$DEV_DIR
-JULIA_PATH="$DEVPATH/julia"
+DEV_PATH=$(pwd)/$DEV_DIR
+JULIA_PATH="$DEV_PATH/julia"
 
 # Create development dir.
 mkdir $DEV_DIR
@@ -46,7 +46,7 @@ cmake .. -GNinja \
     -DCMAKE_BUILD_TYPE=Release
 
 # Test brutus.
-LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(DEVPATH)/julia/julia --project=../Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
+LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:$(DEV_PATH)/julia/julia --project=../Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 ninja check-brutus
 ```
 
