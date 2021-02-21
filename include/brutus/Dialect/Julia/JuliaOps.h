@@ -2,7 +2,7 @@
 #define JL_DIALECT_JLIR_H
 
 #include "mlir/IR/Dialect.h"
-#include "mlir/IR/Function.h"
+#include "mlir/IR/Builders.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "julia.h"

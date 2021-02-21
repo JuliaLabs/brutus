@@ -46,11 +46,6 @@ class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$arguments);
     let results = (outs JLIR_JuliaType);
-
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_datatype_t *type, ArrayRef<Value> arguments">
-    ];
 }
 
 class JLIR_ArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
@@ -80,11 +75,8 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
         unimplemented
     }];
 
+    let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType);
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_datatype_t *type = jl_any_type">
-    ];
 }
 
 def UndefOp : JLIR_Op<"undef"> {
@@ -94,9 +86,6 @@ def UndefOp : JLIR_Op<"undef"> {
     }];
 
     let results = (outs JLIR_JuliaType);
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state">
-    ];
 }
 
 def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
@@ -107,10 +96,6 @@ def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
 
     let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType);
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_value_t *value, jl_datatype_t *type = jl_any_type">
-    ];
 
     // Set the folder bit so that we can implement constant folders.
     let hasFolder = 1;
@@ -129,12 +114,6 @@ def CallOp : JLIR_Op<"call"> {
     // The generic call operation returns a single value of TensorType.
     let results = (outs JLIR_JuliaType);
 
-    // Add custom build methods for the generic call operation.
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "Value callee, ArrayRef<Value> arguments, jl_datatype_t *type">
-    ];
-
     let hasCanonicalizer = 1;
 }
 
@@ -147,14 +126,8 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
                          JLIR_JuliaType:$callee,
                          Variadic<JLIR_JuliaType>:$arguments);
-
+    
     let results = (outs JLIR_JuliaType);
-
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "jl_method_instance_t *methodInstance, Value callee,"
-                  "ArrayRef<Value> arguments, jl_datatype_t *type">
-    ];
 }
 
 def GotoOp : JLIR_Op<"goto", [Terminator]> {
@@ -165,12 +138,6 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$operands);
     let successors = (successor AnySuccessor:$dest);
-
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state, Block *dest,"
-                  "ValueRange operands = {}",
-                  [{ build(builder, state, operands, dest); }]>
-    ];
 }
 
 def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
@@ -182,18 +149,9 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let arguments = (ins JLIR_JuliaType:$condition,
                      Variadic<JLIR_JuliaType>:$branchOperands,
                      Variadic<JLIR_JuliaType>:$fallthroughOperands);
-    let successors = (successor AnySuccessor:$branchDest, AnySuccessor:$fallthroughDest);
-
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state, Value condition,"
-                  "Block *branchDest, ValueRange branchOperands,"
-                  "Block *fallthroughDest, ValueRange fallthroughOperands",
-                  [{
-                      build(builder, state, condition,
-                            branchOperands, fallthroughOperands,
-                            branchDest, fallthroughDest);
-                  }]>
-    ];
+    
+    let successors = (successor AnySuccessor:$branchDest, 
+                      AnySuccessor:$fallthroughDest);
 }
 
 def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
@@ -227,17 +185,11 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
 
     let arguments = (ins JLIR_JuliaType:$input);
     let results = (outs JLIR_JuliaType);
-    let builders = [
-        OpBuilder<"OpBuilder &builder, OperationState &state,"
-                  "Value value, jl_datatype_t *type">
-    ];
 }
 
 def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
     let summary = "JLIR-Standard type conversion operation";
-    let description = [{
-        TODO
-    }];
+    let description = [{}];
 
     let arguments = (ins AnyType:$input);
     let results = (outs AnyType:$output);

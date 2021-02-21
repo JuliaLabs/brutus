@@ -3,7 +3,7 @@
 
 #include "juliapriv/julia_private.h"
 
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Types.h"
 
 #include "llvm/Support/SwapByteOrder.h"
 

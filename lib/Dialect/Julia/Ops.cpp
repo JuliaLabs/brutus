@@ -2,7 +2,7 @@
 
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Types.h"
 
 using namespace mlir;
 using namespace mlir::jlir;

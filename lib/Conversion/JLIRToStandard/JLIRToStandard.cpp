@@ -2,7 +2,7 @@
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Types.h"
 
 #include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
 
