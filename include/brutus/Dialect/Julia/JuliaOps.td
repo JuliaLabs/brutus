@@ -160,6 +160,10 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$operands);
     let successors = (successor AnySuccessor:$dest);
+    let builders = [
+        OpBuilderDAG<(ins "Block *":$dest, "ValueRange":$operands),
+                  [{ build($_builder, $_state, operands, dest); }]>
+    ];
 }
 
 def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
@@ -174,6 +178,19 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     
     let successors = (successor AnySuccessor:$branchDest, 
                       AnySuccessor:$fallthroughDest);
+
+    let builders = [
+        OpBuilderDAG<(ins "Value":$condition,
+                          "Block *":$branchDest, 
+                          "ValueRange":$branchOperands,
+                          "Block *":$fallthroughDest, 
+                          "ValueRange":$fallthroughOperands),
+                  [{
+                      build($_builder, $_state, condition,
+                            branchOperands, fallthroughOperands,
+                            branchDest, fallthroughDest);
+                  }]>
+    ];
 }
 
 def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
