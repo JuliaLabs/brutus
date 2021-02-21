@@ -13,25 +13,25 @@ namespace jlir {
 
 struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
     LLVM::LLVMDialect *llvmDialect;
-    LLVM::LLVMType voidType;
-    LLVM::LLVMType int1Type;
-    LLVM::LLVMType int8Type;
-    LLVM::LLVMType int16Type;
-    LLVM::LLVMType int32Type;
-    LLVM::LLVMType int64Type;
-    LLVM::LLVMType sizeType;
-    LLVM::LLVMType longType;
+    Type voidType;
+    Type int1Type;
+    Type int8Type;
+    Type int16Type;
+    Type int32Type;
+    Type int64Type;
+    Type sizeType;
+    Type longType;
     Type           mlirLongType;
-    LLVM::LLVMType jlvalueType;
-    LLVM::LLVMType pjlvalueType;
-    LLVM::LLVMType jlarrayType;
-    LLVM::LLVMType pjlarrayType;
+    Type jlvalueType;
+    Type pjlvalueType;
+    Type jlarrayType;
+    Type pjlarrayType;
 
     JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOptions options);
-    LLVM::LLVMType julia_bitstype_to_llvm(jl_value_t *bt);
-    LLVM::LLVMType julia_struct_to_llvm(jl_value_t *jt);
-    LLVM::LLVMType julia_type_to_llvm(jl_value_t *jt);
-    LLVM::LLVMType INTT(LLVM::LLVMType t);
+    Type julia_bitstype_to_llvm(jl_value_t *bt);
+    Type julia_struct_to_llvm(jl_value_t *jt);
+    Type julia_type_to_llvm(jl_value_t *jt);
+    Type INTT(Type t);
 };
 
 struct JLIRToLLVMLoweringPass

@@ -97,17 +97,17 @@ Type JLIRToStandardTypeConverter::convertBitstype(jl_datatype_t *jdt) {
     assert(jl_is_primitivetype(jdt));
     if (jdt == jl_bool_type) {
         // convert to i1 even though Julia converts to i8
-        return IntegerType::get(1, ctx);
+        return IntegerType::get(ctx, 1);
     } else if (jdt == jl_int32_type)
-        return IntegerType::get(32, ctx);
+        return IntegerType::get(ctx, 32);
     else if (jdt == jl_int64_type)
-        return IntegerType::get(64, ctx);
+        return IntegerType::get(ctx, 64);
     else if (jdt == jl_float32_type)
         return FloatType::getF32(ctx);
     else if (jdt == jl_float64_type)
         return FloatType::getF64(ctx);
     int nb = jl_datatype_size(jdt);
-    return IntegerType::get(nb * 8, ctx);
+    return IntegerType::get(ctx, nb * 8);
 }
 
 namespace {

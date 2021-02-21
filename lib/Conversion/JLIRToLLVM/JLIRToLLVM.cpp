@@ -13,20 +13,20 @@ using namespace jlir;
 JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOptions options)
     : LLVMTypeConverter(ctx, options),
       llvmDialect(ctx->getOrLoadDialect<LLVM::LLVMDialect>()),
-      voidType(LLVM::LLVMType::getVoidTy(ctx)),
-      int1Type(LLVM::LLVMType::getInt1Ty(ctx)),
-      int8Type(LLVM::LLVMType::getInt8Ty(ctx)),
-      int16Type(LLVM::LLVMType::getInt16Ty(ctx)),
-      int32Type(LLVM::LLVMType::getInt32Ty(ctx)),
-      int64Type(LLVM::LLVMType::getInt64Ty(ctx)),
+      voidType(Type::getVoidTy(ctx)),
+      int1Type(Type::getInt1Ty(ctx)),
+      int8Type(Type::getInt8Ty(ctx)),
+      int16Type(Type::getInt16Ty(ctx)),
+      int32Type(Type::getInt32Ty(ctx)),
+      int64Type(Type::getInt64Ty(ctx)),
       sizeType((sizeof(size_t) == 8)? int64Type : int32Type),
       longType((sizeof(long) == 8)? int64Type : int32Type),
       mlirLongType((sizeof(long) == 8)?
-                   IntegerType::get(64, ctx) : IntegerType::get(32, ctx)),
-      jlvalueType(LLVM::LLVMType::getStructTy(ctx)), // TODO: Add name
+                   IntegerType::get(ctx, 64) : IntegerType::get(ctx, 32)),
+      jlvalueType(Type::getStructTy(ctx)), // TODO: Add name
       pjlvalueType(jlvalueType.getPointerTo()),
       jlarrayType(
-          LLVM::LLVMType::getStructTy(
+          Type::getStructTy(
               ctx,
               llvm::makeArrayRef({
                       int8Type.getPointerTo(), // data
@@ -49,7 +49,7 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
     voidType = pjlvalueType;
 }
 
-LLVM::LLVMType JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
+Type JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
     assert(jl_is_primitivetype(bt));
     // TODO: jl_bool_type is actually i8, but llvm expects i1
     if (bt == (jl_value_t*)jl_bool_type)
@@ -59,16 +59,16 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt) {
     if (bt == (jl_value_t*)jl_int64_type)
         return int64Type;
     // if (llvmcall && (bt == (jl_value_t*)jl_float16_type))
-    //     return LLVM::LLVMType::getHalfTy(llvmDialect);
+    //     return Type::getHalfTy(llvmDialect);
     if (bt == (jl_value_t*)jl_float32_type)
-        return LLVM::LLVMType::getFloatTy(&getContext());
+        return Type::getFloatTy(&getContext());
     if (bt == (jl_value_t*)jl_float64_type)
-        return LLVM::LLVMType::getDoubleTy(&getContext());
+        return Type::getDoubleTy(&getContext());
     int nb = jl_datatype_size(bt);
-    return LLVM::LLVMType::getIntNTy(&getContext(), nb * 8);
+    return Type::getIntNTy(&getContext(), nb * 8);
 }
 
-LLVM::LLVMType JLIRToLLVMTypeConverter::julia_struct_to_llvm(jl_value_t *jt) {
+Type JLIRToLLVMTypeConverter::julia_struct_to_llvm(jl_value_t *jt) {
     // this function converts a Julia Type into the equivalent LLVM struct
     // use this where C-compatible (unboxed) structs are desired
     // use julia_type_to_llvm directly when you want to preserve Julia's
@@ -92,7 +92,7 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::julia_struct_to_llvm(jl_value_t *jt) {
     return pjlvalueType; // prjlvalue?
 }
 
-LLVM::LLVMType JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt) {
+Type JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt) {
     if (jt == jl_bottom_type || jt == (jl_value_t*)jl_void_type)
         return voidType;
     if (jl_is_concrete_immutable(jt)) {
@@ -105,7 +105,7 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt) {
 }
 
 // convert an LLVM type to same-sized int type
-LLVM::LLVMType JLIRToLLVMTypeConverter::INTT(LLVM::LLVMType t) {
+Type JLIRToLLVMTypeConverter::INTT(Type t) {
     if (t.isIntegerTy()) {
         return t;
     } else if (t.isPointerTy()) {
@@ -124,7 +124,7 @@ LLVM::LLVMType JLIRToLLVMTypeConverter::INTT(LLVM::LLVMType t) {
 
     unsigned nbits = t.getPrimitiveSizeInBits();
     assert(t != voidType && nbits > 0);
-    return LLVM::LLVMType::getIntNTy(&getContext(), nbits);
+    return Type::getIntNTy(&getContext(), nbits);
 }
 
 namespace {
@@ -144,12 +144,12 @@ struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp> {
         //       have a type yet
 
         assert(a.getType() == b.getType());
-        LLVM::LLVMType t = a.getType().dyn_cast<LLVM::LLVMType>();
+        Type t = a.getType().dyn_cast<Type>();
 
         if (t.isIntegerTy() || t.isPointerTy()
             || t.isFloatingPointTy()) {
 
-            LLVM::LLVMType t_int = lowering.INTT(t);
+            Type t_int = lowering.INTT(t);
             if (t != t_int) {
                 a = rewriter.create<LLVM::BitcastOp>(loc, t_int, a).getResult();
                 b = rewriter.create<LLVM::BitcastOp>(loc, t_int, b).getResult();
@@ -312,7 +312,7 @@ struct ConstantOpLowering : public OpAndTypeConversionPattern<ConstantOp> {
                                   ConversionPatternRewriter &rewriter) const override {
         jl_value_t *value = op.value();
         jl_datatype_t *julia_type = op.getType().cast<JuliaType>().getDatatype();
-        LLVM::LLVMType llvm_type = lowering.convertType(op.getType()).cast<LLVM::LLVMType>();
+        Type llvm_type = lowering.convertType(op.getType()).cast<Type>();
 
         if (llvm_type == lowering.voidType) {
             rewriter.replaceOp(
