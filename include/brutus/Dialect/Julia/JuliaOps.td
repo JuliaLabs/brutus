@@ -76,7 +76,10 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
     }];
 
     let arguments = (ins JLIR_JuliaValueAttr:$value);
-    let results = (outs JLIR_JuliaType);
+    let results = (outs JLIR_JuliaType:$type);
+    let builders = [
+        OpBuilderDAG<(ins "jl_datatype_t *":$type)>
+    ];
 }
 
 def UndefOp : JLIR_Op<"undef"> {
@@ -86,6 +89,9 @@ def UndefOp : JLIR_Op<"undef"> {
     }];
 
     let results = (outs JLIR_JuliaType);
+    let builders = [
+        OpBuilderDAG<(ins)>
+    ];
 }
 
 def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
@@ -96,6 +102,9 @@ def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
 
     let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType);
+    let builders = [
+        OpBuilderDAG<(ins "jl_value_t *":$value, "jl_datatype_t *":$type)>
+    ];
 
     // Set the folder bit so that we can implement constant folders.
     let hasFolder = 1;
@@ -114,6 +123,12 @@ def CallOp : JLIR_Op<"call"> {
     // The generic call operation returns a single value of TensorType.
     let results = (outs JLIR_JuliaType);
 
+    let builders = [
+        OpBuilderDAG<(ins "Value":$callee,
+                          "ArrayRef<Value>":$arguments,
+                          "jl_datatype_t *":$type)>
+    ];
+
     let hasCanonicalizer = 1;
 }
 
@@ -126,8 +141,15 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
                          JLIR_JuliaType:$callee,
                          Variadic<JLIR_JuliaType>:$arguments);
-    
+   
     let results = (outs JLIR_JuliaType);
+    
+    let builders = [
+        OpBuilderDAG<(ins "jl_method_instance_t *":$methodInstance, 
+                          "Value":$callee,
+                          "ArrayRef<Value>":$arguments,
+                          "jl_datatype_t *":$type)>
+    ];
 }
 
 def GotoOp : JLIR_Op<"goto", [Terminator]> {
@@ -185,6 +207,9 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
 
     let arguments = (ins JLIR_JuliaType:$input);
     let results = (outs JLIR_JuliaType);
+    let builders = [
+        OpBuilderDAG<(ins "Value":$value, "jl_datatype_t *":$type)>
+    ];
 }
 
 def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {

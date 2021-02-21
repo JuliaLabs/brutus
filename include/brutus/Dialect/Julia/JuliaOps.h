@@ -3,6 +3,7 @@
 
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Builders.h"
+#include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
 
 #include "julia.h"
