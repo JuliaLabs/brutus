@@ -27,7 +27,7 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
       jlarrayType(
           LLVM::LLVMStructType::get(
               ctx,
-              llvm::makeArrayRef({
+              ArrayRef<mlir::Type>({
                   LLVM::LLVMPointerType::get(int8Type), // data
                   sizeType,                             // length
                   int16Type,                            // flags
@@ -62,9 +62,9 @@ Type JLIRToLLVMTypeConverter::julia_bitstype_to_llvm(jl_value_t *bt)
     // if (llvmcall && (bt == (jl_value_t*)jl_float16_type))
     //     return Type::getHalfTy(llvmDialect);
     if (bt == (jl_value_t *)jl_float32_type)
-        return LLVM::LLVMFloatType::get(&getContext());
+        return FloatType::getF32(&getContext());
     if (bt == (jl_value_t *)jl_float64_type)
-        return LLVM::LLVMDoubleType::get(&getContext());
+        return FloatType::getF64(&getContext());
     int nb = jl_datatype_size(bt);
     return IntegerType::get(&getContext(), nb * 8);
 }
@@ -111,7 +111,7 @@ Type JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt)
 // convert an LLVM type to same-sized int type
 Type JLIRToLLVMTypeConverter::INTT(Type t)
 {
-    if (t.isIntegerTy())
+    if (t.isIntOrFloat())
     {
         return t;
     }
@@ -141,7 +141,7 @@ Type JLIRToLLVMTypeConverter::INTT(Type t)
 
     unsigned nbits = t.getPrimitiveSizeInBits();
     assert(t != voidType && nbits > 0);
-    return Type::getIntNTy(&getContext(), nbits);
+    return IntegerType::get(&getContext(), nbits);
 }
 
 namespace
@@ -682,7 +682,7 @@ void JLIRToLLVMLoweringPass::runOnFunction()
 
     LLVMConversionTarget target(getContext());
     if (failed(applyPartialConversion(
-            getFunction(), target, patterns)))
+            getFunction(), target, std::move(patterns))))
         signalPassFailure();
 }
 

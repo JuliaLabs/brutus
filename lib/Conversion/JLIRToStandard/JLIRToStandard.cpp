@@ -14,7 +14,7 @@ using namespace mlir::jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
+    addConversion([this](JuliaType t, SmallVectorImpl<Type> &results) {
         // TODO: Drop ghosts?
         llvm::Optional<Type> converted = convertJuliaType(t);
         if (converted.hasValue()) {
@@ -620,13 +620,13 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     OwningRewritePatternList patterns;
     populateJLIRToStdConversionPatterns(patterns, getContext(), converter);
 
-    target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
+    target.addDynamicallyLegalOp<FuncOp>([&converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
 
     if (failed(applyPartialConversion(
-                    module, target, patterns)))
+                    module, target, std::move(patterns))))
         signalPassFailure();
 
 }
