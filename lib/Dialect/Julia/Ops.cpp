@@ -1,5 +1,7 @@
 #include "brutus/Dialect/Julia/JuliaOps.h"
 
+#include "julia.h"
+
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/DialectImplementation.h"
 #include "mlir/IR/Types.h"

@@ -22,10 +22,10 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
       sizeType((sizeof(size_t) == 8) ? int64Type : int32Type),
       longType((sizeof(long) == 8) ? int64Type : int32Type),
       mlirLongType((sizeof(long) == 8) ? IntegerType::get(ctx, 64) : IntegerType::get(ctx, 32)),
-      jlvalueType(LLVM::LLVMStructType::get(ctx)), // TODO: Add name
+      jlvalueType(LLVM::LLVMStructType::getIdentified(ctx, "struct_jl_value_type")), // TODO: Add name
       pjlvalueType(LLVM::LLVMPointerType::get(jlvalueType)),
       jlarrayType(
-          LLVM::LLVMStructType::get(
+          LLVM::LLVMStructType::getLiteral(
               ctx,
               ArrayRef<mlir::Type>({
                   LLVM::LLVMPointerType::get(int8Type), // data
@@ -38,7 +38,7 @@ JLIRToLLVMTypeConverter::JLIRToLLVMTypeConverter(MLIRContext *ctx, LowerToLLVMOp
       pjlarrayType(LLVM::LLVMPointerType::get(jlarrayType))
 {
 
-    static_assert(sizeof(jl_array_flags_t) == sizeof(int16_t));
+    static_assert(sizeof(jl_array_flags_t) == sizeof(int16_t), "sizeof(jl_array_flags) != sizeof(int16_t)");
 
     assert(llvmDialect && "LLVM IR dialect is not registered");
     addConversion([&](JuliaType jt) {
@@ -111,11 +111,11 @@ Type JLIRToLLVMTypeConverter::julia_type_to_llvm(jl_value_t *jt)
 // convert an LLVM type to same-sized int type
 Type JLIRToLLVMTypeConverter::INTT(Type t)
 {
-    if (t.isIntOrFloat())
+    if (t.isInteger(32) || t.isInteger(64))
     {
         return t;
     }
-    else if (t.isPointerTy())
+    else if (LLVM::LLVMPointerType::isValidElementType(t))
     {
         if (sizeof(size_t) == 8)
         {
@@ -126,20 +126,20 @@ Type JLIRToLLVMTypeConverter::INTT(Type t)
             return int32Type;
         }
     }
-    else if (t.isDoubleTy())
+    else if (t.isF64())
     {
         return int64Type;
     }
-    else if (t.isFloatTy())
+    else if (t.isF32())
     {
         return int32Type;
     }
-    else if (t.isHalfTy())
+    else if (t.isF16())
     {
         return int16Type;
     }
 
-    unsigned nbits = t.getPrimitiveSizeInBits();
+    unsigned nbits = LLVM::getPrimitiveTypeSizeInBits(t);
     assert(t != voidType && nbits > 0);
     return IntegerType::get(&getContext(), nbits);
 }
@@ -166,7 +166,10 @@ namespace
             assert(a.getType() == b.getType());
             Type t = a.getType().dyn_cast<Type>();
 
-            if (t.isIntegerTy() || t.isPointerTy() || t.isFloatingPointTy())
+            if (t.isInteger(32) ||
+                t.isInteger(64) ||
+                LLVM::LLVMPointerType::isValidElementType(t) ||
+                t.isF32())
             {
 
                 Type t_int = lowering.INTT(t);
@@ -214,7 +217,7 @@ namespace
         {
             return rewriter.create<LLVM::GEPOp>(
                                loc,
-                               lowering.sizeType.getPointerTo(),
+                               LLVM::LLVMPointerType::get(lowering.sizeType),
                                pointerToArray,
                                llvm::makeArrayRef({// dereference `jl_array_t*` to get to `jl_array_t`
                                                    rewriter.create<LLVM::ConstantOp>(
@@ -240,7 +243,7 @@ namespace
         {
             Value pointerToSize = rewriter.create<LLVM::GEPOp>(
                 loc,
-                lowering.sizeType.getPointerTo(),
+                LLVM::LLVMPointerType::get(lowering.sizeType),
                 pointerToNrows,
                 llvm::makeArrayRef(dimension));
             return rewriter.create<LLVM::LoadOp>(
@@ -371,7 +374,7 @@ namespace
                 memcpy(bits, value, nb);
 
                 Attribute value_attribute;
-                if (llvm_type.isFloatingPointTy())
+                if (llvm_type.isF32())
                 {
                     APFloat fval(llvm_type.cast<FloatType>().getFloatSemantics(), val);
                     if (julia_type == jl_float32_type)
