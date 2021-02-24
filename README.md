@@ -4,10 +4,9 @@ _Brutus_
 <figure style="text-align:center;">
 <p align="center">
 <img height="300px" src="zonkey.png"/>
-<figcaption><b>Et tu, Brute?</b></figcaption>
+<figcaption style="text-align:center;"><b>Et tu, Brute?</b></figcaption>
 </p>
 </figure>
-
 
 `Brutus` is a research project that uses MLIR to implement code-generation and optimisations for Julia.
 
