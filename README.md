@@ -1,5 +1,12 @@
 Brutus
 ======
+
+<figure style="text-align:center;">
+<p align="center">
+<img height="300px" src="zonkey.png"/>
+</p>
+</figure>
+
 *Et tu?*
 
 Brutus is a research project that uses MLIR to implement code-generation and
@@ -29,7 +36,6 @@ cmake .. -G Ninja \
 LD_LIBRARY_PATH=${LD_LIBRARY_PATH}:`pwd`/../julia/julia --project=../Brutus -e 'using Pkg; pkg"instantiate"; pkg"precompile"'
 ninja check-brutus
 ```
-
 
 ### VSCode setting
 Using the `Cmake Tools` extension, and with the path to Julia as built above in
