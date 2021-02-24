@@ -5,17 +5,16 @@ emit(identity, Nothing)
 
 
 # CHECK: module  {
-# CHECK-NEXT:   func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     return %arg1 : !jlir.Nothing
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface} {
+# CHECK:   llvm.func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     llvm.return %arg1 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.call @"Tuple{typeof(Base.identity), Nothing}"(%arg0, %arg1) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:     llvm.return %0 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-# CHECK-NEXT: error: lowering to LLVM dialect failed

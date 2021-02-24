@@ -6,20 +6,19 @@ emit(symbol)
 
 
 # CHECK: module  {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<":testing">} : () -> !jlir.Symbol
 # CHECK-NEXT:     return %0 : !jlir.Symbol
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.symbol)}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface} {
+# CHECK:   llvm.func @"Tuple{typeof(Main.symbol)}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
 # CHECK-NEXT:     %1 = llvm.inttoptr %0 : i64 to !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:     llvm.return %1 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.symbol)}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.symbol)}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.call @"Tuple{typeof(Main.symbol)}"(%arg0) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:     llvm.return %0 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-# CHECK-NEXT: error: lowering to LLVM dialect failed

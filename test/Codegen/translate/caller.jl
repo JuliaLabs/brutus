@@ -8,7 +8,7 @@ emit(caller, Int64, Int64)
 
 
 
-# CHECK:   func @"Tuple{typeof(Main.caller), Int64, Int64}"(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK:   func nested @"Tuple{typeof(Main.caller), Int64, Int64}"(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.Main.add} : () -> !jlir<"typeof(Main.add)">
@@ -16,5 +16,3 @@ emit(caller, Int64, Int64)
 # CHECK-NEXT:     "jlir.return"(%1) : (!jlir.Int64) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-
-# CHECK: error: lowering to LLVM dialect failed

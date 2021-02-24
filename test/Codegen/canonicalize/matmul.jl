@@ -16,7 +16,7 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 
 
 
-# CHECK:   func @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: !jlir<"Array{Float64, 2}">, %arg2: !jlir<"Array{Float64, 2}">, %arg3: !jlir<"Array{Float64, 2}">) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
+# CHECK:   func nested @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: !jlir<"Array{Float64, 2}">, %arg2: !jlir<"Array{Float64, 2}">, %arg3: !jlir<"Array{Float64, 2}">) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -134,5 +134,3 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 # CHECK-NEXT:     "jlir.return"(%81) : (!jlir.Nothing) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-
-# CHECK: error: lowering to LLVM dialect failed

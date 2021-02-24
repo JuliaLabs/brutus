@@ -6,7 +6,7 @@ emit(select, Bool)
 
 
 # CHECK: module  {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: i1) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: i1) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c2_i64 = constant 2 : i64
 # CHECK-NEXT:     %c3_i64 = constant 3 : i64
 # CHECK-NEXT:     %c1_i64 = constant 1 : i64
@@ -16,7 +16,7 @@ emit(select, Bool)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.select), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK:   llvm.func @"Tuple{typeof(Main.select), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
 # CHECK-NEXT:     %1 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
 # CHECK-NEXT:     %2 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
@@ -24,9 +24,8 @@ emit(select, Bool)
 # CHECK-NEXT:     %4 = llvm.add %3, %2  : i64
 # CHECK-NEXT:     llvm.return %4 : i64
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.select), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.select), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.call @"Tuple{typeof(Main.select), Bool}"(%arg0, %arg1) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, i1) -> i64
 # CHECK-NEXT:     llvm.return %0 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-# CHECK-NEXT: error: lowering to LLVM dialect failed

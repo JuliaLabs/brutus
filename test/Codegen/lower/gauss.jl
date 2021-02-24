@@ -12,7 +12,7 @@ emit(gauss, Int64)
 
 
 # CHECK: module  {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !jlir<"typeof(Main.gauss)">, %arg1: i64) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !jlir<"typeof(Main.gauss)">, %arg1: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c1_i64 = constant 1 : i64
 # CHECK-NEXT:     %c0_i64 = constant 0 : i64
 # CHECK-NEXT:     %false = constant false
@@ -54,7 +54,7 @@ emit(gauss, Int64)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i64) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK:   llvm.func @"Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i64) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
 # CHECK-NEXT:     %1 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
 # CHECK-NEXT:     %2 = llvm.mlir.constant(false) : i1
@@ -65,31 +65,28 @@ emit(gauss, Int64)
 # CHECK-NEXT:     llvm.cond_br %6, ^bb1, ^bb2(%2, %0, %0 : i1, i64, i64)
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %7 = llvm.mlir.undef : i64
-# CHECK-NEXT:     %8 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb2(%3, %7, %8 : i1, i64, i64)
-# CHECK-NEXT:   ^bb2(%9: i1, %10: i64, %11: i64):  // 2 preds: ^bb0, ^bb1
-# CHECK-NEXT:     %12 = llvm.xor %9, %3  : i1
-# CHECK-NEXT:     llvm.cond_br %12, ^bb3(%10, %11, %1 : i64, i64, i64), ^bb7(%1 : i64)
-# CHECK-NEXT:   ^bb3(%13: i64, %14: i64, %15: i64):  // 2 preds: ^bb2, ^bb6
-# CHECK-NEXT:     %16 = llvm.add %15, %13  : i64
-# CHECK-NEXT:     %17 = llvm.icmp "eq" %14, %5 : i64
-# CHECK-NEXT:     llvm.cond_br %17, ^bb4, ^bb5
+# CHECK-NEXT:     llvm.br ^bb2(%3, %7, %7 : i1, i64, i64)
+# CHECK-NEXT:   ^bb2(%8: i1, %9: i64, %10: i64):  // 2 preds: ^bb0, ^bb1
+# CHECK-NEXT:     %11 = llvm.xor %8, %3  : i1
+# CHECK-NEXT:     llvm.cond_br %11, ^bb3(%9, %10, %1 : i64, i64, i64), ^bb7(%1 : i64)
+# CHECK-NEXT:   ^bb3(%12: i64, %13: i64, %14: i64):  // 2 preds: ^bb2, ^bb6
+# CHECK-NEXT:     %15 = llvm.add %14, %12  : i64
+# CHECK-NEXT:     %16 = llvm.icmp "eq" %13, %5 : i64
+# CHECK-NEXT:     llvm.cond_br %16, ^bb4, ^bb5
 # CHECK-NEXT:   ^bb4:  // pred: ^bb3
-# CHECK-NEXT:     %18 = llvm.mlir.undef : i64
-# CHECK-NEXT:     %19 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb6(%18, %19, %3 : i64, i64, i1)
+# CHECK-NEXT:     %17 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb6(%17, %17, %3 : i64, i64, i1)
 # CHECK-NEXT:   ^bb5:  // pred: ^bb3
-# CHECK-NEXT:     %20 = llvm.add %14, %0  : i64
-# CHECK-NEXT:     llvm.br ^bb6(%20, %20, %2 : i64, i64, i1)
-# CHECK-NEXT:   ^bb6(%21: i64, %22: i64, %23: i1):  // 2 preds: ^bb4, ^bb5
-# CHECK-NEXT:     %24 = llvm.xor %23, %3  : i1
-# CHECK-NEXT:     llvm.cond_br %24, ^bb3(%21, %22, %16 : i64, i64, i64), ^bb7(%16 : i64)
-# CHECK-NEXT:   ^bb7(%25: i64):  // 2 preds: ^bb2, ^bb6
-# CHECK-NEXT:     llvm.return %25 : i64
+# CHECK-NEXT:     %18 = llvm.add %13, %0  : i64
+# CHECK-NEXT:     llvm.br ^bb6(%18, %18, %2 : i64, i64, i1)
+# CHECK-NEXT:   ^bb6(%19: i64, %20: i64, %21: i1):  // 2 preds: ^bb4, ^bb5
+# CHECK-NEXT:     %22 = llvm.xor %21, %3  : i1
+# CHECK-NEXT:     llvm.cond_br %22, ^bb3(%19, %20, %15 : i64, i64, i64), ^bb7(%15 : i64)
+# CHECK-NEXT:   ^bb7(%23: i64):  // 2 preds: ^bb2, ^bb6
+# CHECK-NEXT:     llvm.return %23 : i64
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i64) -> i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.gauss), Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i64) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.call @"Tuple{typeof(Main.gauss), Int64}"(%arg0, %arg1) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, i64) -> i64
 # CHECK-NEXT:     llvm.return %0 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-# CHECK-NEXT: error: lowering to LLVM dialect failed

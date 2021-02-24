@@ -21,7 +21,7 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
     Type int64Type;
     Type sizeType;
     Type longType;
-    Type           mlirLongType;
+    Type mlirLongType;
     Type jlvalueType;
     Type pjlvalueType;
     Type jlarrayType;

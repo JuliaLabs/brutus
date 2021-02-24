@@ -8,7 +8,7 @@ emit(calls)
 
 
 
-# CHECK:   func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK:   func nested @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.unimplemented"() : () -> !jlir.Int16
@@ -121,4 +121,4 @@ emit(calls)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK: error: module canonicalization failed
+# CHECK: error: lowering to Standard dialect failed

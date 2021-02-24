@@ -273,6 +273,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
 
     // Create actual function
     mlir::FuncOp function = mlir::FuncOp::create(locations[0], name, ftype);
+    mlir::SymbolTable::setSymbolVisibility(function, mlir::SymbolTable::Visibility::Nested);
 
     // In MLIR the entry block of the function is special: it must have the same
     // argument list as the function itself.
@@ -572,8 +573,8 @@ extern "C"
         // lower to LLVM dialect
 
         mlir::PassManager loweringToLLVMPM(&context);
-        mlir::OpPassManager &func_opm = loweringToLLVMPM.nest<FuncOp>();
-        func_opm.addPass(createJLIRToLLVMLoweringPass());
+        mlir::OpPassManager &funcop_pm= loweringToLLVMPM.nest<FuncOp>();
+        funcop_pm.addPass(createJLIRToLLVMLoweringPass());
         loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
         loweringToLLVMPM.addPass(mlir::createCSEPass());
         LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);

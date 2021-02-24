@@ -365,7 +365,7 @@ def JLIR_Builtin_nfields : JLIR_IntrinsicBuiltinOp<"nfields">;
 def JLIR_Builtin_tuple : JLIR_IntrinsicBuiltinOp<"tuple">;
 def JLIR_Builtin_svec : JLIR_IntrinsicBuiltinOp<"svec">;
 def JLIR_Builtin_getfield : JLIR_IntrinsicBuiltinOp<"getfield">;
-def JLIR_Builtin_setfield : JLIR_IntrinsicBuiltinOp<"setfield">;
+def JLIR_Builtin_setfield : JLIR_IntrinsicBuiltinOp<"setfield!">;
 def JLIR_Builtin_fieldtype : JLIR_IntrinsicBuiltinOp<"fieldtype">;
 def JLIR_Builtin_arrayref : JLIR_IntrinsicBuiltinOp<"arrayref">;
 def JLIR_Builtin_const_arrayref : JLIR_IntrinsicBuiltinOp<"const_arrayref">;

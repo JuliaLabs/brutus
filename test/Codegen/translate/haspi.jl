@@ -9,7 +9,7 @@ emit(haspi, Union{Int64, Float64})
 
 
 
-# CHECK:   func @"Tuple{typeof(Main.haspi), Union{Float64, Int64}}"(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}"> attributes {llvm.emit_c_interface} {
+# CHECK:   func nested @"Tuple{typeof(Main.haspi), Union{Float64, Int64}}"(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}"> attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.isa} : () -> !jlir<"typeof(isa)">
@@ -29,5 +29,3 @@ emit(haspi, Union{Int64, Float64})
 # CHECK-NEXT:     "jlir.return"(%9) : (!jlir<"Union{Nothing, Int64}">) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-
-# CHECK: error: lowering to LLVM dialect failed

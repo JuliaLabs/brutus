@@ -11,7 +11,7 @@ emit(loop, Int64)
 
 
 
-# CHECK:   func @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK:   func nested @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
@@ -39,7 +39,7 @@ emit(loop, Int64)
 # CHECK-NEXT:     %19 = "jlir.call"(%18, %15) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
 # CHECK-NEXT:     %20 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %21 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.gotoifnot"(%19, %20, %16, %17, %21)[^bb10, ^bb5] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:     "jlir.gotoifnot"(%19, %21, %16, %17, %20)[^bb10, ^bb5] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
 # CHECK-NEXT:   ^bb5(%22: !jlir.Int64, %23: !jlir.Int64, %24: !jlir.Int64):  // 2 preds: ^bb4, ^bb9
 # CHECK-NEXT:     %25 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %26 = "jlir.call"(%25, %24, %22) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
@@ -67,5 +67,3 @@ emit(loop, Int64)
 # CHECK-NEXT:     "jlir.return"(%41) : (!jlir.Int64) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
-
-# CHECK: error: lowering to LLVM dialect failed
