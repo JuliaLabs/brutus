@@ -11,8 +11,8 @@ end
 emit(sum, Matrix{Float64})
 
 
-# CHECK: module {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.sum), Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.sum)">, %arg1: !jlir<"Array{Float64, 2}">) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
+
+# CHECK:   func @"Tuple{typeof(Main.sum), Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.sum)">, %arg1: !jlir<"Array{Float64, 2}">) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
@@ -60,3 +60,5 @@ emit(sum, Matrix{Float64})
 # CHECK-NEXT:     "jlir.return"(%33) : (!jlir.Float64) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
+
+# CHECK: error: lowering to LLVM dialect failed

@@ -75,7 +75,6 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
         unimplemented
     }];
 
-    let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType:$type);
     let builders = [
         OpBuilderDAG<(ins "jl_datatype_t *":$type)>

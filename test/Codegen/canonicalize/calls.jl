@@ -7,8 +7,7 @@ end
 emit(calls)
 
 
-# CHECK: module {
-# CHECK-NEXT:   func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK:   func @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.unimplemented"() : () -> !jlir.Int16
@@ -16,7 +15,7 @@ emit(calls)
 # CHECK-NEXT:     %2 = "jlir.sext_int"(%1, %0) : (!jlir.DataType, !jlir.Int16) -> !jlir.Int64
 # CHECK-NEXT:     %3 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %4 = "jlir.add_int"(%2, %3) : (!jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %5 = "jlir.constant"() {value = #jlir<"typeof(Random.default_rng)()">} : () -> !jlir<"typeof(Random.default_rng)">
+# CHECK-NEXT:     %5 = "jlir.constant"() {value = #jlir.Random.default_rng} : () -> !jlir<"typeof(Random.default_rng)">
 # CHECK-NEXT:     %6 = "jlir.invoke"(%5, %4) {methodInstance = #jlir<"default_rng(Int64) from default_rng(Int64)">} : (!jlir<"typeof(Random.default_rng)">, !jlir.Int64) -> !jlir.Random.MersenneTwister
 # CHECK-NEXT:     %7 = "jlir.constant"() {value = #jlir<":idxF">} : () -> !jlir.Symbol
 # CHECK-NEXT:     %8 = "jlir.getfield"(%6, %7) : (!jlir.Random.MersenneTwister, !jlir.Symbol) -> !jlir.Int64
@@ -24,7 +23,7 @@ emit(calls)
 # CHECK-NEXT:     %10 = "jlir.==="(%8, %9) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
 # CHECK-NEXT:     "jlir.gotoifnot"(%10)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK-NEXT:   ^bb2:  // pred: ^bb1
-# CHECK-NEXT:     %11 = "jlir.constant"() {value = #jlir<"typeof(Random.gen_rand)()">} : () -> !jlir<"typeof(Random.gen_rand)">
+# CHECK-NEXT:     %11 = "jlir.constant"() {value = #jlir.Random.gen_rand} : () -> !jlir<"typeof(Random.gen_rand)">
 # CHECK-NEXT:     %12 = "jlir.invoke"(%11, %6) {methodInstance = #jlir<"gen_rand(Random.MersenneTwister) from gen_rand(Random.MersenneTwister)">} : (!jlir<"typeof(Random.gen_rand)">, !jlir.Random.MersenneTwister) -> !jlir.Any
 # CHECK-NEXT:     "jlir.goto"()[^bb3] : () -> ()
 # CHECK-NEXT:   ^bb3:  // 2 preds: ^bb1, ^bb2
@@ -65,11 +64,11 @@ emit(calls)
 # CHECK-NEXT:   ^bb9:  // pred: ^bb8
 # CHECK-NEXT:     "jlir.gotoifnot"(%35)[^bb11, ^bb10] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK-NEXT:   ^bb10:  // pred: ^bb9
-# CHECK-NEXT:     %36 = "jlir.constant"() {value = #jlir<"typeof(Base.:(+))()">} : () -> !jlir<"typeof(Base.:(+))">
+# CHECK-NEXT:     %36 = "jlir.constant"() {value = #jlir<"Base.:(+)">} : () -> !jlir<"typeof(Base.:(+))">
 # CHECK-NEXT:     %37 = "jlir.pi"(%36) : (!jlir<"typeof(Base.:(+))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
 # CHECK-NEXT:     "jlir.goto"(%37)[^bb12] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK-NEXT:   ^bb11:  // pred: ^bb9
-# CHECK-NEXT:     %38 = "jlir.constant"() {value = #jlir<"typeof(Base.:(-))()">} : () -> !jlir<"typeof(Base.:(-))">
+# CHECK-NEXT:     %38 = "jlir.constant"() {value = #jlir<"Base.:(-)">} : () -> !jlir<"typeof(Base.:(-))">
 # CHECK-NEXT:     %39 = "jlir.pi"(%38) : (!jlir<"typeof(Base.:(-))">) -> !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">
 # CHECK-NEXT:     "jlir.goto"(%39)[^bb12] : (!jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">) -> ()
 # CHECK-NEXT:   ^bb12(%40: !jlir<"Union{typeof(Base.:(+)), typeof(Base.:(-))}">):  // 2 preds: ^bb10, ^bb11

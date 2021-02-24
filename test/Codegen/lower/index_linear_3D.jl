@@ -6,7 +6,7 @@ emit(index, Array{Int64, 3}, Int64)
 
 
 
-# CHECK: module {
+# CHECK: module  {
 # CHECK-NEXT:   func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: memref<?x?x?xi64>, %arg2: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c0 = constant 0 : index
 # CHECK-NEXT:     %c1 = constant 1 : index
@@ -17,8 +17,7 @@ emit(index, Array{Int64, 3}, Int64)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK: module {
-# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<()>>, %arg1: !llvm.ptr<i64>, %arg2: !llvm.ptr<i64>, %arg3: !llvm.i64, %arg4: !llvm.i64, %arg5: !llvm.i64, %arg6: !llvm.i64, %arg7: !llvm.i64, %arg8: !llvm.i64, %arg9: !llvm.i64, %arg10: !llvm.i64) -> !llvm.i64 attributes {llvm.emit_c_interface} {
+# CHECK:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<i64>, %arg2: !llvm.ptr<i64>, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: i64, %arg9: i64, %arg10: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = llvm.mlir.undef : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %1 = llvm.insertvalue %arg1, %0[0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %2 = llvm.insertvalue %arg2, %1[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
@@ -29,23 +28,21 @@ emit(index, Array{Int64, 3}, Int64)
 # CHECK-NEXT:     %7 = llvm.insertvalue %arg8, %6[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %8 = llvm.insertvalue %arg6, %7[3, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %9 = llvm.insertvalue %arg9, %8[4, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %10 = llvm.mlir.constant(0 : index) : !llvm.i64
-# CHECK-NEXT:     %11 = llvm.mlir.constant(1 : index) : !llvm.i64
-# CHECK-NEXT:     %12 = llvm.sub %arg10, %11 : !llvm.i64
+# CHECK-NEXT:     %10 = llvm.mlir.constant(0 : index) : i64
+# CHECK-NEXT:     %11 = llvm.mlir.constant(1 : index) : i64
+# CHECK-NEXT:     %12 = llvm.sub %arg10, %11  : i64
 # CHECK-NEXT:     %13 = llvm.extractvalue %9[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %14 = llvm.extractvalue %9[4, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %15 = llvm.mul %10, %14 : !llvm.i64
-# CHECK-NEXT:     %16 = llvm.add %10, %15 : !llvm.i64
-# CHECK-NEXT:     %17 = llvm.extractvalue %9[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %18 = llvm.mul %10, %17 : !llvm.i64
-# CHECK-NEXT:     %19 = llvm.add %16, %18 : !llvm.i64
-# CHECK-NEXT:     %20 = llvm.mul %12, %11 : !llvm.i64
-# CHECK-NEXT:     %21 = llvm.add %19, %20 : !llvm.i64
-# CHECK-NEXT:     %22 = llvm.getelementptr %13[%21] : (!llvm.ptr<i64>, !llvm.i64) -> !llvm.ptr<i64>
-# CHECK-NEXT:     %23 = llvm.load %22 : !llvm.ptr<i64>
-# CHECK-NEXT:     llvm.return %23 : !llvm.i64
+# CHECK-NEXT:     %15 = llvm.mul %10, %14  : i64
+# CHECK-NEXT:     %16 = llvm.extractvalue %9[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
+# CHECK-NEXT:     %17 = llvm.mul %10, %16  : i64
+# CHECK-NEXT:     %18 = llvm.add %15, %17  : i64
+# CHECK-NEXT:     %19 = llvm.add %18, %12  : i64
+# CHECK-NEXT:     %20 = llvm.getelementptr %13[%19] : (!llvm.ptr<i64>, i64) -> !llvm.ptr<i64>
+# CHECK-NEXT:     %21 = llvm.load %20 : !llvm.ptr<i64>
+# CHECK-NEXT:     llvm.return %21 : i64
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<()>>, %arg1: !llvm.ptr<struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>>, %arg2: !llvm.i64) -> !llvm.i64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>>, %arg2: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>>
 # CHECK-NEXT:     %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
@@ -56,7 +53,8 @@ emit(index, Array{Int64, 3}, Int64)
 # CHECK-NEXT:     %7 = llvm.extractvalue %0[4, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %8 = llvm.extractvalue %0[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %9 = llvm.extractvalue %0[4, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %10 = llvm.call @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0, %1, %2, %3, %4, %5, %6, %7, %8, %9, %arg2) : (!llvm.ptr<struct<()>>, !llvm.ptr<i64>, !llvm.ptr<i64>, !llvm.i64, !llvm.i64, !llvm.i64, !llvm.i64, !llvm.i64, !llvm.i64, !llvm.i64, !llvm.i64) -> !llvm.i64
-# CHECK-NEXT:     llvm.return %10 : !llvm.i64
+# CHECK-NEXT:     %10 = llvm.call @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0, %1, %2, %3, %4, %5, %6, %7, %8, %9, %arg2) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, !llvm.ptr<i64>, !llvm.ptr<i64>, i64, i64, i64, i64, i64, i64, i64, i64) -> i64
+# CHECK-NEXT:     llvm.return %10 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
+# CHECK-NEXT: error: lowering to LLVM dialect failed

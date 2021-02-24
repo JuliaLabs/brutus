@@ -572,7 +572,8 @@ extern "C"
         // lower to LLVM dialect
 
         mlir::PassManager loweringToLLVMPM(&context);
-        loweringToLLVMPM.addPass(createJLIRToLLVMLoweringPass());
+        mlir::OpPassManager &func_opm = loweringToLLVMPM.nest<FuncOp>();
+        func_opm.addPass(createJLIRToLLVMLoweringPass());
         loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
         loweringToLLVMPM.addPass(mlir::createCSEPass());
         LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
