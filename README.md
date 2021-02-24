@@ -1,18 +1,19 @@
-Brutus
+_Brutus_
 ======
 
 <figure style="text-align:center;">
 <p align="center">
 <img height="300px" src="zonkey.png"/>
+<figcaption><b>Et tu, Brute?</b></figcaption>
 </p>
 </figure>
 
-*Et tu?*
 
-Brutus is a research project that uses MLIR to implement code-generation and
-optimisations for Julia.
+`Brutus` is a research project that uses MLIR to implement code-generation and optimisations for Julia.
 
 ## Setting it up
+
+`Brutus` currently requires that you create a non-standard build of Julia.
 
 ```
 git clone https://github.com/JuliaLabs/brutus
@@ -38,6 +39,7 @@ ninja check-brutus
 ```
 
 ### VSCode setting
+
 Using the `Cmake Tools` extension, and with the path to Julia as built above in
 place of `JULIA_PATH`:
 ```json
