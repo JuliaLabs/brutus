@@ -1,3 +1,5 @@
 .vscode/
 build*/
 Brutus/Manifest.toml
+llvm
+julia

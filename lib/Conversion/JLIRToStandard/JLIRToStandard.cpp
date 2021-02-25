@@ -2,7 +2,7 @@
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/AffineMap.h"
-#include "mlir/IR/StandardTypes.h"
+#include "mlir/IR/Types.h"
 
 #include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
 
@@ -14,7 +14,7 @@ using namespace mlir::jlir;
 JLIRToStandardTypeConverter::JLIRToStandardTypeConverter(MLIRContext *ctx)
     : ctx(ctx) {
 
-    addConversion([this, ctx](JuliaType t, SmallVectorImpl<Type> &results) {
+    addConversion([this](JuliaType t, SmallVectorImpl<Type> &results) {
         // TODO: Drop ghosts?
         llvm::Optional<Type> converted = convertJuliaType(t);
         if (converted.hasValue()) {
@@ -97,17 +97,17 @@ Type JLIRToStandardTypeConverter::convertBitstype(jl_datatype_t *jdt) {
     assert(jl_is_primitivetype(jdt));
     if (jdt == jl_bool_type) {
         // convert to i1 even though Julia converts to i8
-        return IntegerType::get(1, ctx);
+        return IntegerType::get(ctx, 1);
     } else if (jdt == jl_int32_type)
-        return IntegerType::get(32, ctx);
+        return IntegerType::get(ctx, 32);
     else if (jdt == jl_int64_type)
-        return IntegerType::get(64, ctx);
+        return IntegerType::get(ctx, 64);
     else if (jdt == jl_float32_type)
         return FloatType::getF32(ctx);
     else if (jdt == jl_float64_type)
         return FloatType::getF64(ctx);
     int nb = jl_datatype_size(jdt);
-    return IntegerType::get(nb * 8, ctx);
+    return IntegerType::get(ctx, nb * 8);
 }
 
 namespace {
@@ -620,13 +620,13 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     OwningRewritePatternList patterns;
     populateJLIRToStdConversionPatterns(patterns, getContext(), converter);
 
-    target.addDynamicallyLegalOp<FuncOp>([this, &converter](FuncOp op) {
+    target.addDynamicallyLegalOp<FuncOp>([&converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
     populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
 
     if (failed(applyPartialConversion(
-                    module, target, patterns)))
+                    module, target, std::move(patterns))))
         signalPassFailure();
 
 }

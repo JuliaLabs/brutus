@@ -23,6 +23,7 @@ llvm_add_library(
   MLIR
   ${LLVM_PTHREAD_LIB}
   ${Julia_LIBRARY}
+  ${Julia_Internal_LIBRARY}
 )
 llvm_update_compile_flags(brutus)
 message("Libraries included in libBrutus.so: ${brutus_libs}")

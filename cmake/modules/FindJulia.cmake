@@ -89,10 +89,18 @@ if(Julia_EXECUTABLE)
         COMMAND ${Julia_EXECUTABLE} --startup-file=no -E "${USING_LIBDL}\nabspath(Libdl.dlpath((ccall(:jl_is_debugbuild, Cint, ()) != 0) ? \"libjulia-debug\" : \"libjulia\"))"
         OUTPUT_VARIABLE Julia_LIBRARY
     )
+    
+    execute_process(
+        COMMAND ${Julia_EXECUTABLE} --startup-file=no -E "${USING_LIBDL}\nabspath(Libdl.dlpath((ccall(:jl_is_debugbuild, Cint, ()) != 0) ? \"libjulia-internal-debug\" : \"libjulia-internal\"))"
+        OUTPUT_VARIABLE Julia_Internal_LIBRARY
+    )
 
     string(REGEX REPLACE "\"" "" Julia_LIBRARY "${Julia_LIBRARY}")
     string(REGEX REPLACE "\n" "" Julia_LIBRARY "${Julia_LIBRARY}")
+    string(REGEX REPLACE "\"" "" Julia_Internal_LIBRARY "${Julia_Internal_LIBRARY}")
+    string(REGEX REPLACE "\n" "" Julia_Internal_LIBRARY "${Julia_Internal_LIBRARY}")
     string(STRIP "${Julia_LIBRARY}" Julia_LIBRARY)
+    string(STRIP "${Julia_Internal_LIBRARY}" Julia_Internal_LIBRARY)
 
     if(WIN32)
         get_filename_component(Julia_LIBRARY_DIR ${Julia_LIBRARY} DIRECTORY)
@@ -108,13 +116,15 @@ if(Julia_EXECUTABLE)
     set(Julia_LIBRARY "${Julia_LIBRARY}"
         CACHE PATH "Julia library")
 else()
-    find_library(Julia_LIBRARY NAMES libjulia.${Julia_VERSION_STRING}.dylib julia libjulia libjulia.dll.a CMAKE_FIND_ROOT_PATH_BOTH)
+    find_library(Julia_LIBRARY NAMES libjulia.${Julia_VERSION_STRING}.dylib julia libjulia libjulia_internal libjulia.dll.a CMAKE_FIND_ROOT_PATH_BOTH)
+    find_library(Julia_Internal_LIBRARY NAMES libjulia-internal.so.${Julia_VERSION_STRING} CMAKE_FIND_ROOT_PATH_BOTH)
 endif()
 
 get_filename_component(Julia_LIBRARY_DIR ${Julia_LIBRARY} DIRECTORY)
 
 MESSAGE(STATUS "Julia_LIBRARY_DIR:    ${Julia_LIBRARY_DIR}")
 MESSAGE(STATUS "Julia_LIBRARY:        ${Julia_LIBRARY}")
+MESSAGE(STATUS "Julia_Internal_LIBRARY:        ${Julia_Internal_LIBRARY}")
 
 ##############
 # JULIA_HOME #
@@ -171,7 +181,7 @@ endif()
 
 include(FindPackageHandleStandardArgs)
 find_package_handle_standard_args(Julia
-    REQUIRED_VARS   Julia_LIBRARY Julia_LIBRARY_DIR Julia_INCLUDE_DIRS Julia_MAIN_HEADER
+    REQUIRED_VARS   Julia_LIBRARY Julia_Internal_LIBRARY Julia_LIBRARY_DIR Julia_INCLUDE_DIRS Julia_MAIN_HEADER
     VERSION_VAR     Julia_VERSION_STRING
     FAIL_MESSAGE    "Julia not found"
 )
