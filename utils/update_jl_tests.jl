@@ -25,7 +25,7 @@ import Base.Threads: @threads
             else
                 last_empty = false
             end
-            
+
             if startswith(line, r"#\s*+RUN:\s*")
                 push!(runlines, line)
             elseif startswith(line, r"#\s*CHECK")
@@ -55,7 +55,7 @@ import Base.Threads: @threads
     end
 
     fname, io = mktemp()
-    
+
     write(io, runline, "\n")
     for line in content
         write(io, line, "\n")
@@ -87,6 +87,6 @@ import Base.Threads: @threads
         write(io, line, "\n")
     end
     close(io)
-    
+
     mv(fname, test, force=true)
 end
