@@ -15,6 +15,7 @@ extern "C"
     jl_function_t *getindex_func;
 
     jl_unionall_t *sizedarray_type;
+    jl_value_t *br_intrinsic_type;
 
     void brutus_init(jl_module_t *brutus_module)
     {
@@ -30,6 +31,9 @@ extern "C"
         return_node_type = jl_get_global(compiler_module, jl_symbol("ReturnNode"));
         getindex_func = (jl_function_t *)jl_get_global(
             jl_base_module, jl_symbol("getindex"));
+
+        br_intrinsic_type = jl_get_global(brutus_module, jl_symbol("BrutusIntrinsic"));
+        assert(br_intrinsic_type);
 
         mlir::DialectRegistry registry;
         registry.insert<mlir::jlir::JLIRDialect>();

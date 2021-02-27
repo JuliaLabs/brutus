@@ -18,6 +18,7 @@ extern jl_value_t *const_type;
 extern jl_value_t *gotoifnot_type;
 extern jl_value_t *return_node_type;
 extern jl_value_t *getindex_func;
+extern jl_value_t *br_intrinsic_type;
 
 #ifdef __cplusplus
 } // end extern "C"

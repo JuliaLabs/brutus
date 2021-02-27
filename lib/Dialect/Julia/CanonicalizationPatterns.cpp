@@ -1,7 +1,8 @@
 #include "mlir/IR/Matchers.h"
 #include "mlir/IR/PatternMatch.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
-
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+//using namespace mlir::linalg;
 #include "julia.h"
 #include "juliapriv/julia_private.h"
 
@@ -17,18 +18,18 @@ using namespace jlir;
 namespace {
 
 /// Intrinsic rewriter
-struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
+struct LowerIntrinsicCallPattern : public OpRewritePattern<jlir::CallOp> {
     public:
-        using OpRewritePattern<CallOp>::OpRewritePattern;
+        using OpRewritePattern<jlir::CallOp>::OpRewritePattern;
 
-    LogicalResult match(CallOp op) const override {
+    LogicalResult match(jlir::CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
             return failure();
         }
-        if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
+        if (jlir::ConstantOp constant = dyn_cast<jlir::ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_typeis(value, jl_intrinsic_type)) {
                 return success();
@@ -37,8 +38,8 @@ struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
         return failure();
     }
 
-    void rewrite(CallOp op, PatternRewriter &rewriter) const override {
-        ConstantOp defining = dyn_cast<ConstantOp>(op.callee().getDefiningOp());
+    void rewrite(jlir::CallOp op, PatternRewriter &rewriter) const override {
+        jlir::ConstantOp defining = dyn_cast<jlir::ConstantOp>(op.callee().getDefiningOp());
         JL_I::intrinsic f = (JL_I::intrinsic)*(uint32_t*)jl_data_ptr(defining.value());
         assert(f < JL_I::num_intrinsics);
         StringRef name = "jlir." + std::string(jl_intrinsic_name(f));
@@ -55,18 +56,18 @@ struct LowerIntrinsicCallPattern : public OpRewritePattern<CallOp> {
 };
 
 /// Builtin rewriter
-struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
+struct LowerBuiltinCallPattern : public OpRewritePattern<jlir::CallOp> {
     public:
-        using OpRewritePattern<CallOp>::OpRewritePattern;
+        using OpRewritePattern<mlir::jlir::CallOp>::OpRewritePattern;
 
-    LogicalResult match(CallOp op) const override {
+    LogicalResult match(jlir::CallOp op) const override {
         Value callee = op.callee();
         Operation *definingOp = callee.getDefiningOp();
         if (!definingOp) {
             // Value is block-argument.
             return failure();
         }
-        if (ConstantOp constant = dyn_cast<ConstantOp>(definingOp)) {
+        if (auto constant = dyn_cast<jlir::ConstantOp>(definingOp)) {
             jl_value_t* value = constant.value();
             if (jl_isa(value, (jl_value_t*)jl_builtin_type)) {
                 return success();
@@ -75,8 +76,8 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
         return failure();
     }
 
-    void rewrite(CallOp op, PatternRewriter &rewriter) const override {
-        ConstantOp defining = dyn_cast<ConstantOp>(op.callee().getDefiningOp());
+    void rewrite(jlir::CallOp op, PatternRewriter &rewriter) const override {
+        auto defining = dyn_cast<jlir::ConstantOp>(op.callee().getDefiningOp());
         assert(jl_isa(defining.value(), (jl_value_t*)jl_builtin_type));
         jl_datatype_t* typeof_builtin = (jl_datatype_t*)jl_typeof(defining.value());
         StringRef name = "jlir." + std::string(jl_symbol_name(typeof_builtin->name->mt->name));
@@ -91,14 +92,56 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
     }
 };
 
+/// Intrinsic rewriter
+struct LowerCustomIntrinsicCallPattern : public OpRewritePattern<InvokeOp> {
+    public:
+        using OpRewritePattern<InvokeOp>::OpRewritePattern;
+
+    LogicalResult match(InvokeOp op) const override {
+        Value callee = op.callee();
+        Operation *definingOp = callee.getDefiningOp();
+        llvm::errs() << " trying to lower: " << op << "\n";
+        if (!definingOp) {
+            llvm::errs() << " not an op\n";
+            // Value is block-argument.
+            return failure();
+        }
+        if (jlir::ConstantOp constant = dyn_cast<jlir::ConstantOp>(definingOp)) {
+            Type resultType = op.getResult().getType();
+            if (auto jlResultType = resultType.dyn_cast<JuliaType>()) {
+                jl_((jl_value_t*)jlResultType.getDatatype());
+                if (jl_subtype((jl_value_t*)jlResultType.getDatatype(), br_intrinsic_type)) {
+                    return success();
+                }
+                llvm::errs() << " not typeis\n";
+            }
+            llvm::errs() << " not JLType\n";
+        }
+        llvm::errs() << " not constant : " << *definingOp << "\n";
+
+        return failure();
+    }
+
+    void rewrite(InvokeOp op, PatternRewriter &rewriter) const override {
+        jlir::ConstantOp defining = dyn_cast<jlir::ConstantOp>(op.callee().getDefiningOp());
+
+        auto args = op.arguments();
+        // Replace the value of the old Op with the Result of the new op
+        SmallVector<mlir::Value, 2> inargs = {args[2], args[3]};
+        SmallVector<mlir::Value, 1> outargs = {args[1]};
+        rewriter.replaceOpWithNewOp<mlir::linalg::MatmulOp>(op, inargs, outargs);
+    }
+};
+
 } // namespace
 
-/// Register our patterns as "canonicalization" patterns on the CallOp so
+/// Register our patterns as "canonicalization" patterns on the jlir::CallOp so
 /// that they can be picked up by the Canonicalization framework.
-void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void jlir::CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
                                          MLIRContext *context) {
     results.insert<LowerIntrinsicCallPattern>(context);
     results.insert<LowerBuiltinCallPattern>(context);
+    results.insert<LowerCustomIntrinsicCallPattern>(context);
 }
 
 namespace {

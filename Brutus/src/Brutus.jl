@@ -13,6 +13,13 @@ end
     DumpTranslateToLLVM = 16
 end
 
+
+abstract type BrutusIntrinsic <: Function end
+
+struct Matmul! <: BrutusIntrinsic end
+@noinline (::Matmul!)(A, B, C) = Base.inferencebarrier(nothing)::Nothing
+const matmul! = Matmul!()
+
 function find_invokes(IR)
     callees = Core.MethodInstance[]
     for stmt in IR.stmts

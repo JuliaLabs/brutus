@@ -20,7 +20,6 @@ end
 emit(labels, Int64)
 
 
-
 # CHECK:   func nested @"Tuple{typeof(Main.labels), Int64}"(%arg0: !jlir<"typeof(Main.labels)">, %arg1: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

@@ -11,7 +11,6 @@ end
 emit(sum, Matrix{Float64})
 
 
-
 # CHECK:   func nested @"Tuple{typeof(Main.sum), Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.sum)">, %arg1: !jlir<"Array{Float64, 2}">) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
