@@ -474,25 +474,12 @@ extern "C"
         DUMP_TRANSLATE_TO_LLVM = 16,
     };
 
-    MlirContext *brutus_create_context(void)
-    {
-        mlir::MLIRContext *context = new mlir::MLIRContext;
-
-        // Load our Dialect in this MLIR Context
-        context->getOrLoadDialect<JLIRDialect>();
-        context->getOrLoadDialect<StandardOpsDialect>();
-        MlirContext *ctx = new MlirContext;
-        ctx->ptr = (void *)context;
-        return ctx;
-    }
-
     // TODO: enum with ERROR codes for failures.
-    MlirModule *brutus_codegen_jlir(MlirContext *context,
-                                    jl_value_t *methods,
-                                    jl_method_instance_t *entry_mi)
+    mlir::ModuleOp brutus_codegen_jlir(mlir::MLIRContext *context,
+                                        jl_value_t *methods,
+                                        jl_method_instance_t *entry_mi)
     {
-        mlir::MLIRContext *mlir_ctx = (mlir::MLIRContext *)context->ptr;
-        jl_mlirctx_t ctx(mlir_ctx);
+        jl_mlirctx_t ctx(context);
 
         jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t *)entry_mi);
         jl_value_t *ir_code = jl_fieldref(entry, 0);
@@ -511,25 +498,18 @@ extern "C"
         mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
         module.push_back(function);
         function->setAttr("llvm.emit_c_interface", UnitAttr::get(ctx.context));
-        MlirModule *mod = new MlirModule;
         if (failed(mlir::verify(module)))
         {
             module.emitError("module verification failed");
-            mod->ptr = nullptr;
+            return nullptr;
         }
-        else
-        {
-            mod->ptr = module;
-        }
-        return mod;
+        return module;
     }
 
     // canonicalize
-    void brutus_canonicalize(MlirContext *context, MlirModule *module)
+    void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module)
     {
-        mlir::MLIRContext *ctx = (mlir::MLIRContext *)context->ptr;
-        mlir::ModuleOp *mod = (mlir::ModuleOp *)module->ptr;
-        mlir::PassManager canonicalizePM(ctx);
+        mlir::PassManager canonicalizePM(context);
         // Apply any generic pass manager command line options and run the
         // pipeline.
         // FIXME: The next line currently seqfaults
@@ -537,76 +517,56 @@ extern "C"
         mlir::OpPassManager &canonicalizeOpPM = canonicalizePM.nest<mlir::FuncOp>();
         canonicalizeOpPM.addPass(mlir::createCanonicalizerPass());
         canonicalizeOpPM.addPass(mlir::createCSEPass());
-        LogicalResult canonicalizeResult = canonicalizePM.run(*mod);
+        LogicalResult canonicalizeResult = canonicalizePM.run(*module);
         ;
 
         if (mlir::failed(canonicalizeResult))
         {
-            mod->emitError("module canonicalization failed");
+            module->emitError("module canonicalization failed");
         }
         return;
     }
 
     // lower to Standard dialect
-    void brutus_lower_to_standard(MlirContext *context, MlirModule *module)
+    void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module)
     {
-        mlir::MLIRContext *ctx = (mlir::MLIRContext *)context->ptr;
-        mlir::ModuleOp *mod = (mlir::ModuleOp *)module->ptr;
         // llvm::DebugFlag = true;
-        mlir::PassManager loweringToStdPM(ctx);
+        mlir::PassManager loweringToStdPM(context);
         loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
         // canonicalize to remove redundant `ConvertStdOp`s
         loweringToStdPM.addPass(mlir::createCanonicalizerPass());
         loweringToStdPM.addPass(mlir::createCSEPass());
-        LogicalResult loweringToStdResult = loweringToStdPM.run(*mod);
+        LogicalResult loweringToStdResult = loweringToStdPM.run(*module);
         if (mlir::failed(loweringToStdResult))
         {
-            mod->emitError("lowering to Standard dialect failed");
+            module->emitError("lowering to Standard dialect failed");
         }
-        return;
     }
 
     // lower to LLVM dialect
-    void brutus_lower_to_llvm(MlirContext *context, MlirModule *module)
+    void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module)
     {
-        mlir::ModuleOp *mod = (mlir::ModuleOp *)module->ptr;
-        mlir::MLIRContext *ctx = (mlir::MLIRContext *)context->ptr;
-        mlir::PassManager loweringToLLVMPM(ctx);
+        mlir::PassManager loweringToLLVMPM(context);
         mlir::OpPassManager &funcop_pm = loweringToLLVMPM.nest<FuncOp>();
         funcop_pm.addPass(createJLIRToLLVMLoweringPass());
         loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
         loweringToLLVMPM.addPass(mlir::createCSEPass());
-        LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(*mod);
-        LogicalResult verifyResult = verify(*mod);
+        LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(*module);
+        LogicalResult verifyResult = verify(*module);
         if (mlir::failed(loweringToLLVMResult))
         {
-            mod->emitError("lowering to LLVM dialect failed");
+            module->emitError("lowering to LLVM dialect failed");
         }
         if (mlir::failed(verifyResult))
         {
-            mod->emitError("module verification failed");
+            module->emitError("module verification failed");
         }
-        return;
     }
 
-    ExecutionEngineFPtrResult brutus_create_execution_engine(MlirContext *context, 
-                                                             MlirModule *module, 
+    ExecutionEngineFPtrResult brutus_create_execution_engine(mlir::MLIRContext *context,
+                                                             mlir::ModuleOp *module,
                                                              std::string name)
     {
-        mlir::ModuleOp *mod = (mlir::ModuleOp *)module->ptr;
-        mlir::MLIRContext *ctx = (mlir::MLIRContext *)context->ptr;
-        
-        //if (dump_flags & DUMP_TRANSLATE_TO_LLVM)
-        //{
-        //    llvm::LLVMContext llvmContext;
-        //    auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
-        //    llvm::dbgs() << "after lowering to LLVM IR:";
-        //    Mod->print(llvm::dbgs(), nullptr);
-        //    llvm::dbgs() << "\n\n";
-        //    return nullptr;
-        //}
-        // see mlir/lib/ExecutionEngine/JitRunner.cpp
-
         Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
             llvm::CodeGenOpt::Aggressive;
 
@@ -624,7 +584,7 @@ extern "C"
         }
 
         auto transformer = makeLLVMPassesTransformer(None, 3, tmOrError->get());
-        auto expectedEngine = ExecutionEngine::create(*mod, nullptr, transformer, jitCodeGenOptLevel);
+        auto expectedEngine = ExecutionEngine::create(*module, nullptr, transformer, jitCodeGenOptLevel);
 
         if (!expectedEngine)
         {
@@ -646,13 +606,16 @@ extern "C"
 
     ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
     {
-        auto ctx = brutus_create_context();
-        auto module = brutus_codegen_jlir(ctx, methods, entry_mi);
-        brutus_canonicalize(ctx, module);
-        brutus_lower_to_standard(ctx, module);
-        brutus_lower_to_llvm(ctx, module);
+
+        mlir::MLIRContext context;
+        context.getOrLoadDialect<JLIRDialect>();
+        context.getOrLoadDialect<StandardOpsDialect>();
+        auto module = brutus_codegen_jlir(&context, methods, entry_mi);
+        brutus_canonicalize(&context, &module);
+        brutus_lower_to_standard(&context, &module);
+        brutus_lower_to_llvm(&context, &module);
         std::string name = mi_name(entry_mi);
-        auto engine_ptr = brutus_create_execution_engine(ctx, module, name);
+        auto engine_ptr = brutus_create_execution_engine(&context, &module, name);
         return engine_ptr;
     }
 
