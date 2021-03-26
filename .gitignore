@@ -1,6 +1,6 @@
 .vscode/
-build*/
 Brutus/Manifest.toml
 llvm
-julia
 MLIR.jl
+julia
+build

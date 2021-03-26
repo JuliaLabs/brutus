@@ -18,6 +18,7 @@
 #include "mlir/Target/LLVMIR.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 
 using namespace mlir;
 using namespace mlir::jlir;
@@ -475,9 +476,11 @@ extern "C"
     };
 
     // TODO: enum with ERROR codes for failures.
-    mlir::ModuleOp brutus_codegen_jlir(mlir::MLIRContext *context,
-                                        jl_value_t *methods,
-                                        jl_method_instance_t *entry_mi)
+    void brutus_codegen_jlir(mlir::ModuleOp &module,
+                             mlir::MLIRContext *context,
+                             jl_value_t *methods,
+                             jl_method_instance_t *entry_mi,
+                             char dump_flags)
     {
         jl_mlirctx_t ctx(context);
 
@@ -486,7 +489,7 @@ extern "C"
         jl_value_t *ret_type = jl_fieldref(entry, 1);
 
         // 1. Create MLIR builder and module
-        ModuleOp module = ModuleOp::create(ctx.builder.getUnknownLoc());
+        module = ModuleOp::create(ctx.builder.getUnknownLoc());
 
         // 2. Function prototype
         mlir::FunctionType ftype = emit_ftype(ctx, ir_code, ret_type);
@@ -501,13 +504,18 @@ extern "C"
         if (failed(mlir::verify(module)))
         {
             module.emitError("module verification failed");
-            return nullptr;
         }
-        return module;
+
+        if (dump_flags & DUMP_TRANSLATED)
+        {
+            llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
+            module.dump();
+            llvm::dbgs() << "\n\n";
+        }
     }
 
     // canonicalize
-    void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module)
+    void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
     {
         mlir::PassManager canonicalizePM(context);
         // Apply any generic pass manager command line options and run the
@@ -524,11 +532,17 @@ extern "C"
         {
             module->emitError("module canonicalization failed");
         }
-        return;
+
+        if (dump_flags & DUMP_CANONICALIZED)
+        {
+            llvm::dbgs() << "after canonicalizing:";
+            module->dump();
+            llvm::dbgs() << "\n\n";
+        }
     }
 
     // lower to Standard dialect
-    void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module)
+    void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
     {
         // llvm::DebugFlag = true;
         mlir::PassManager loweringToStdPM(context);
@@ -541,10 +555,17 @@ extern "C"
         {
             module->emitError("lowering to Standard dialect failed");
         }
+
+        if (dump_flags & DUMP_LOWERED_TO_STD)
+        {
+            llvm::dbgs() << "after lowering to Standard dialect:\n";
+            module->dump();
+            llvm::dbgs() << "\n\n";
+        }
     }
 
     // lower to LLVM dialect
-    void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module)
+    void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
     {
         mlir::PassManager loweringToLLVMPM(context);
         mlir::OpPassManager &funcop_pm = loweringToLLVMPM.nest<FuncOp>();
@@ -560,6 +581,22 @@ extern "C"
         if (mlir::failed(verifyResult))
         {
             module->emitError("module verification failed");
+        }
+
+        if (dump_flags & DUMP_LOWERED_TO_LLVM)
+        {
+            llvm::dbgs() << "after lowering to LLVM dialect:";
+            module->dump();
+            llvm::dbgs() << "\n\n";
+        }
+
+        if (dump_flags & DUMP_TRANSLATE_TO_LLVM)
+        {
+            llvm::LLVMContext llvmContext;
+            auto Mod = mlir::translateModuleToLLVMIR(*module, llvmContext);
+            llvm::dbgs() << "after lowering to LLVM IR:";
+            Mod->print(llvm::dbgs(), nullptr);
+            llvm::dbgs() << "\n\n";
         }
     }
 
@@ -606,17 +643,18 @@ extern "C"
 
     ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
     {
-
         mlir::MLIRContext context;
         context.getOrLoadDialect<JLIRDialect>();
         context.getOrLoadDialect<StandardOpsDialect>();
-        auto module = brutus_codegen_jlir(&context, methods, entry_mi);
-        brutus_canonicalize(&context, &module);
-        brutus_lower_to_standard(&context, &module);
-        brutus_lower_to_llvm(&context, &module);
+        context.getOrLoadDialect<linalg::LinalgDialect>();
+        //context.getOrLoadDialect<LinalgDialect>();
+        mlir::ModuleOp module;
+        brutus_codegen_jlir(module, &context, methods, entry_mi, dump_flags);
+        brutus_canonicalize(&context, &module, dump_flags);
+        brutus_lower_to_standard(&context, &module, dump_flags);
+        brutus_lower_to_llvm(&context, &module, dump_flags);
         std::string name = mi_name(entry_mi);
         auto engine_ptr = brutus_create_execution_engine(&context, &module, name);
         return engine_ptr;
     }
-
 } // extern "C"

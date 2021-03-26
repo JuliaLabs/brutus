@@ -20,18 +20,19 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 
 #ifdef __cplusplus
-extern "C" {
+extern "C"
+{
 #endif
 
-typedef void (*ExecutionEngineFPtrResult)(void **);
+    typedef void (*ExecutionEngineFPtrResult)(void **);
 
-void brutus_init(jl_module_t *brutus);
-mlir::ModuleOp brutus_codegen_jlir(mlir::MLIRContext *context, jl_value_t *methods, jl_method_instance_t *entry_mi);
-void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module);
-void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module);
-void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module);
-ExecutionEngineFPtrResult brutus_create_execution_engine(mlir::MLIRContext *context, mlir::ModuleOp *module, std::string name);
-ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags);
+    void brutus_init(jl_module_t *brutus);
+    void brutus_codegen_jlir(mlir::ModuleOp &module, mlir::MLIRContext *context, jl_value_t *methods, jl_method_instance_t *entry_mi, char dump_flags);
+    void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags);
+    void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags);
+    void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags);
+    ExecutionEngineFPtrResult brutus_create_execution_engine(mlir::MLIRContext *context, mlir::ModuleOp *module, std::string name);
+    ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags);
 
 #ifdef __cplusplus
 } // end extern "C"
