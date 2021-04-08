@@ -64,11 +64,10 @@ struct MLIRCompilerParams <: AbstractCompilerParams
 end
 
 # Emit MLIR IR to stdout
-function _jit(job::CompilerJob)
+function _emit(job::CompilerJob)
     ft, tt = job.source.f, job.source.tt.parameters
     emit_fptr = job.params.emit_fptr
     dump_options = job.params.dump_options
-    name = (ft isa Type && ft <: Function) ? nameof(ft.instance) : nameof(ft)
 
     # get first method instance matching signature
     entry_mi = get_methodinstance(Tuple{typeof(ft), tt...})
@@ -116,10 +115,10 @@ function _link(job::CompilerJob, (fptr, rt))
     return Thunk{typeof(f), rt, tt}(f, fptr)
 end
 
-function jit(f::F, tt::TT = Tuple{}; emit_fptr = true, dump_options::Vector{DumpOption} = DumpOption[]) where {F, TT <: Type}
-    fspec = FunctionSpec(f, tt, false, nothing)
+function emit(@nospecialize(f), tt...; emit_fptr = true, dump_options::Vector{DumpOption} = DumpOption[])
+    fspec = FunctionSpec(f, Tuple{tt...}, false, nothing)
     job = CompilerJob(MLIRCompilerTarget(), fspec, MLIRCompilerParams(emit_fptr, dump_options))
-    return GPUCompiler.cached_compilation(compiled_cache, job, _jit, _link)
+    return GPUCompiler.cached_compilation(compiled_cache, job, _emit, _link)
 end
 
 # Need to pass struct as pointer, to match cifacme ABI
@@ -147,6 +146,6 @@ end
 end
 
 function call(f::F, args...) where F
-    TT = Tuple{map(Core.Typeof, args)...}
-    return jit(f, TT)(args...)
+    TT = map(Core.Typeof, args)
+    return emit(f, TT...)(args...)
 end

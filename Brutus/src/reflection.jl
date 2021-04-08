@@ -1,4 +1,3 @@
-
 function get_methodinstance(@nospecialize(sig);
                             world=Base.get_world_counter(),
                             interp=Core.Compiler.NativeInterpreter(world))
@@ -49,24 +48,25 @@ function code_ircode(mi::Core.Compiler.MethodInstance;
     resize!(ir.argtypes, opt.nargs)
     return ir => Core.Compiler.widenconst(result.result)
 end
+
 emit_optimized(f, tt...) =
-    emit(typeof(f), tt,
+    emit(f, tt...;
          emit_fptr=false,
          dump_options=[Brutus.DumpCanonicalized])
 
 emit_lowered(f, tt...) =
-    emit(typeof(f), tt,
+    emit(f, tt...;
          emit_fptr=false, # TODO: change to true when ready
          dump_options=[Brutus.DumpLoweredToStd,
                        Brutus.DumpLoweredToLLVM])
 
 emit_translated(f, tt...) =
-    emit(typeof(f), tt,
+    emit(f, tt...;
          emit_fptr=false,
          dump_options=[Brutus.DumpTranslated])
 
 emit_llvm(f, tt...) =
-    emit(typeof(f), tt,
+    emit(f, tt...;
          emit_fptr=false, # TODO: change to true when ready
          dump_options=[Brutus.DumpLoweredToLLVM,
                        Brutus.DumpTranslateToLLVM])

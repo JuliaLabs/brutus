@@ -38,7 +38,7 @@ index(A, i, j) = A[i, j]
 index(A, i, j, k) = A[i, j, k]
 
 @testset "3D indexing" begin
-    thunk = Brutus.jit(index, Tuple{Array{Int,3}, Int, Int, Int})
+    thunk = Brutus.emit(index, Array{Int,3}, Int, Int, Int)
 
     arr = Int[i*j*k for i in 1:3, j in 1:5, k in 1:7]
     for i in 1:3
