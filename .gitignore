@@ -4,3 +4,4 @@ llvm
 MLIR.jl
 julia
 build
+scratch
