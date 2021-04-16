@@ -16,6 +16,9 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Target/LLVMIR.h"
+#include "mlir-c/IR.h"
+#include "mlir/CAPI/Wrap.h"
+#include "mlir/CAPI/IR.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
@@ -476,20 +479,25 @@ extern "C"
     };
 
     // TODO: enum with ERROR codes for failures.
-    void brutus_codegen_jlir(mlir::ModuleOp &module,
-                             mlir::MLIRContext *context,
+    void brutus_codegen_jlir(MlirContext Context,
+                             MlirModule Module,
                              jl_value_t *methods,
                              jl_method_instance_t *entry_mi,
                              char dump_flags)
     {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
+
         jl_mlirctx_t ctx(context);
+
+        context->getOrLoadDialect<JLIRDialect>();
+        context->getOrLoadDialect<StandardOpsDialect>();
+        context->getOrLoadDialect<linalg::LinalgDialect>();
+        // context.getOrLoadDialect<LinalgDialect>();
 
         jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t *)entry_mi);
         jl_value_t *ir_code = jl_fieldref(entry, 0);
         jl_value_t *ret_type = jl_fieldref(entry, 1);
-
-        // 1. Create MLIR builder and module
-        module = ModuleOp::create(ctx.builder.getUnknownLoc());
 
         // 2. Function prototype
         mlir::FunctionType ftype = emit_ftype(ctx, ir_code, ret_type);
@@ -503,20 +511,25 @@ extern "C"
         function->setAttr("llvm.emit_c_interface", UnitAttr::get(ctx.context));
         if (failed(mlir::verify(module)))
         {
-            module.emitError("module verification failed");
+            module->emitError("module verification failed");
         }
 
         if (dump_flags & DUMP_TRANSLATED)
         {
             llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
-            module.dump();
+            module->dump();
             llvm::dbgs() << "\n\n";
         }
     }
 
     // canonicalize
-    void brutus_canonicalize(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
+    void brutus_canonicalize(MlirContext Context,
+                             MlirModule Module, 
+                             char dump_flags)
     {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
+
         mlir::PassManager canonicalizePM(context);
         // Apply any generic pass manager command line options and run the
         // pipeline.
@@ -525,7 +538,7 @@ extern "C"
         mlir::OpPassManager &canonicalizeOpPM = canonicalizePM.nest<mlir::FuncOp>();
         canonicalizeOpPM.addPass(mlir::createCanonicalizerPass());
         canonicalizeOpPM.addPass(mlir::createCSEPass());
-        LogicalResult canonicalizeResult = canonicalizePM.run(*module);
+        LogicalResult canonicalizeResult = canonicalizePM.run(module);
         ;
 
         if (mlir::failed(canonicalizeResult))
@@ -542,15 +555,20 @@ extern "C"
     }
 
     // lower to Standard dialect
-    void brutus_lower_to_standard(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
+    void brutus_lower_to_standard(MlirContext Context,
+                                  MlirModule Module,
+                                  char dump_flags)
     {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
+
         // llvm::DebugFlag = true;
         mlir::PassManager loweringToStdPM(context);
         loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
         // canonicalize to remove redundant `ConvertStdOp`s
         loweringToStdPM.addPass(mlir::createCanonicalizerPass());
         loweringToStdPM.addPass(mlir::createCSEPass());
-        LogicalResult loweringToStdResult = loweringToStdPM.run(*module);
+        LogicalResult loweringToStdResult = loweringToStdPM.run(module);
         if (mlir::failed(loweringToStdResult))
         {
             module->emitError("lowering to Standard dialect failed");
@@ -565,15 +583,20 @@ extern "C"
     }
 
     // lower to LLVM dialect
-    void brutus_lower_to_llvm(mlir::MLIRContext *context, mlir::ModuleOp *module, char dump_flags)
+    void brutus_lower_to_llvm(MlirContext Context,
+                              MlirModule Module,
+                              char dump_flags)
     {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
+
         mlir::PassManager loweringToLLVMPM(context);
         mlir::OpPassManager &funcop_pm = loweringToLLVMPM.nest<FuncOp>();
         funcop_pm.addPass(createJLIRToLLVMLoweringPass());
         loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
         loweringToLLVMPM.addPass(mlir::createCSEPass());
-        LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(*module);
-        LogicalResult verifyResult = verify(*module);
+        LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
+        LogicalResult verifyResult = verify(module);
         if (mlir::failed(loweringToLLVMResult))
         {
             module->emitError("lowering to LLVM dialect failed");
@@ -593,17 +616,19 @@ extern "C"
         if (dump_flags & DUMP_TRANSLATE_TO_LLVM)
         {
             llvm::LLVMContext llvmContext;
-            auto Mod = mlir::translateModuleToLLVMIR(*module, llvmContext);
+            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
             llvm::dbgs() << "after lowering to LLVM IR:";
             Mod->print(llvm::dbgs(), nullptr);
             llvm::dbgs() << "\n\n";
         }
     }
 
-    ExecutionEngineFPtrResult brutus_create_execution_engine(mlir::MLIRContext *context,
-                                                             mlir::ModuleOp *module,
+    ExecutionEngineFPtrResult brutus_create_execution_engine(MlirContext Context,
+                                                             MlirModule Module,
                                                              std::string name)
     {
+        mlir::ModuleOp module = unwrap(Module);
+
         Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
             llvm::CodeGenOpt::Aggressive;
 
@@ -621,7 +646,7 @@ extern "C"
         }
 
         auto transformer = makeLLVMPassesTransformer(None, 3, tmOrError->get());
-        auto expectedEngine = ExecutionEngine::create(*module, nullptr, transformer, jitCodeGenOptLevel);
+        auto expectedEngine = ExecutionEngine::create(module, nullptr, transformer, jitCodeGenOptLevel);
 
         if (!expectedEngine)
         {
@@ -643,18 +668,19 @@ extern "C"
 
     ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
     {
-        mlir::MLIRContext context;
-        context.getOrLoadDialect<JLIRDialect>();
-        context.getOrLoadDialect<StandardOpsDialect>();
-        context.getOrLoadDialect<linalg::LinalgDialect>();
-        //context.getOrLoadDialect<LinalgDialect>();
-        mlir::ModuleOp module;
-        brutus_codegen_jlir(module, &context, methods, entry_mi, dump_flags);
-        brutus_canonicalize(&context, &module, dump_flags);
-        brutus_lower_to_standard(&context, &module, dump_flags);
-        brutus_lower_to_llvm(&context, &module, dump_flags);
+        MlirContext context = mlirContextCreate();
+        MlirModule module = mlirModuleCreateEmpty(mlirLocationUnknownGet(context));
+
+        brutus_codegen_jlir(context, module, methods, entry_mi, dump_flags);
+        brutus_canonicalize(context, module, dump_flags);
+        brutus_lower_to_standard(context, module, dump_flags);
+        brutus_lower_to_llvm(context, module, dump_flags);
         std::string name = mi_name(entry_mi);
-        auto engine_ptr = brutus_create_execution_engine(&context, &module, name);
+        auto engine_ptr = brutus_create_execution_engine(context, module, name);
+
+        mlirModuleDestroy(module);
+        mlirContextDestroy(context);
+
         return engine_ptr;
     }
-} // extern "C"
+}

@@ -1,5 +1,7 @@
 module Brutus
 
+using MLIR
+
 using GPUCompiler
 import GPUCompiler: FunctionSpec, AbstractCompilerTarget, AbstractCompilerParams
 
