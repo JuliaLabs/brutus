@@ -9,6 +9,7 @@ julia = joinpath(Sys.BINDIR, Base.julia_exename())
 import Base.Threads: @threads
 
 @threads for test in tests
+    display(test)
     runlines = String[]
     content = String[]
     open(test, "r") do io

@@ -5,7 +5,9 @@ emit(select, Bool)
 
 
 
-# CHECK:   func nested @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: !jlir.Bool) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.select), Bool}, svec(), select(c) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/lower/select.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: !jlir.Bool) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()

@@ -5,7 +5,9 @@ emit(add, Float64, Float64)
 
 
 
-# CHECK:   func nested @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
+
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.add), Float64, Float64}, svec(), add(x, y) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/lower/add_float64.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #12 add_float>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">

@@ -11,7 +11,9 @@ end
 emit(sum, Matrix{Float64})
 
 
-# CHECK:   func nested @"Tuple{typeof(Main.sum), Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.sum)">, %arg1: !jlir<"Array{Float64, 2}">) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
+
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.sum), Matrix{Float64}}, svec(), sum(A) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/canonicalize/sum.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.sum), Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.sum)">, %arg1: !jlir<"Array{Float64, 2}">) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.Core.arraysize} : () -> !jlir<"typeof(Core.arraysize)">

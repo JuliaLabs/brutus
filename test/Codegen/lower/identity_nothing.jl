@@ -4,7 +4,9 @@ emit(identity, Nothing)
 
 
 
-# CHECK:   func nested @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
+
+# CHECK: Core.MethodMatch(Tuple{typeof(identity), Nothing}, svec(), identity(x) in Base at operators.jl:513, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     "jlir.return"(%arg1) : (!jlir.Nothing) -> ()

@@ -5,7 +5,9 @@ emit(ne, Float64, Float64)
 
 
 
-# CHECK:   func nested @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !jlir<"typeof(Main.ne)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Bool attributes {llvm.emit_c_interface} {
+
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.ne), Float64, Float64}, svec(), ne(x, y) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/lower/ne.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !jlir<"typeof(Main.ne)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Bool attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #32 ne_float>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
