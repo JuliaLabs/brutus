@@ -5,6 +5,14 @@ emit(symbol)
 
 
 
+# CHECK:   func nested @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<":testing">} : () -> !jlir.Symbol
+# CHECK-NEXT:     "jlir.return"(%0) : (!jlir.Symbol) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
+
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.symbol)}"(%arg0: !jlir<"typeof(Main.symbol)">) -> !jlir.Symbol attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<":testing">} : () -> !jlir.Symbol
