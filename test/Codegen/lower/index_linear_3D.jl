@@ -6,6 +6,16 @@ emit(index, Array{Int64, 3}, Int64)
 
 
 
+# CHECK:   func nested @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.Core.arrayref} : () -> !jlir<"typeof(Core.arrayref)">
+# CHECK-NEXT:     %1 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     %2 = "jlir.call"(%0, %1, %arg1, %arg2) : (!jlir<"typeof(Core.arrayref)">, !jlir.Bool, !jlir<"Array{Int64, 3}">, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     "jlir.return"(%2) : (!jlir.Int64) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
+
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: memref<?x?x?xi64>, %arg2: i64) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c0 = constant 0 : index

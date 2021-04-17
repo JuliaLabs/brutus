@@ -5,6 +5,15 @@ emit(add, Float64, Float64)
 
 
 
+# CHECK:   func nested @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Float64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #12 add_float>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %1 = "jlir.call"(%0, %arg1, %arg2) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Float64, !jlir.Float64) -> !jlir.Float64
+# CHECK-NEXT:     "jlir.return"(%1) : (!jlir.Float64) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
+
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.add), Float64, Float64}"(%arg0: !jlir<"typeof(Main.add)">, %arg1: f64, %arg2: f64) -> f64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %0 = addf %arg1, %arg2 : f64

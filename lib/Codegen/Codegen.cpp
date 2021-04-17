@@ -1,3 +1,4 @@
+
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
@@ -16,22 +17,26 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Target/LLVMIR.h"
+#include "mlir-c/IR.h"
+#include "mlir/CAPI/Wrap.h"
+#include "mlir/CAPI/IR.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 
 using namespace mlir;
 using namespace mlir::jlir;
 
 class jl_mlirctx_t
 {
-public:
-    OpBuilder builder;
-    MLIRContext *context;
-    std::vector<Value> values;
-    std::vector<Value> arguments;
+    public:
+        OpBuilder builder;
+        MLIRContext *context;
+        std::vector<Value> values;
+        std::vector<Value> arguments;
 
-    jl_mlirctx_t(MLIRContext *context)
-        : builder(context), context(context) {}
+        jl_mlirctx_t(MLIRContext *context)
+            : builder(context), context(context) {}
 };
 
 std::string mi_name(jl_method_instance_t *mi)
@@ -53,7 +58,7 @@ std::string mi_name(jl_method_instance_t *mi)
 }
 
 mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
-                             mlir::Value value, jl_datatype_t *expected_type)
+        mlir::Value value, jl_datatype_t *expected_type)
 {
     // widen the type of the value with a PiOp if its type is a subtype of the
     // expected type
@@ -71,7 +76,7 @@ mlir::Value maybe_widen_type(jl_mlirctx_t &ctx, mlir::Location loc,
 }
 
 mlir::Value emit_value(jl_mlirctx_t &ctx, mlir::Location loc,
-                       jl_value_t *value, jl_datatype_t *type = nullptr)
+        jl_value_t *value, jl_datatype_t *type = nullptr)
 {
     // check if we have a const globalref
     if (jl_is_globalref(value))
@@ -184,7 +189,7 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
     else
     {
         auto op = ctx.builder.create<UnimplementedOp>(
-            loc, type);
+                loc, type);
         return op.getResult();
     }
 }
@@ -192,16 +197,16 @@ mlir::Value emit_expr(jl_mlirctx_t &ctx, Location &loc, jl_expr_t *expr, jl_data
 void handleLLVMError(llvm::Error error)
 {
     llvm::handleAllErrors(std::move(error),
-                          [](const llvm::ErrorInfoBase &info) {
-                              llvm::errs() << "error: ";
-                              info.log(llvm::errs());
-                              llvm::errs() << "\n";
-                          });
+            [](const llvm::ErrorInfoBase &info) {
+            llvm::errs() << "error: ";
+            info.log(llvm::errs());
+            llvm::errs() << "\n";
+            });
 }
 
 mlir::FunctionType emit_ftype(jl_mlirctx_t &ctx,
-                              jl_value_t *ir_code,
-                              jl_value_t *ret_type)
+        jl_value_t *ir_code,
+        jl_value_t *ret_type)
 {
 
     jl_array_t *argtypes = (jl_array_t *)jl_get_field(ir_code, "argtypes");
@@ -213,18 +218,18 @@ mlir::FunctionType emit_ftype(jl_mlirctx_t &ctx,
     {
         // this assumes that we have `jl_datatype_t`s!
         args.push_back(
-            JuliaType::get(ctx.context, (jl_datatype_t *)jl_arrayref(argtypes, i)));
+                JuliaType::get(ctx.context, (jl_datatype_t *)jl_arrayref(argtypes, i)));
     }
     mlir::Type ret = (mlir::Type)JuliaType::get(ctx.context, (jl_datatype_t *)ret_type);
     return ctx.builder.getFunctionType(args, llvm::makeArrayRef(ret));
 }
 
 mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
-                           jl_value_t *ir_code,
-                           mlir::FunctionType ftype,
-                           mlir::Type ret,
-                           jl_value_t *ret_type,
-                           std::string name)
+        jl_value_t *ir_code,
+        mlir::FunctionType ftype,
+        mlir::Type ret,
+        jl_value_t *ret_type,
+        std::string name)
 {
     jl_value_t *irstream = jl_get_field(ir_code, "stmts");
 
@@ -260,7 +265,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 fname = "macro expansion";
             assert(inlined_at <= i);
             mlir::Location current = mlir::NameLoc::get(mlir::Identifier::get(fname, ctx.context),
-                                                        mlir::FileLineColLoc::get(file, line, 0, ctx.context));
+                    mlir::FileLineColLoc::get(file, line, 0, ctx.context));
 
             // codegen.cpp uses a better heuristic for now just live with this
             if (inlined_at > 0)
@@ -337,7 +342,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 {
                     // Julia allows undef PhiNode references to be dropped need to represent them here
                     auto op = ctx.builder.create<UndefOp>(
-                        loc, JuliaType::get(ctx.context, type));
+                            loc, JuliaType::get(ctx.context, type));
                     v.push_back(op.getResult());
                 }
             }
@@ -377,9 +382,9 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 // if type of return value is a subtype of expected return type,
                 // use PiOp to widen the value
                 value = maybe_widen_type(
-                    ctx, loc,
-                    emit_value(ctx, loc, ret_val),
-                    (jl_datatype_t *)ret_type);
+                        ctx, loc,
+                        emit_value(ctx, loc, ret_val),
+                        (jl_datatype_t *)ret_type);
             }
             else
             {
@@ -403,9 +408,9 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
             assert(dest <= nblocks);
             assert(current_block + 1 <= nblocks);
             ctx.builder.create<GotoIfNotOp>(
-                loc, cond,
-                bbs[dest], emit_branchargs(current_block, dest, loc),
-                bbs[current_block + 1], emit_branchargs(current_block, current_block + 1, loc)); // Implicit fallthrough
+                    loc, cond,
+                    bbs[dest], emit_branchargs(current_block, dest, loc),
+                    bbs[current_block + 1], emit_branchargs(current_block, current_block + 1, loc)); // Implicit fallthrough
             is_terminator = true;
         }
         else if (jl_is_phinode(stmt))
@@ -439,14 +444,14 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
         if (!is_terminator)
         {
             jl_value_t *range = jl_get_field(
-                jl_arrayref(cfg_blocks, current_block - 1), "stmts");
+                    jl_arrayref(cfg_blocks, current_block - 1), "stmts");
             int stop = jl_unbox_long(jl_get_field(range, "stop")) - 1;
             if (i == stop)
             {
                 assert(current_block + 1 <= nblocks);
                 ctx.builder.create<GotoOp>(
-                    loc, bbs[current_block + 1],
-                    emit_branchargs(current_block, current_block + 1, loc));
+                        loc, bbs[current_block + 1],
+                        emit_branchargs(current_block, current_block + 1, loc));
                 is_terminator = true;
             }
         }
@@ -474,25 +479,25 @@ extern "C"
         DUMP_TRANSLATE_TO_LLVM = 16,
     };
 
-    ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods,
-                                             jl_method_instance_t *entry_mi,
-                                             char emit_fptr,
-                                             char dump_flags)
+    // TODO: enum with ERROR codes for failures.
+    void brutus_codegen_jlir(MlirContext Context,
+            MlirModule Module,
+            jl_value_t *methods,
+            jl_method_instance_t *entry_mi,
+            char dump_flags)
     {
-        mlir::MLIRContext context;
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
 
-        // Load our Dialect in this MLIR Context
-        context.getOrLoadDialect<JLIRDialect>();
-        context.getOrLoadDialect<StandardOpsDialect>();
+        jl_mlirctx_t ctx(context);
 
-        jl_mlirctx_t ctx(&context);
+        context->getOrLoadDialect<JLIRDialect>();
+        context->getOrLoadDialect<StandardOpsDialect>();
+        context->getOrLoadDialect<linalg::LinalgDialect>();
 
         jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t *)entry_mi);
         jl_value_t *ir_code = jl_fieldref(entry, 0);
         jl_value_t *ret_type = jl_fieldref(entry, 1);
-
-        // 1. Create MLIR builder and module
-        ModuleOp module = ModuleOp::create(ctx.builder.getUnknownLoc());
 
         // 2. Function prototype
         mlir::FunctionType ftype = emit_ftype(ctx, ir_code, ret_type);
@@ -503,27 +508,22 @@ extern "C"
         std::string name = mi_name(entry_mi);
         mlir::FuncOp function = emit_function(ctx, ir_code, ftype, ret, ret_type, name);
         module.push_back(function);
-
-        // 4. Set `emit_c_interface`
         function->setAttr("llvm.emit_c_interface", UnitAttr::get(ctx.context));
-
-        if (dump_flags & DUMP_TRANSLATED)
-        {
-            llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
-            module.dump();
-            llvm::dbgs() << "\n\n";
-        }
-
-        // Lastly verify module
         if (failed(mlir::verify(module)))
         {
-            module.emitError("module verification failed");
-            return nullptr;
+            module->emitError("module verification failed");
         }
+    }
 
-        // canonicalize
+    // canonicalize
+    void brutus_canonicalize(MlirContext Context,
+            MlirModule Module,
+            char dump_flags)
+    {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
 
-        mlir::PassManager canonicalizePM(&context);
+        mlir::PassManager canonicalizePM(context);
         // Apply any generic pass manager command line options and run the
         // pipeline.
         // FIXME: The next line currently seqfaults
@@ -534,87 +534,63 @@ extern "C"
         LogicalResult canonicalizeResult = canonicalizePM.run(module);
         ;
 
-        if (dump_flags & DUMP_CANONICALIZED)
-        {
-            llvm::dbgs() << "after canonicalizing:";
-            module.dump();
-            llvm::dbgs() << "\n\n";
-        }
-
         if (mlir::failed(canonicalizeResult))
         {
-            module.emitError("module canonicalization failed");
-            return nullptr;
+            module->emitError("module canonicalization failed");
         }
+    }
 
-        // lower to Standard dialect
+    // lower to Standard dialect
+    void brutus_lower_to_standard(MlirContext Context,
+            MlirModule Module,
+            char dump_flags)
+    {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
 
         // llvm::DebugFlag = true;
-        mlir::PassManager loweringToStdPM(&context);
+        mlir::PassManager loweringToStdPM(context);
         loweringToStdPM.addPass(createJLIRToStandardLoweringPass());
         // canonicalize to remove redundant `ConvertStdOp`s
         loweringToStdPM.addPass(mlir::createCanonicalizerPass());
         loweringToStdPM.addPass(mlir::createCSEPass());
         LogicalResult loweringToStdResult = loweringToStdPM.run(module);
-
-        if (dump_flags & DUMP_LOWERED_TO_STD)
-        {
-            llvm::dbgs() << "after lowering to Standard dialect:\n";
-            module.dump();
-            llvm::dbgs() << "\n\n";
-        }
-
         if (mlir::failed(loweringToStdResult))
         {
-            module.emitError("lowering to Standard dialect failed");
-            return nullptr;
+            module->emitError("lowering to Standard dialect failed");
         }
+    }
 
-        // lower to LLVM dialect
+    // lower to LLVM dialect
+    void brutus_lower_to_llvm(MlirContext Context,
+            MlirModule Module,
+            char dump_flags)
+    {
+        mlir::MLIRContext *context = unwrap(Context);
+        mlir::ModuleOp module = unwrap(Module);
 
-        mlir::PassManager loweringToLLVMPM(&context);
-        mlir::OpPassManager &funcop_pm= loweringToLLVMPM.nest<FuncOp>();
+        mlir::PassManager loweringToLLVMPM(context);
+        mlir::OpPassManager &funcop_pm = loweringToLLVMPM.nest<FuncOp>();
         funcop_pm.addPass(createJLIRToLLVMLoweringPass());
         loweringToLLVMPM.addPass(mlir::createCanonicalizerPass());
         loweringToLLVMPM.addPass(mlir::createCSEPass());
         LogicalResult loweringToLLVMResult = loweringToLLVMPM.run(module);
-
-        if (dump_flags & DUMP_LOWERED_TO_LLVM)
-        {
-            llvm::dbgs() << "after lowering to LLVM dialect:";
-            module.dump();
-            llvm::dbgs() << "\n\n";
-        }
-
+        LogicalResult verifyResult = verify(module);
         if (mlir::failed(loweringToLLVMResult))
         {
-            module.emitError("lowering to LLVM dialect failed");
-            return nullptr;
+            module->emitError("lowering to LLVM dialect failed");
         }
-
-        // Lastly verify module
-        if (failed(mlir::verify(module)))
+        if (mlir::failed(verifyResult))
         {
-            module.emitError("module verification failed");
-            return nullptr;
+            module->emitError("module verification failed");
         }
+    }
 
-        if (dump_flags & DUMP_TRANSLATE_TO_LLVM)
-        {
-            llvm::LLVMContext llvmContext;
-            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
-            llvm::dbgs() << "after lowering to LLVM IR:";
-            Mod->print(llvm::dbgs(), nullptr);
-            llvm::dbgs() << "\n\n";
-            return nullptr;
-        }
-
-        if (!emit_fptr)
-        {
-            return nullptr;
-        }
-
-        // see mlir/lib/ExecutionEngine/JitRunner.cpp
+    ExecutionEngineFPtrResult brutus_create_execution_engine(MlirContext Context,
+            MlirModule Module,
+            std::string name)
+    {
+        mlir::ModuleOp module = unwrap(Module);
 
         Optional<llvm::CodeGenOpt::Level> jitCodeGenOptLevel =
             llvm::CodeGenOpt::Aggressive;
@@ -634,7 +610,7 @@ extern "C"
 
         auto transformer = makeLLVMPassesTransformer(None, 3, tmOrError->get());
         auto expectedEngine = ExecutionEngine::create(module, nullptr, transformer, jitCodeGenOptLevel);
-        
+
         if (!expectedEngine)
         {
             handleLLVMError(expectedEngine.takeError());
@@ -653,4 +629,68 @@ extern "C"
         return expectedFPtr.get();
     }
 
-} // extern "C"
+    ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
+    {
+        MlirContext Context = mlirContextCreate();
+        MlirModule Module = mlirModuleCreateEmpty(mlirLocationUnknownGet(Context));
+
+        brutus_codegen_jlir(Context, Module, methods, entry_mi, dump_flags);
+        if (dump_flags && DUMP_TRANSLATED)
+        {
+            mlir::ModuleOp module = unwrap(Module);
+            llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
+            module.dump();
+            llvm::dbgs() << "\n\n";
+        }
+
+        brutus_canonicalize(Context, Module, dump_flags);
+        if (dump_flags & DUMP_CANONICALIZED)
+        {
+            mlir::ModuleOp module = unwrap(Module);
+            llvm::dbgs() << "after canonicalizing:";
+            module.dump();
+            llvm::dbgs() << "\n\n";
+        }
+
+        brutus_lower_to_standard(Context, Module, dump_flags);
+        if (dump_flags & DUMP_LOWERED_TO_STD)
+        {
+            mlir::ModuleOp module = unwrap(Module);
+            llvm::dbgs() << "after lowering to Standard dialect:\n";
+            module.dump();
+            llvm::dbgs() << "\n\n";
+        }
+
+        brutus_lower_to_llvm(Context, Module, dump_flags);
+        if (dump_flags & DUMP_LOWERED_TO_LLVM)
+        {
+            mlir::ModuleOp module = unwrap(Module);
+            llvm::dbgs() << "after lowering to LLVM dialect:";
+            module.dump();
+            llvm::dbgs() << "\n\n";
+        }
+        if (dump_flags & DUMP_TRANSLATE_TO_LLVM)
+        {
+            mlir::ModuleOp module = unwrap(Module);
+            llvm::LLVMContext llvmContext;
+            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
+            llvm::dbgs() << "after lowering to LLVM IR:";
+            Mod->print(llvm::dbgs(), nullptr);
+            llvm::dbgs() << "\n\n";
+            return nullptr;
+        }
+
+        if (!emit_fptr)
+        {
+            return nullptr;
+        }
+
+        std::string name = mi_name(entry_mi);
+        auto engine_ptr = brutus_create_execution_engine(Context, Module, name);
+
+        mlirModuleDestroy(Module);
+        mlirContextDestroy(Context);
+
+        return engine_ptr;
+    }
+}

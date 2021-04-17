@@ -4,6 +4,13 @@ emit(identity, Bool)
 
 
 
+# CHECK:   func nested @"Tuple{typeof(Base.identity), Bool}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Bool) -> !jlir.Bool attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     "jlir.return"(%arg1) : (!jlir.Bool) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
+
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Base.identity), Bool}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: i1) -> i1 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     return %arg1 : i1

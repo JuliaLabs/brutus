@@ -5,6 +5,24 @@ emit(select, Bool)
 
 
 
+# CHECK:   func nested @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: !jlir.Bool) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     "jlir.gotoifnot"(%arg1)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb2:  // pred: ^bb1
+# CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%0)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb3:  // pred: ^bb1
+# CHECK-NEXT:     %1 = "jlir.constant"() {value = #jlir<"3">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%1)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb4(%2: !jlir.Int64):  // 2 preds: ^bb2, ^bb3
+# CHECK-NEXT:     %3 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %4 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %5 = "jlir.call"(%3, %4, %2) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     "jlir.return"(%5) : (!jlir.Int64) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }
+
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.select), Bool}"(%arg0: !jlir<"typeof(Main.select)">, %arg1: i1) -> i64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c2_i64 = constant 2 : i64
