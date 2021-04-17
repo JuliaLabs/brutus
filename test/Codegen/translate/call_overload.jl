@@ -8,7 +8,8 @@ a = A(10)
 emit(a, Int64)
 
 
-# CHECK:   func nested @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any attributes {llvm.emit_c_interface} {
+# CHECK: Core.MethodMatch(Tuple{Main.Main.A, Int64}, svec(), (a::Main.Main.A)(y) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/translate/call_overload.jl:6, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK-NEXT:   func nested @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.getfield} : () -> !jlir<"typeof(getfield)">
