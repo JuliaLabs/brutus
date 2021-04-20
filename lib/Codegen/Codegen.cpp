@@ -1,4 +1,3 @@
-
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
@@ -469,31 +468,38 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
 extern "C"
 {
 
-    enum DumpOption
+    void brutus_register_extern_dialect(MlirContext Context, MlirDialect Dialect)
     {
-        // DUMP_IRCODE       = 0,
-        DUMP_TRANSLATED = 1,
-        DUMP_CANONICALIZED = 2,
-        DUMP_LOWERED_TO_STD = 4,
-        DUMP_LOWERED_TO_LLVM = 8,
-        DUMP_TRANSLATE_TO_LLVM = 16,
+        return;
+    }
+
+    void brutus_register_dialects(MlirContext Context)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        ctx->getOrLoadDialect<JLIRDialect>();
+        ctx->getOrLoadDialect<StandardOpsDialect>();
+        ctx->getOrLoadDialect<linalg::LinalgDialect>();
     };
 
-    // TODO: enum with ERROR codes for failures.
+    MlirType brutus_get_juliatype(MlirContext Context, 
+            jl_datatype_t *datatype)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        mlir::Type type = JuliaType::get(ctx, datatype);
+        return wrap(type);
+    };
+
     void brutus_codegen_jlir(MlirContext Context,
             MlirModule Module,
             jl_value_t *methods,
             jl_method_instance_t *entry_mi,
             char dump_flags)
     {
-        mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
 
+        brutus_register_dialects(Context);
+        mlir::MLIRContext *context = unwrap(Context);
         jl_mlirctx_t ctx(context);
-
-        context->getOrLoadDialect<JLIRDialect>();
-        context->getOrLoadDialect<StandardOpsDialect>();
-        context->getOrLoadDialect<linalg::LinalgDialect>();
 
         jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t *)entry_mi);
         jl_value_t *ir_code = jl_fieldref(entry, 0);
@@ -628,6 +634,16 @@ extern "C"
 
         return expectedFPtr.get();
     }
+
+    enum DumpOption
+    {
+        // DUMP_IRCODE       = 0,
+        DUMP_TRANSLATED = 1,
+        DUMP_CANONICALIZED = 2,
+        DUMP_LOWERED_TO_STD = 4,
+        DUMP_LOWERED_TO_LLVM = 8,
+        DUMP_TRANSLATE_TO_LLVM = 16,
+    };
 
     ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
     {
