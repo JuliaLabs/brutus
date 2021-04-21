@@ -34,7 +34,7 @@ end
 
 function convert_type_to_jlirtype(builder::JLIRBuilder, a)
     ctx = builder.ctx
-    return ccall((:brutus_get_juliatype, "libbrutus"), 
+    return ccall((:brutus_get_jlirtype, "libbrutus"), 
                  JLIR.Type, 
                  (JLIR.Context, Any), 
                  ctx, a)
@@ -42,8 +42,8 @@ end
 
 function convert_value_to_jlirattr(builder::JLIRBuilder, a)
     ctx = builder.ctx
-    return ccall((:brutus_get_juliavalueattr, "libbrutus"), 
-                 JLIR.Value, 
+    return ccall((:brutus_get_jlirattr, "libbrutus"), 
+                 JLIR.Attribute, 
                  (JLIR.Context, Any), 
                  ctx, a)
 end

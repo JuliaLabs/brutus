@@ -481,7 +481,7 @@ extern "C"
         ctx->getOrLoadDialect<linalg::LinalgDialect>();
     };
 
-    MlirType brutus_get_juliatype(MlirContext Context, 
+    MlirType brutus_get_jlirtype(MlirContext Context, 
             jl_datatype_t *datatype)
     {
         mlir::MLIRContext *ctx = unwrap(Context);
@@ -489,11 +489,11 @@ extern "C"
         return wrap(type);
     };
     
-    MlirValue brutus_get_juliavalueattr(MlirContext Context, 
+    MlirAttribute brutus_get_jlirattr(MlirContext Context, 
             jl_value_t *value)
     {
         mlir::MLIRContext *ctx = unwrap(Context);
-        mlir::Value val = JuliaValueAttr::get(ctx, value);
+        mlir::Attribute val = JuliaValueAttr::get(ctx, value);
         return wrap(val);
     };
 
