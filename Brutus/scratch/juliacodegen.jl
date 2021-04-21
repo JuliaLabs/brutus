@@ -13,6 +13,6 @@ end
 
 mi = Brutus.get_methodinstance(Tuple{typeof(gauss), Int})
 ir_code, ret = Brutus.code_ircode(mi)
-ft = Brutus.Compiler.create_func_op(ir_code, ret, "gauss")
+mod = Brutus.Compiler.emit_jlir(ir_code, ret, "gauss")
 
 end # module

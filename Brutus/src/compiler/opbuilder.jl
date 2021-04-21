@@ -6,27 +6,74 @@
 
 mutable struct JLIRBuilder
     ctx::JLIR.Context
-    values::Vector{JLIR.Value}
-    arguments::Vector{JLIR.Value}
     insertion::Int
+    state::JLIR.OperationState
+    values::Vector{JLIR.Value}
+    arguments::Vector{JLIR.Type}
+    locations::Vector{JLIR.Location}
     blocks::Vector{JLIR.Block}
+    code::Core.Compiler.IRCode
     function JLIRBuilder()
         ctx = JLIR.create_context()
         ccall((:brutus_register_dialects, "libbrutus"),
               Cvoid,
               (JLIR.Context, ),
               ctx)
-        new(ctx, JLIR.Value[], JLIR.Value[], 1)
+        new(ctx, 1)
     end
 end
 
+function JLIRBuilder(code::Core.Compiler.IRCode, name::String)
+    b = JLIRBuilder()
+    irstream = code.stmts
+    stmts = irstream.inst
+    types = irstream.type
+    location_indices = getfield(irstream, :line)
+    linetable = getfield(code, :linetable)
+    locations = extract_linetable_meta(b, linetable)
+    argtypes = getfield(code, :argtypes)
+    args = [convert_type_to_jlirtype(b, a) for a in argtypes]
+    state = JLIR.create_operation_state(name, locations[1])
+    entry_blk, reg = JLIR.add_entry_block!(state, args)
+    tr = JLIR.get_first_block(reg)
+    nblocks = length(code.cfg.blocks)
+    blocks = JLIR.Block[entry_blk]
+    for i in 1 : nblocks
+        blk = JLIR.Block()
+        JLIR.insertafter!(reg, entry_blk, blk)
+        push!(blocks, blk)
+    end
+    b.state = state
+    b.arguments = args
+    b.locations = locations
+    b.blocks = blocks
+    b.state = state
+    b.code = code
+    b.arguments = args
+    v = walk_cfg_emit_branchargs(b, 1, 2, locations[1])
+    goto = create!(b, GotoOp(), JLIR.Location(b.ctx), blocks[2], v)
+    set_insertion!(b, 2)
+    return b
+end
+
 set_insertion!(b::JLIRBuilder, blk::Int) = b.insertion = blk
+
+get_stmts(b::JLIRBuilder) = b.code.stmts.inst
+get_types(b::JLIRBuilder) = b.code.stmts.type
+get_stmt(b::JLIRBuilder, ind::Int) = getindex(b.code.stmts.inst, ind)
+get_type(b::JLIRBuilder, ind::Int) = getindex(b.code.stmts.type, ind)
+function get_cfg(b::JLIRBuilder)
+    @assert(isdefined(b, :code))
+    return b.code.cfg
+end
 
 function push!(b::JLIRBuilder, op::JLIR.Operation)
     @assert(isdefined(b, :blocks))
     blk = b.blocks[b.insertion]
     push_operation!(blk, op)
 end
+
+finish(b::JLIRBuilder) = JLIR.Operation(b.state)
 
 #####
 ##### Utilities

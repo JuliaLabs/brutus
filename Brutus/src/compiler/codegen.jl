@@ -4,81 +4,98 @@
 
 # This is the Julia interface between Julia's IRCode and JLIR.
 
-function emit_value(builder::JLIRBuilder, loc::JLIR.Location, value::GlobalRef, type)
+function emit_value(b::JLIRBuilder, loc::JLIR.Location, value::GlobalRef, type)
     name = value.name
     v = getproperty(value.mod, value.name)
-    return create_constant_op(builder, loc, v, type)
+    return create_constant_op(b, loc, v, type)
 end
 
-function emit_value(builder::JLIRBuilder, loc::JLIR.Location, value::Core.SSAValue, type)
+function emit_value(b::JLIRBuilder, loc::JLIR.Location, value::Core.SSAValue, type)
     @assert(value.id >= 1)
-    return getindex(builder.values, value.id)
+    return getindex(b.values, value.id)
 end
 
-function emit_value(builder::JLIRBuilder, loc::JLIR.Location, value, type)
-    return create_unimplemented_op(builder, loc, type)
+function emit_value(b::JLIRBuilder, loc::JLIR.Location, value, type)
+    return create_unimplemented_op(b, loc, type)
 end
 
-function emit_ftype(builder::JLIRBuilder, ir_code::Core.Compiler.IRCode, ret_type)
+function emit_ftype(b::JLIRBuilder, ret_type)
     argtypes = getfield(ir_code, :argtypes)
     nargs = length(argtypes)
-    args = [convert_type_to_mlir(builder, a) for a in argtypes]
-    ret = convert_type_to_mlir(builder, ret_type)
-    return get_functype(builder, args, ret)
+    args = [convert_type_to_jlirtype(b, a) for a in argtypes]
+    ret = convert_type_to_jlirtype(b, ret_type)
+    return get_functype(b, args, ret)
 end
 
-function process_node!(b::JLIRBuilder)
+function handle_node!(b::JLIRBuilder, current::Int, 
+        v::Vector{JLIR.Value}, stmt::Core.PhiNode, 
+        type::Type, loc::JLIR.Location)
+    edges = stmt.edges
+    values = stmt.values
+    found = false
+    for (v, e) in zip(edges, values)
+        if e == current
+            val = emit_value(b, loc, v)
+            push!(v, maybe_widen_type(b, loc, val, type))
+            found = true
+        end
+    end
+    if !found
+        op = create!(b, UndefOp(), loc, convert_type_to_jlirtype(b, type))
+        push!(v, JLIR.get_result(op, 0))
+    end
 end
 
-function walk_cfg_emit_branchargs(builder, 
-        cfg::Core.Compiler.CFG, current_block::Int, 
-        target_block::Int, stmts, types, loc::JLIR.Location)
+function walk_cfg_emit_branchargs(b::JLIRBuilder, current::Int, 
+        target::Int, loc::JLIR.Location)
     v = JLIR.Value[]
-    for stmt in cfg.blocks[target].stmts
-        handle_node!(builder, v, stmt, loc)
+    cfg = get_cfg(b)
+    for ind in cfg.blocks[target].stmts
+        stmt = get_stmt(b, ind)
+        stmt isa Core.PhiNode || break
+        type = get_type(b, ind)
+        handle_node!(b, v, current, stmt, type, loc)
     end
     return v
 end
 
-function emit_jlir(builder::JLIRBuilder, 
-        ir_code::Core.Compiler.IRCode, ret::Type, name::String)
+function emit_op!(b::JLIRBuilder, code::Core.Compiler.IRCode, 
+        stmt::Core.GotoIfNot, loc::JLIR.Location, ret::Type)
+    label = stmt.label
+    v = walk_cfg_emit_branchargs(b, b.insertion, label, loc)
+    create!(b, GotoOp(), loc, b.blocks[label], v)
+    return true
+end
 
-    # Setup.
-    irstream = ir_code.stmts
-    location_indices = getfield(irstream, :line)
-    linetable = getfield(ir_code, :linetable)
-    locations = extract_linetable_meta(builder, linetable)
-    argtypes = getfield(ir_code, :argtypes)
-    args = [convert_type_to_mlir(builder, a) for a in argtypes]
-    state = JLIR.create_operation_state(name, locations[1])
-    entry_blk, reg = JLIR.add_entry_block!(state, args)
-    cfg = ir_code.cfg
-    cfg_blocks = cfg.blocks
-    nblocks = length(cfg_blocks)
-    blocks = JLIR.Block[JLIR.push_new_block!(reg) for _ in 1 : nblocks]
-    pushfirst!(blocks, entry_blk)
-    builder.blocks = blocks
-    stmts = irstream.inst
-    types = irstream.type
-    v = walk_cfg_emit_branchargs(builder, cfg, 1, 2, stmts, types, locations[0])
-    goto = create_goto_op(Location(builder.ctx), blocks[2], v)
-    push!(builder, goto)
-    set_insertion!(builder, 2)
-
-    # Process.
-    for (ind, (stmt, type)) in enumerate(zip(stmts, types))
-        loc = linetable[ind] == 0 ? JLIR.Location() : locations[ind]
-        is_terminator = false
-        process_node!(builder, stmt, loc)
+function emit_op!(b::JLIRBuilder, stmt::Core.ReturnNode, 
+        loc::JLIR.Location, ret::Type)
+    if isdefined(stmt, :val)
+        value = maybe_widen_type(b, loc, emit_value(b, loc, stmt.val), ret)
+    else
+        value = create!(b, UndefOp(), loc)
     end
-   
-    # Create op from state and verify.
-    op = JLIR.Operation(state)
-    @assert(JLIR.verify(op))
-    return op
+    create!(b, ReturnOp(), loc, value)
+    return true
 end
 
 function emit_jlir(ir_code::Core.Compiler.IRCode, ret::Type, name::String)
-    b = JLIRBuilder()
-    return create_func_op(b, ir_code, ret, name)
+
+    # Create builder.
+    b = JLIRBuilder(ir_code, name)
+    stmts = get_stmts(b)
+    types = get_types(b)
+    
+    # Process.
+    for (ind, (stmt, type)) in enumerate(zip(stmts, types))
+        @assert(b.insertion <= nblocks)
+        lt_ind = location_indices[ind]
+        loc = lt_ind == 0 ? JLIR.Location() : locations[lt_ind]
+        is_terminator = false
+        is_terminator = emit_op!(b, stmt, loc, ret)
+    end
+   
+    # Create op from state and verify.
+    op = finish(b)
+    @assert(JLIR.verify(op))
+    return op
 end

@@ -645,11 +645,11 @@ extern "C"
 
     enum DumpOption
     {
-        // DUMP_IRCODE       = 0,
-        DUMP_TRANSLATED = 1,
-        DUMP_CANONICALIZED = 2,
-        DUMP_LOWERED_TO_STD = 4,
-        DUMP_LOWERED_TO_LLVM = 8,
+        // DUMP_IRCODE         = 0,
+        DUMP_TRANSLATED        = 1,
+        DUMP_CANONICALIZED     = 2,
+        DUMP_LOWERED_TO_STD    = 4,
+        DUMP_LOWERED_TO_LLVM   = 8,
         DUMP_TRANSLATE_TO_LLVM = 16,
     };
 
