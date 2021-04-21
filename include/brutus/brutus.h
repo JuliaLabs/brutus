@@ -27,6 +27,7 @@ extern "C"
     void brutus_register_dialects(MlirContext Context);
     void brutus_register_extern_dialect(MlirContext Context, MlirDialect Dialect);
     MlirType brutus_get_juliatype(MlirContext context, jl_datatype_t *datatype);
+    MlirValue brutus_get_juliavalueattr(MlirContext context, jl_value_t *value);
 
     // Export C API for pipeline.
     typedef void (*ExecutionEngineFPtrResult)(void **);

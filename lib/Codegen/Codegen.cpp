@@ -488,6 +488,14 @@ extern "C"
         mlir::Type type = JuliaType::get(ctx, datatype);
         return wrap(type);
     };
+    
+    MlirValue brutus_get_juliavalueattr(MlirContext Context, 
+            jl_value_t *value)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        mlir::Value val = JuliaValueAttr::get(ctx, value);
+        return wrap(val);
+    };
 
     void brutus_codegen_jlir(MlirContext Context,
             MlirModule Module,
