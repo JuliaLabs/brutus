@@ -82,13 +82,20 @@ function emit_op!(b::JLIRBuilder, stmt::Core.ReturnNode,
 end
 
 function emit_jlir(ir_code::Core.Compiler.IRCode, ret::Type, name::String)
-
+    GC.enable(false)
+    
     # Create builder.
     b = JLIRBuilder(ir_code, name)
-    stmts = get_stmts(b)
-    types = get_types(b)
+
+    # Create branch from entry block.
+    v = walk_cfg_emit_branchargs(b, 1, 2, b.locations[1])
+    goto = create_goto_op(JLIR.Location(b.ctx), b.blocks[1], b.blocks[2], v)
+    push!(b.blocks[1], goto)
+    JLIR.dump(goto)
     
     # Process.
+    #stmts = get_stmts(b)
+    #types = get_types(b)
     #for (ind, (stmt, type)) in enumerate(zip(stmts, types))
     #    lt_ind = location_indices[ind]
     #    loc = lt_ind == 0 ? JLIR.Location() : locations[lt_ind]
@@ -97,7 +104,7 @@ function emit_jlir(ir_code::Core.Compiler.IRCode, ret::Type, name::String)
     #end
    
     # Create op from state and verify.
-    op = finish(b)
-    @assert(JLIR.verify(op))
+    op = JLIR.Operation(b.state)
+    GC.enable(true)
     return op
 end

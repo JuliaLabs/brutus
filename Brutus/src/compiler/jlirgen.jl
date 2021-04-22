@@ -20,7 +20,7 @@ end
 
 function create_goto_op(loc::JLIR.Location, from::JLIR.Block, 
         to::JLIR.Block, v::Vector{JLIR.Value})
-    state = JLIR.create_operation_state("jlir.goto", loc)
+    state = JLIR.create_operation_state("std.br", loc)
     JLIR.push_operands!(state, v)
     JLIR.push_successors!(state, to)
     return JLIR.Operation(state)
@@ -89,7 +89,7 @@ function create!(b::JLIRBuilder, ::UnimplementedOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     op = create_unimplemented_op(loc, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -98,7 +98,7 @@ function create!(b::JLIRBuilder, ::UndefOp, loc::JLIR.Location)
     @assert(isdefined(b, :blocks))
     op = create_undef_op(loc, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -108,7 +108,7 @@ function create!(b::JLIRBuilder, ::ConstantOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     op = create_constant_op(loc, value, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -118,8 +118,6 @@ function create!(b::JLIRBuilder, ::GotoOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     from = get_insertion_block(b)
     op = create_goto_op(loc, from, to, v)
-    JLIR.dump(op)
-    @assert(JLIR.verify(op))
     JLIR.push_operation!(from, op)
     return op
 end
@@ -129,8 +127,7 @@ function create!(b::JLIRBuilder, ::GotoIfNotOp, loc::JLIR.Location,
         fall::JLIR.Block, fallv::Vector{JLIR.Value})
     @assert(isdefined(b, :blocks))
     op = create_gotoifnot_op(loc, cond, dest, v, fall, fallv)
-    @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -140,7 +137,7 @@ function create!(b::JLIRBuilder, ::PiOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     op = create_pi_op(loc, value, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -150,7 +147,7 @@ function create!(b::JLIRBuilder, ::ReturnOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     op = create_return_op(loc, input)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -161,7 +158,7 @@ function create!(b::JLIRBuilder, ::CallOp, loc::JLIR.Location,
     @assert(isdefined(b, :blocks))
     op = create_call_op(loc, callee, arguments, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end
@@ -173,7 +170,7 @@ function create!(b::JLIRBuilder, ::InvokeOp, loc::JLIR.Location,
     jlir_mi = convert_value_to_jlirattr(b, mi)
     op = create_invoke_op(loc, jlir_mi, callee, arguments, type)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
+    blk = get_insertion_block(b)
     push_operation!(blk, op)
     return op
 end

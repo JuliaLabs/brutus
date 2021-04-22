@@ -4,11 +4,11 @@ using Brutus
 using MLIR
 
 function gauss(N)
-    acc = 0
-    for i in 1:N
-        acc += i
+    k = 0
+    for i in 1 : N
+        k += i
     end
-    return acc
+    return k
 end
 
 mi = Brutus.get_methodinstance(Tuple{typeof(gauss), Int})
