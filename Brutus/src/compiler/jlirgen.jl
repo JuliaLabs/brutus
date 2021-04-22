@@ -6,6 +6,11 @@ function create_unimplemented_op(loc::JLIR.Location, type::JLIR.Type)
     return JLIR.Operation(state)
 end
 
+function create_undef_op(loc::JLIR.Location, type::JLIR.Type)
+    state = JLIR.create_operation_state("jlir.undef", loc)
+    return JLIR.Operation(state)
+end
+
 function create_constant_op(loc::JLIR.Location, value::JLIR.Value, type::JLIR.Type)
     state = JLIR.create_operation_state("jlir.constant", loc)
     JLIR.push_operands!(state, value)
@@ -13,11 +18,11 @@ function create_constant_op(loc::JLIR.Location, value::JLIR.Value, type::JLIR.Ty
     return JLIR.Operation(state)
 end
 
-function create_goto_op(loc::JLIR.Location, blk::JLIR.Block, 
-        v::Vector{JLIR.Value})
+function create_goto_op(loc::JLIR.Location, from::JLIR.Block, 
+        to::JLIR.Block, v::Vector{JLIR.Value})
     state = JLIR.create_operation_state("jlir.goto", loc)
     JLIR.push_operands!(state, v)
-    JLIR.push_successors!(state, blk)
+    JLIR.push_successors!(state, to)
     return JLIR.Operation(state)
 end
 
@@ -70,6 +75,7 @@ end
 #####
 
 struct UnimplementedOp end
+struct UndefOp end
 struct ConstantOp end
 struct GotoOp end
 struct GotoIfNotOp end
@@ -88,6 +94,15 @@ function create!(b::JLIRBuilder, ::UnimplementedOp, loc::JLIR.Location,
     return op
 end
 
+function create!(b::JLIRBuilder, ::UndefOp, loc::JLIR.Location)
+    @assert(isdefined(b, :blocks))
+    op = create_undef_op(loc, type)
+    @assert(JLIR.verify(op))
+    blk = getindex(b.blocks, b.insertion)
+    push_operation!(blk, op)
+    return op
+end
+
 function create!(b::JLIRBuilder, ::ConstantOp, loc::JLIR.Location, 
         value::JLIR.Value, type::JLIR.Type)
     @assert(isdefined(b, :blocks))
@@ -99,12 +114,13 @@ function create!(b::JLIRBuilder, ::ConstantOp, loc::JLIR.Location,
 end
 
 function create!(b::JLIRBuilder, ::GotoOp, loc::JLIR.Location, 
-        blk::JLIR.Block, v::Vector{JLIR.Value})
+        to::JLIR.Block, v::Vector{JLIR.Value})
     @assert(isdefined(b, :blocks))
-    op = create_goto_op(loc, blk, v)
+    from = get_insertion_block(b)
+    op = create_goto_op(loc, from, to, v)
+    JLIR.dump(op)
     @assert(JLIR.verify(op))
-    blk = getindex(b.blocks, b.insertion)
-    JLIR.push_operation!(blk, op)
+    JLIR.push_operation!(from, op)
     return op
 end
 

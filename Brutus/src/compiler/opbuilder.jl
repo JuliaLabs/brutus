@@ -56,19 +56,16 @@ function JLIRBuilder(code::Core.Compiler.IRCode, name::String)
     return b
 end
 
-set_insertion!(b::JLIRBuilder, blk::Int) = b.insertion = blk
+set_insertion!(b::JLIRBuilder, blk::Int) = setfield!(b, :insertion, blk)
+get_insertion_block(b::JLIRBuilder) = b.blocks[b.insertion]
 
 get_stmts(b::JLIRBuilder) = b.code.stmts.inst
 get_types(b::JLIRBuilder) = b.code.stmts.type
 get_stmt(b::JLIRBuilder, ind::Int) = getindex(b.code.stmts.inst, ind)
 get_type(b::JLIRBuilder, ind::Int) = getindex(b.code.stmts.type, ind)
-function get_cfg(b::JLIRBuilder)
-    @assert(isdefined(b, :code))
-    return b.code.cfg
-end
+get_cfg(b::JLIRBuilder) = b.code.cfg
 
 function push!(b::JLIRBuilder, op::JLIR.Operation)
-    @assert(isdefined(b, :blocks))
     blk = b.blocks[b.insertion]
     push_operation!(blk, op)
 end
