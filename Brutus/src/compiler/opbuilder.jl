@@ -11,11 +11,12 @@ struct JLIRBuilder
     arguments::Vector{JLIR.Type}
     locations::Vector{JLIR.Location}
     blocks::Vector{JLIR.Block}
+    reg::JLIR.Region
     code::Core.Compiler.IRCode
     state::JLIR.OperationState
 end
 
-function JLIRBuilder(code::Core.Compiler.IRCode, name::String)
+function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
     ctx = JLIR.create_context()
     ccall((:brutus_register_dialects, "libbrutus"),
           Cvoid,
@@ -29,7 +30,14 @@ function JLIRBuilder(code::Core.Compiler.IRCode, name::String)
     locations = extract_linetable_locations(ctx, linetable)
     argtypes = getfield(code, :argtypes)
     args = [convert_type_to_jlirtype(ctx, a) for a in argtypes]
-    state = JLIR.create_operation_state(name, locations[1])
+    ftype = emit_ftype(ctx, code, rt)
+    state = JLIR.create_operation_state("func", locations[1])
+    type_attr = JLIR.get_type_attribute(ftype)
+    named_type_attr = JLIR.NamedAttribute(ctx, "type", type_attr)
+    string_attr = JLIR.get_string_attribute(ctx, name)
+    symbol_name_attr = JLIR.NamedAttribute(ctx, "sym_name", string_attr)
+    JLIR.push_attributes!(state, named_type_attr)
+    JLIR.push_attributes!(state, symbol_name_attr)
     entry_blk, reg = JLIR.add_entry_block!(state, args)
     tr = JLIR.get_first_block(reg)
     nblocks = length(code.cfg.blocks)
@@ -39,12 +47,13 @@ function JLIRBuilder(code::Core.Compiler.IRCode, name::String)
         JLIR.push!(reg, blk)
         push!(blocks, blk)
     end
-    return JLIRBuilder(ctx, Ref(2), JLIR.Value[], args, locations, blocks, code, state)
+    return JLIRBuilder(ctx, Ref(2), JLIR.Value[], args, locations, blocks, reg, code, state)
 end
 
 set_insertion!(b::JLIRBuilder, blk::Int) = b.insertion[] = blk
 get_insertion_block(b::JLIRBuilder) = b.blocks[b.insertion[]]
 
+get_locindices(b::JLIRBuilder) = b.code.stmts.line
 get_stmts(b::JLIRBuilder) = b.code.stmts.inst
 get_types(b::JLIRBuilder) = b.code.stmts.type
 get_stmt(b::JLIRBuilder, ind::Int) = getindex(b.code.stmts.inst, ind)
@@ -62,6 +71,8 @@ finish(b::JLIRBuilder) = JLIR.Operation(b.state)
 ##### Utilities
 #####
 
+# Explicitly exposed as part of extern C in codegen.cpp.
+
 function convert_type_to_jlirtype(ctx::JLIR.Context, a)
     return ccall((:brutus_get_jlirtype, "libbrutus"), 
                  JLIR.Type, 
@@ -76,14 +87,21 @@ function convert_value_to_jlirattr(ctx::JLIR.Context, a)
                  ctx, a)
 end
 
-function get_functype(builder::JLIRBuilder, args::Vector{JLIR.Type}, ret::JLIR.Type)
-    return MLIR.API.mlirFunctionTypeGet(builder.ctx, length(args), args, 1, [ret])
+function convert_jlirvalue_to_type(v::JLIR.Value)
+    return ccall((:brutus_get_julia_type, "libbrutus"),
+                 Any,
+                 (JLIR.Value, ),
+                 v)
 end
 
-function get_functype(builder::JLIRBuilder, args, ret)
-    return get_functype(builder, length(args), map(args) do a
-                            convert_type_to_jlirtype(builder.ctx, a)
-                        end, 1, [convert_type_to_jlirtype(builder.ctx, ret)])
+function get_functype(ctx::JLIR.Context, args::Vector{JLIR.Type}, ret::JLIR.Type)
+    return MLIR.API.mlirFunctionTypeGet(ctx, length(args), args, 1, [ret])
+end
+
+function get_functype(ctx::JLIR.Context, args, ret)
+    return get_functype(ctx, length(args), map(args) do a
+                            convert_type_to_jlirtype(ctx, a)
+                        end, 1, [convert_type_to_jlirtype(ctx, ret)])
 end
 
 function unwrap(mi::Core.MethodInstance)

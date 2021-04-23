@@ -24,10 +24,14 @@
 extern "C"
 {
 #endif
-    void brutus_register_dialects(MlirContext Context);
-    void brutus_register_extern_dialect(MlirContext Context, MlirDialect Dialect);
+    void brutus_register_dialects(MlirContext context);
     MlirType brutus_get_jlirtype(MlirContext context, jl_datatype_t *datatype);
+    jl_value_t *brutus_get_julia_type(MlirValue v);
     MlirAttribute brutus_get_jlirattr(MlirContext context, jl_value_t *value);
+   
+    // TODO: deprecate -- should be available in MLIR C API.
+    void brutus_register_extern_dialect(MlirContext context, MlirDialect dialect);
+    MlirValue brutusBlockAddArgument(MlirBlock block, MlirType type);
 
     // Export C API for pipeline.
     typedef void (*ExecutionEngineFPtrResult)(void **);

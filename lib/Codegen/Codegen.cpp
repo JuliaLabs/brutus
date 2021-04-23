@@ -468,6 +468,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
 extern "C"
 {
 
+    // TODO: deprecate -- available in MLIR C API.
     void brutus_register_extern_dialect(MlirContext Context, MlirDialect Dialect)
     {
         return;
@@ -488,7 +489,13 @@ extern "C"
         mlir::Type type = JuliaType::get(ctx, datatype);
         return wrap(type);
     };
-    
+
+    jl_value_t *brutus_get_julia_type(MlirValue v) {
+        mlir::Value value = unwrap(v);
+        jl_value_t *value_type = (jl_value_t *)value.getType().cast<JuliaType>().getDatatype();
+        return value_type;
+    }
+
     MlirAttribute brutus_get_jlirattr(MlirContext Context, 
             jl_value_t *value)
     {
@@ -496,6 +503,12 @@ extern "C"
         mlir::Attribute val = JuliaValueAttr::get(ctx, value);
         return wrap(val);
     };
+
+    // TODO: deprecate -- available in MLIR C API.
+    MlirValue brutusBlockAddArgument(MlirBlock block, MlirType type) 
+    {
+        return wrap(unwrap(block)->addArgument(unwrap(type)));
+    }
 
     void brutus_codegen_jlir(MlirContext Context,
             MlirModule Module,
