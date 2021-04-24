@@ -13,6 +13,7 @@ struct JLIRBuilder
     blocks::Vector{JLIR.Block}
     reg::JLIR.Region
     code::Core.Compiler.IRCode
+    rt::Type
     state::JLIR.OperationState
 end
 
@@ -47,7 +48,7 @@ function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
         JLIR.push!(reg, blk)
         push!(blocks, blk)
     end
-    return JLIRBuilder(ctx, Ref(2), JLIR.Value[], args, locations, blocks, reg, code, state)
+    return JLIRBuilder(ctx, Ref(2), JLIR.Value[], args, locations, blocks, reg, code, rt, state)
 end
 
 set_insertion!(b::JLIRBuilder, blk::Int) = b.insertion[] = blk
@@ -87,10 +88,10 @@ function convert_value_to_jlirattr(ctx::JLIR.Context, a)
                  ctx, a)
 end
 
-function convert_jlirvalue_to_type(v::JLIR.Value)
+function convert_jlirtype_to_type(v::JLIR.Type)
     return ccall((:brutus_get_julia_type, "libbrutus"),
-                 Any,
-                 (JLIR.Value, ),
+                 Type,
+                 (JLIR.Type, ),
                  v)
 end
 

@@ -40,11 +40,11 @@ function create_gotoifnot_op(loc::JLIR.Location, cond::JLIR.Value,
     return JLIR.Operation(state)
 end
 
-function create_pi_op(loc::JLIR.Location, input::JLIR.Type, 
+function create_pi_op(loc::JLIR.Location, value::JLIR.Value, 
         type::JLIR.Type)
     state = JLIR.create_operation_state("jlir.pi", loc)
-    JLIR.push_operands!(state, value)
     JLIR.push_results!(state, type)
+    JLIR.push_operands!(state, value)
     return JLIR.Operation(state)
 end
 

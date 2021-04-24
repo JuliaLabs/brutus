@@ -490,10 +490,9 @@ extern "C"
         return wrap(type);
     };
 
-    jl_value_t *brutus_get_julia_type(MlirValue v) {
-        mlir::Value value = unwrap(v);
-        jl_value_t *value_type = (jl_value_t *)value.getType().cast<JuliaType>().getDatatype();
-        return value_type;
+    jl_datatype_t *brutus_get_julia_type(MlirType v) {
+        mlir::Type type = unwrap(v);
+        return (jl_datatype_t *)type.cast<JuliaType>().getDatatype();
     }
 
     MlirAttribute brutus_get_jlirattr(MlirContext Context, 

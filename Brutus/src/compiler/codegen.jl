@@ -5,13 +5,15 @@
 # This is the Julia interface between Julia's IRCode and JLIR.
 
 function maybe_widen_type(b::JLIRBuilder, loc::JLIR.Location, 
-        value::JLIR.Value, expected_type::Type)
-    type = convert_jlirvalue_to_type(value)
+        jlir_value::JLIR.Value, expected_type::Type)
+    jlir_type = JLIR.get_type(jlir_value)
+    type = convert_jlirtype_to_type(jlir_type)
     if (type != expected_type && type <: expected_type)
-        op = create!(b, PiOp(), loc, value, expected_type)
+        jlir_expected_type = convert_type_to_jlirtype(b.ctx, expected_type)
+        op = create!(b, PiOp(), loc, jlir_value, jlir_expected_type)
         return JLIR.get_result(op, 0)
     else
-        return value
+        return jlir_value
     end
 end
 
@@ -25,7 +27,8 @@ end
 function emit_value(b::JLIRBuilder, loc::JLIR.Location,
         value::Core.Argument, type::Type)
     idx = value.n
-    return b.arguments[idx];
+    arg = JLIR.get_arg(b.blocks[1], idx - 1)
+    return arg
 end
 
 function emit_value(b::JLIRBuilder, loc::JLIR.Location, 
@@ -143,8 +146,8 @@ end
 function process_stmt!(b::JLIRBuilder, ind::Int,
         stmt::Core.ReturnNode, loc::JLIR.Location, type::Type)
     if isdefined(stmt, :val)
-        v = emit_value(b, loc, stmt.val, Any)
-        value = maybe_widen_type(b, loc, v, type)
+        jlir_v = emit_value(b, loc, stmt.val, Any)
+        value = maybe_widen_type(b, loc, jlir_v, b.rt)
     else
         jlir_type = convert_type_to_jlirtype(b.ctx, type)
         value = create!(b, UndefOp(), loc, jlir_type)
@@ -169,7 +172,6 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
         args = JLIR.Value[emit_value(b, loc, a, Any) for a in args]
         op = create!(b, CallOp(), loc, callee, args, jlir_type)
     else
-        display(head)
         op = create!(b, UnimplementedOp(), loc, jlir_type)
     end
     res = JLIR.get_result(op, 0)
@@ -180,6 +182,7 @@ end
 function emit_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
     # Create builder.
     b = JLIRBuilder(ir_code, rt, name)
+    m = JLIR.Module(JLIR.Location(b.ctx))
 
     # Create branch from entry block.
     v = walk_cfg_emit_branchargs(b, 1, 2, b.locations[1])
@@ -200,8 +203,9 @@ function emit_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
         end
     end
 
-    # Create op from state and verify.
-    op = finish(b)
+    # Create op from module and verify.
+    JLIR.push_operation!(m, finish(b))
+    op = JLIR.get_operation(m)
     JLIR.verify(op)
     JLIR.dump(op)
     return op
