@@ -18,17 +18,23 @@ struct JLIRBuilder
 end
 
 function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
+
+    # Create a context and register dialects required by Brutus.
     ctx = JLIR.create_context()
     ccall((:brutus_register_dialects, "libbrutus"),
           Cvoid,
           (JLIR.Context, ),
           ctx)
+
+    # IRCode metadata -> JLIR metadata (locations).
     irstream = code.stmts
     stmts = irstream.inst
     types = irstream.type
     location_indices = getfield(irstream, :line)
     linetable = getfield(code, :linetable)
     locations = extract_linetable_locations(ctx, linetable)
+
+    # Create toplevel FuncOp.
     argtypes = getfield(code, :argtypes)
     args = [convert_type_to_jlirtype(ctx, a) for a in argtypes]
     ftype = emit_ftype(ctx, code, rt)
@@ -37,8 +43,13 @@ function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
     named_type_attr = JLIR.NamedAttribute(ctx, "type", type_attr)
     string_attr = JLIR.get_string_attribute(ctx, name)
     symbol_name_attr = JLIR.NamedAttribute(ctx, "sym_name", string_attr)
+    viz_attr = JLIR.get_string_attribute(ctx, "nested")
+    named_viz_attr = JLIR.NamedAttribute(ctx, "sym_visibility", viz_attr)
+    unit_attr = JLIR.get_unit_attribute(ctx)
     JLIR.push_attributes!(state, named_type_attr)
     JLIR.push_attributes!(state, symbol_name_attr)
+    JLIR.push_attributes!(state, named_viz_attr)
+    JLIR.push_attributes!(state, JLIR.NamedAttribute(ctx, "llvm.emit_c_interface", unit_attr))
     entry_blk, reg = JLIR.add_entry_block!(state, args)
     tr = JLIR.get_first_block(reg)
     nblocks = length(code.cfg.blocks)
@@ -48,6 +59,8 @@ function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
         JLIR.push!(reg, blk)
         push!(blocks, blk)
     end
+
+    # Pass FuncOp state in builder.
     return JLIRBuilder(ctx, Ref(2), Dict{Int, JLIR.Value}(), args, locations, blocks, reg, code, rt, state)
 end
 

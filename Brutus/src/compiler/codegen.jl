@@ -186,7 +186,19 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
     return false
 end
 
-function emit_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
+#####
+##### JLIR generation
+#####
+
+mutable struct CompiledJLIRModule
+    ctx::JLIR.Context
+    mod::JLIR.Module
+    name::String
+end
+
+Base.display(jlir::CompiledJLIRModule) = JLIR.dump(JLIR.get_operation(jlir.mod))
+
+function codegen_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
     # Create builder.
     b = JLIRBuilder(ir_code, rt, name)
     m = JLIR.Module(JLIR.Location(b.ctx))
@@ -212,7 +224,44 @@ function emit_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
 
     # Create op from module and verify.
     JLIR.push_operation!(m, finish(b))
-    op = JLIR.get_operation(m)
-    JLIR.verify(op)
-    return op
+    @assert(JLIR.verify(JLIR.get_operation(m)))
+    return CompiledJLIRModule(b.ctx, m, name)
+end
+
+function canonicalize!(jlir::CompiledJLIRModule)
+    ccall((:brutus_canonicalize, "libbrutus"), 
+          Cvoid, 
+          (JLIR.Context, JLIR.Module),
+          jlir.ctx, jlir.mod)
+    op = JLIR.get_operation(jlir.mod)
+    @assert(JLIR.verify(op))
+    return
+end
+
+function dialect_lower_to_std!(jlir::CompiledJLIRModule)
+    ccall((:brutus_lower_to_standard, "libbrutus"), 
+          Cvoid, 
+          (JLIR.Context, JLIR.Module),
+          jlir.ctx, jlir.mod)
+    op = JLIR.get_operation(jlir.mod)
+    @assert(JLIR.verify(op))
+    return
+end
+
+function dialect_lower_to_llvm!(jlir::CompiledJLIRModule)
+    ccall((:brutus_lower_to_llvm, "libbrutus"), 
+          Cvoid, 
+          (JLIR.Context, JLIR.Module),
+          jlir.ctx, jlir.mod)
+    op = JLIR.get_operation(jlir.mod)
+    @assert(JLIR.verify(op))
+    return
+end
+
+function thunk(jlir::CompiledJLIRModule)
+    fptr = ccall((:c_brutus_create_execution_engine, "libbrutus"), 
+                 Ptr{Nothing}, 
+                 (JLIR.Context, JLIR.Module, Cstring),
+                 jlir.ctx, jlir.mod, jlir.name)
+    return fptr
 end

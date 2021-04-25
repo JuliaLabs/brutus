@@ -51,7 +51,7 @@ end
 
 # Emit MLIR IR to stdout
 function emit(job::CompilerJob)
-    ft = job.source.f
+    ft = typeof(job.source.f)
     tt = job.source.tt
     emit_fptr = job.params.emit_fptr
     dump_options = job.params.dump_options
@@ -67,36 +67,37 @@ function emit(job::CompilerJob)
         println(IR)
     end
 
-    worklist = [IR]
-    methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, Any}}(
-        entry_mi => (IR, rt)
-    )
+    #worklist = [IR]
+    #methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, Any}}(
+    #    entry_mi => (IR, rt)
+    #)
 
-    while !isempty(worklist)
-        code = pop!(worklist)
-        callees = find_invokes(code)
-        for callee in callees
-            if !haskey(methods, callee)
-                _code, _rt = code_ircode(callee)
+    #while !isempty(worklist)
+    #    code = pop!(worklist)
+    #    callees = find_invokes(code)
+    #    for callee in callees
+    #        if !haskey(methods, callee)
+    #            _code, _rt = code_ircode(callee)
 
-                methods[callee] = (_code, _rt)
-                push!(worklist, _code)
-            end
-        end
-    end
+    #            methods[callee] = (_code, _rt)
+    #            push!(worklist, _code)
+    #        end
+    #    end
+    #end
 
     # generate LLVM bitcode and load it
-    dump_flags = reduce(|, map(UInt8, dump_options), init=0)
-    fptr = ccall((:brutus_codegen, "libbrutus"),
-                 Ptr{Nothing},
-                 (Any, Any, Cuchar, Cuchar),
-                 methods, entry_mi, emit_fptr, dump_flags)
+    jlir = Brutus.Compiler.codegen_jlir(IR, rt, String(name))
+    Brutus.Compiler.canonicalize!(jlir)
+    Brutus.Compiler.canonicalize!(jlir)
+    Brutus.Compiler.dialect_lower_to_std!(jlir)
+    Brutus.Compiler.dialect_lower_to_llvm!(jlir)
+    fptr = Brutus.Compiler.thunk(jlir)
     return (fptr, rt)
 end
 
 function emit(@nospecialize(ft), @nospecialize(tt);
-              emit_fptr::Bool=true,
-              dump_options::Vector{DumpOption}=DumpOption[])
+        emit_fptr::Bool=true,
+        dump_options::Vector{DumpOption}=DumpOption[])
     fspec = GPUCompiler.FunctionSpec(ft, Tuple{tt...}, false, nothing)
     target = BrutusCompilerTarget()
     params = BrutusCompilerParams(emit_fptr, dump_options)
@@ -135,25 +136,26 @@ struct Thunk{F, RT, TT}
     ptr::Ptr{Cvoid}
 end
 
-const brutus_cache = Dict{UInt,Any}()
-
 function link(job::CompilerJob, (fptr, rt))
     @assert fptr != C_NULL
-    fptr, rt = result
     f = job.source.f
     tt = job.source.tt
     return Thunk{typeof(f), rt, tt}(f, fptr)
 end
 
-function thunk(f::F, tt::TT=Tuple{}; emit_fptr::Bool = true, dump_options::Vector{DumpOption} = DumpOption[]) where {F<:Base.Callable, TT<:Type}
-    fspec = GPUCompiler.FunctionSpec(F, tt, false, nothing)
+const brutus_cache = Dict{UInt,Any}()
+
+function thunk(f::F, tt::TT=Tuple{}; 
+        emit_fptr::Bool = true, 
+        dump_options::Vector{DumpOption} = DumpOption[]) where {F <: Base.Callable, TT <: Type}
+    fspec = GPUCompiler.FunctionSpec(f, tt, false, nothing)
     target = BrutusCompilerTarget()
     params = BrutusCompilerParams(emit_fptr, dump_options)
     job = CompilerJob(target, fspec, params)
     return GPUCompiler.cached_compilation(brutus_cache, job, emit, link)
 end
 
-# Need to pass struct as pointer, to match cifacme ABI
+# Need to pass struct as pointer, to match ciface ABI
 abi(::Type{<:Array{T, N}}) where {T, N} = Ref{MemrefDescriptor{T, N}} 
 function abi(T::DataType)
     if isprimitivetype(T)

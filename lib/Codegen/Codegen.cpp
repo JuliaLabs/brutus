@@ -1,3 +1,4 @@
+#include <iostream>
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
@@ -16,6 +17,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Target/LLVMIR.h"
+#include "llvm-c/Core.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/CAPI/IR.h"
@@ -512,8 +514,7 @@ extern "C"
     void brutus_codegen_jlir(MlirContext Context,
             MlirModule Module,
             jl_value_t *methods,
-            jl_method_instance_t *entry_mi,
-            char dump_flags)
+            jl_method_instance_t *entry_mi)
     {
         mlir::ModuleOp module = unwrap(Module);
 
@@ -543,8 +544,7 @@ extern "C"
 
     // canonicalize
     void brutus_canonicalize(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -568,8 +568,7 @@ extern "C"
 
     // lower to Standard dialect
     void brutus_lower_to_standard(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -589,8 +588,7 @@ extern "C"
 
     // lower to LLVM dialect
     void brutus_lower_to_llvm(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -670,7 +668,7 @@ extern "C"
         MlirContext Context = mlirContextCreate();
         MlirModule Module = mlirModuleCreateEmpty(mlirLocationUnknownGet(Context));
 
-        brutus_codegen_jlir(Context, Module, methods, entry_mi, dump_flags);
+        brutus_codegen_jlir(Context, Module, methods, entry_mi);
         if (dump_flags && DUMP_TRANSLATED)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -679,7 +677,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_canonicalize(Context, Module, dump_flags);
+        brutus_canonicalize(Context, Module);
         if (dump_flags & DUMP_CANONICALIZED)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -688,7 +686,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_lower_to_standard(Context, Module, dump_flags);
+        brutus_lower_to_standard(Context, Module);
         if (dump_flags & DUMP_LOWERED_TO_STD)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -697,7 +695,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_lower_to_llvm(Context, Module, dump_flags);
+        brutus_lower_to_llvm(Context, Module);
         if (dump_flags & DUMP_LOWERED_TO_LLVM)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -728,5 +726,13 @@ extern "C"
         mlirContextDestroy(Context);
 
         return engine_ptr;
+    }
+
+    ExecutionEngineFPtrResult c_brutus_create_execution_engine(MlirContext Context,
+            MlirModule Module,
+            const char *name)
+    {
+        std::string str(name);
+        return brutus_create_execution_engine(Context, Module, str);
     }
 }
