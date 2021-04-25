@@ -26,6 +26,16 @@ function emit_value(b::JLIRBuilder, loc::JLIR.Location,
     return JLIR.get_result(op, 0)
 end
 
+function emit_value(b::JLIRBuilder, loc::JLIR.Location, 
+        value::QuoteNode, ::Type)
+    value = getfield(value, :value)
+    type = typeof(value)
+    jlir_type = convert_type_to_jlirtype(b.ctx, type)
+    jlir_value = convert_value_to_jlirattr(b.ctx, value)
+    op = create!(b, ConstantOp(), loc, jlir_value, jlir_type)
+    return JLIR.get_result(op, 0)
+end
+
 function emit_value(b::JLIRBuilder, loc::JLIR.Location,
         value::Core.Argument, type::Type)
     idx = value.n
@@ -194,6 +204,11 @@ mutable struct CompiledJLIRModule
     ctx::JLIR.Context
     mod::JLIR.Module
     name::String
+end
+
+function cleanup!(jlir::CompiledJLIRModule)
+    JLIR.destroy!(jlir.ctx)
+    JLIR.destroy!(jlir.mod)
 end
 
 Base.display(jlir::CompiledJLIRModule) = JLIR.dump(JLIR.get_operation(jlir.mod))

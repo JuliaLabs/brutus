@@ -25,6 +25,12 @@ end
     DumpTranslateToLLVM = 16
 end
 
+const DumpAll = DumpOption[DumpIRCode, 
+                           DumpTranslated, 
+                           DumpCanonicalized, 
+                           DumpLoweredToStd, 
+                           DumpLoweredToLLVM]
+
 struct BrutusCompilerParams <: AbstractCompilerParams
     emit_fptr::Bool
     dump_options::Vector{DumpOption}
@@ -65,6 +71,7 @@ function emit(job::CompilerJob)
         println("return type: ", rt)
         println("IRCode:\n")
         println(IR)
+        println()
     end
 
     #worklist = [IR]
@@ -84,14 +91,38 @@ function emit(job::CompilerJob)
     #        end
     #    end
     #end
-
+    
     # generate LLVM bitcode and load it
     jlir = Brutus.Compiler.codegen_jlir(IR, rt, String(name))
+    if DumpTranslated in dump_options
+        println("JLIR:")
+        display(jlir)
+        println()
+    end
+    
     Brutus.Compiler.canonicalize!(jlir)
-    Brutus.Compiler.canonicalize!(jlir)
+    if DumpCanonicalized in dump_options
+        println("After canonicalization:")
+        display(jlir)
+        println()
+    end
+    
     Brutus.Compiler.dialect_lower_to_std!(jlir)
+    if DumpLoweredToStd in dump_options
+        println("Standard:")
+        display(jlir)
+        println()
+    end
+
     Brutus.Compiler.dialect_lower_to_llvm!(jlir)
+    if DumpLoweredToLLVM in dump_options
+        println("LLVM dialect:")
+        display(jlir)
+        println()
+    end
+
     fptr = Brutus.Compiler.thunk(jlir)
+    Brutus.Compiler.cleanup!(jlir)
     return (fptr, rt)
 end
 
@@ -180,7 +211,8 @@ end
     return expr
 end
 
-function call(f::F, args...) where F
+function call(f::F, args...; 
+        dump_options::Vector{DumpOption} = DumpOption[]) where F
     TT = Tuple{map(Core.Typeof, args)...}
-    return thunk(f, TT)(args...)
+    return thunk(f, TT; dump_options = dump_options)(args...)
 end
