@@ -1,4 +1,142 @@
 #####
+##### GPUCompiler codegen
+#####
+
+struct BrutusCompilerTarget <: AbstractCompilerTarget end
+GPUCompiler.llvm_triple(::BrutusCompilerTarget) = Sys.MACHINE
+GPUCompiler.llvm_machine(::BrutusCompilerTarget) = tm[]
+
+module Runtime
+    # the runtime library
+    signal_exception() = return
+    malloc(sz) = Base.Libc.malloc(sz)
+    report_oom(sz) = return
+    report_exception(ex) = return
+    report_exception_name(ex) = return
+    report_exception_frame(idx, func, file, line) = return
+end
+
+@enum DumpOption::UInt8 begin
+    DumpIRCode        = 0
+    DumpTranslated    = 1
+    DumpCanonicalized = 2
+    DumpLoweredToStd  = 4
+    DumpLoweredToLLVM = 8
+    DumpTranslateToLLVM = 16
+end
+
+const DumpAll = DumpOption[DumpIRCode, 
+                           DumpTranslated, 
+                           DumpCanonicalized, 
+                           DumpLoweredToStd, 
+                           DumpLoweredToLLVM]
+
+struct BrutusCompilerParams <: AbstractCompilerParams
+    emit_fptr::Bool
+    dump_options::Vector{DumpOption}
+end
+
+GPUCompiler.ci_cache(job::CompilerJob{BrutusCompilerTarget}) = GLOBAL_CI_CACHE
+GPUCompiler.runtime_module(job::CompilerJob{BrutusCompilerTarget}) = Runtime
+GPUCompiler.isintrinsic(::CompilerJob{BrutusCompilerTarget}, fn::String) = true
+GPUCompiler.can_throw(::CompilerJob{BrutusCompilerTarget}) = true
+GPUCompiler.runtime_slug(job::CompilerJob{BrutusCompilerTarget}) = "brutus"
+
+function find_invokes(IR)
+    callees = Core.MethodInstance[]
+    for stmt in IR.stmts
+        if stmt isa Expr
+            if stmt.head == :invoke
+                mi = stmt.args[1]
+                push!(callees, mi)
+            end
+        end
+    end
+    return callees
+end
+
+# Emit MLIR IR to stdout
+function emit(job::CompilerJob)
+    ft = typeof(job.source.f)
+    tt = job.source.tt
+    emit_fptr = job.params.emit_fptr
+    dump_options = job.params.dump_options
+    name = (ft <: Function) ? nameof(ft.instance) : nameof(ft)
+
+    # get first method instance matching signature
+    entry_mi = get_methodinstance(Tuple{ft, tt.parameters...})
+    IR, rt = code_ircode(entry_mi)
+
+    if DumpIRCode in dump_options
+        println("return type: ", rt)
+        println("IRCode:\n")
+        println(IR)
+        println()
+    end
+
+    #worklist = [IR]
+    #methods = Dict{Core.MethodInstance, Tuple{Core.Compiler.IRCode, Any}}(
+    #    entry_mi => (IR, rt)
+    #)
+
+    #while !isempty(worklist)
+    #    code = pop!(worklist)
+    #    callees = find_invokes(code)
+    #    for callee in callees
+    #        if !haskey(methods, callee)
+    #            _code, _rt = code_ircode(callee)
+
+    #            methods[callee] = (_code, _rt)
+    #            push!(worklist, _code)
+    #        end
+    #    end
+    #end
+    
+    # generate LLVM bitcode and load it
+    jlir = Brutus.Compiler.codegen_jlir(IR, rt, String(name))
+    if DumpTranslated in dump_options
+        println("JLIR:")
+        display(jlir)
+        println()
+    end
+    
+    Brutus.Compiler.canonicalize!(jlir)
+    if DumpCanonicalized in dump_options
+        println("After canonicalization:")
+        display(jlir)
+        println()
+    end
+    
+    Brutus.Compiler.dialect_lower_to_std!(jlir)
+    if DumpLoweredToStd in dump_options
+        println("Standard:")
+        display(jlir)
+        println()
+    end
+
+    Brutus.Compiler.dialect_lower_to_llvm!(jlir)
+    if DumpLoweredToLLVM in dump_options
+        println("LLVM dialect:")
+        display(jlir)
+        println()
+    end
+
+    fptr = Brutus.Compiler.thunk(jlir)
+    Brutus.Compiler.cleanup!(jlir)
+    return (fptr, rt)
+end
+
+function emit(@nospecialize(ft), @nospecialize(tt);
+        emit_fptr::Bool=true,
+        dump_options::Vector{DumpOption}=DumpOption[])
+    fspec = GPUCompiler.FunctionSpec(ft, Tuple{tt...}, false, nothing)
+    target = BrutusCompilerTarget()
+    params = BrutusCompilerParams(emit_fptr, dump_options)
+    job = CompilerJob(target, fspec, params)
+    return emit(job)
+end
+
+#####
 ##### Call Interface
 #####
 
@@ -29,17 +167,18 @@ struct Thunk{F, RT, TT}
     ptr::Ptr{Cvoid}
 end
 
-const brutus_cache = Dict{UInt,Any}()
-
 function link(job::CompilerJob, (fptr, rt))
     @assert fptr != C_NULL
-    fptr, rt = result
     f = job.source.f
     tt = job.source.tt
     return Thunk{typeof(f), rt, tt}(f, fptr)
 end
 
-function thunk(f::F, tt::TT=Tuple{}; emit_fptr::Bool = true, dump_options::Vector{DumpOption} = DumpOption[]) where {F<:Base.Callable, TT<:Type}
+const brutus_cache = Dict{UInt,Any}()
+
+function thunk(f::F, tt::TT=Tuple{}; 
+        emit_fptr::Bool = true, 
+        dump_options::Vector{DumpOption} = DumpOption[]) where {F <: Base.Callable, TT <: Type}
     fspec = GPUCompiler.FunctionSpec(f, tt, false, nothing)
     target = BrutusCompilerTarget()
     params = BrutusCompilerParams(emit_fptr, dump_options)
@@ -47,7 +186,7 @@ function thunk(f::F, tt::TT=Tuple{}; emit_fptr::Bool = true, dump_options::Vecto
     return GPUCompiler.cached_compilation(brutus_cache, job, emit, link)
 end
 
-# Need to pass struct as pointer, to match cifacme ABI
+# Need to pass struct as pointer, to match ciface ABI
 abi(::Type{<:Array{T, N}}) where {T, N} = Ref{MemrefDescriptor{T, N}} 
 function abi(T::DataType)
     if isprimitivetype(T)
@@ -72,7 +211,8 @@ end
     return expr
 end
 
-function call(f::F, args...) where F
+function call(f::F, args...; 
+        dump_options::Vector{DumpOption} = DumpOption[]) where F
     TT = Tuple{map(Core.Typeof, args)...}
-    return thunk(f, TT)(args...)
+    return thunk(f, TT; dump_options = dump_options)(args...)
 end

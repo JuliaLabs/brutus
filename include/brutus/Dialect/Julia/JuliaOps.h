@@ -1,6 +1,8 @@
 #ifndef JL_DIALECT_JLIR_H
 #define JL_DIALECT_JLIR_H
 
+#include <iostream>
+
 #include "mlir/IR/Dialect.h"
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"

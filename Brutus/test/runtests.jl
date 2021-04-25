@@ -68,4 +68,5 @@ for array in [rand(Int64, 2, 3), rand(Int64, 2, 3)]
     @test Brutus.call(customsum, array) == customsum(array)
 end
 end
+
 # TODO: arrays with floating point elements

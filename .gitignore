@@ -3,3 +3,5 @@ build*/
 Brutus/Manifest.toml
 llvm
 julia
+MLIR.jl
+Brutus/dev

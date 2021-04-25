@@ -11,7 +11,7 @@ import GPUCompiler: AbstractCompilerTarget, AbstractCompilerParams
 export emit
 
 include("init.jl")
-include("codegen.jl")
+include("compiler/Compiler.jl")
 include("reflection.jl")
 include("interface.jl")
 

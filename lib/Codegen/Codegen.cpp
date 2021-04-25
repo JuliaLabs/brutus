@@ -1,4 +1,3 @@
-
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
@@ -17,6 +16,7 @@
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
 #include "mlir/Target/LLVMIR.h"
+#include "llvm-c/Core.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/CAPI/IR.h"
@@ -469,31 +469,57 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
 extern "C"
 {
 
-    enum DumpOption
+    // TODO: deprecate -- available in MLIR C API.
+    void brutus_register_extern_dialect(MlirContext Context, MlirDialect Dialect)
     {
-        // DUMP_IRCODE       = 0,
-        DUMP_TRANSLATED = 1,
-        DUMP_CANONICALIZED = 2,
-        DUMP_LOWERED_TO_STD = 4,
-        DUMP_LOWERED_TO_LLVM = 8,
-        DUMP_TRANSLATE_TO_LLVM = 16,
+        return;
+    }
+
+    void brutus_register_dialects(MlirContext Context)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        ctx->getOrLoadDialect<JLIRDialect>();
+        ctx->getOrLoadDialect<StandardOpsDialect>();
+        ctx->getOrLoadDialect<linalg::LinalgDialect>();
     };
 
-    // TODO: enum with ERROR codes for failures.
+    MlirType brutus_get_jlirtype(MlirContext Context, 
+            jl_datatype_t *datatype)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        mlir::Type type = JuliaType::get(ctx, datatype);
+        return wrap(type);
+    };
+
+    jl_datatype_t *brutus_get_julia_type(MlirType v) {
+        mlir::Type type = unwrap(v);
+        return (jl_datatype_t *)type.cast<JuliaType>().getDatatype();
+    }
+
+    MlirAttribute brutus_get_jlirattr(MlirContext Context, 
+            jl_value_t *value)
+    {
+        mlir::MLIRContext *ctx = unwrap(Context);
+        mlir::Attribute val = JuliaValueAttr::get(ctx, value);
+        return wrap(val);
+    };
+
+    // TODO: deprecate -- available in MLIR C API.
+    MlirValue brutusBlockAddArgument(MlirBlock block, MlirType type) 
+    {
+        return wrap(unwrap(block)->addArgument(unwrap(type)));
+    }
+
     void brutus_codegen_jlir(MlirContext Context,
             MlirModule Module,
             jl_value_t *methods,
-            jl_method_instance_t *entry_mi,
-            char dump_flags)
+            jl_method_instance_t *entry_mi)
     {
-        mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
 
+        brutus_register_dialects(Context);
+        mlir::MLIRContext *context = unwrap(Context);
         jl_mlirctx_t ctx(context);
-
-        context->getOrLoadDialect<JLIRDialect>();
-        context->getOrLoadDialect<StandardOpsDialect>();
-        context->getOrLoadDialect<linalg::LinalgDialect>();
 
         jl_value_t *entry = jl_call2(getindex_func, methods, (jl_value_t *)entry_mi);
         jl_value_t *ir_code = jl_fieldref(entry, 0);
@@ -517,8 +543,7 @@ extern "C"
 
     // canonicalize
     void brutus_canonicalize(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -542,8 +567,7 @@ extern "C"
 
     // lower to Standard dialect
     void brutus_lower_to_standard(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -563,8 +587,7 @@ extern "C"
 
     // lower to LLVM dialect
     void brutus_lower_to_llvm(MlirContext Context,
-            MlirModule Module,
-            char dump_flags)
+            MlirModule Module)
     {
         mlir::MLIRContext *context = unwrap(Context);
         mlir::ModuleOp module = unwrap(Module);
@@ -629,12 +652,22 @@ extern "C"
         return expectedFPtr.get();
     }
 
+    enum DumpOption
+    {
+        // DUMP_IRCODE         = 0,
+        DUMP_TRANSLATED        = 1,
+        DUMP_CANONICALIZED     = 2,
+        DUMP_LOWERED_TO_STD    = 4,
+        DUMP_LOWERED_TO_LLVM   = 8,
+        DUMP_TRANSLATE_TO_LLVM = 16,
+    };
+
     ExecutionEngineFPtrResult brutus_codegen(jl_value_t *methods, jl_method_instance_t *entry_mi, char emit_fptr, char dump_flags)
     {
         MlirContext Context = mlirContextCreate();
         MlirModule Module = mlirModuleCreateEmpty(mlirLocationUnknownGet(Context));
 
-        brutus_codegen_jlir(Context, Module, methods, entry_mi, dump_flags);
+        brutus_codegen_jlir(Context, Module, methods, entry_mi);
         if (dump_flags && DUMP_TRANSLATED)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -643,7 +676,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_canonicalize(Context, Module, dump_flags);
+        brutus_canonicalize(Context, Module);
         if (dump_flags & DUMP_CANONICALIZED)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -652,7 +685,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_lower_to_standard(Context, Module, dump_flags);
+        brutus_lower_to_standard(Context, Module);
         if (dump_flags & DUMP_LOWERED_TO_STD)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -661,7 +694,7 @@ extern "C"
             llvm::dbgs() << "\n\n";
         }
 
-        brutus_lower_to_llvm(Context, Module, dump_flags);
+        brutus_lower_to_llvm(Context, Module);
         if (dump_flags & DUMP_LOWERED_TO_LLVM)
         {
             mlir::ModuleOp module = unwrap(Module);
@@ -692,5 +725,13 @@ extern "C"
         mlirContextDestroy(Context);
 
         return engine_ptr;
+    }
+
+    ExecutionEngineFPtrResult c_brutus_create_execution_engine(MlirContext Context,
+            MlirModule Module,
+            const char *name)
+    {
+        std::string str(name);
+        return brutus_create_execution_engine(Context, Module, str);
     }
 }
