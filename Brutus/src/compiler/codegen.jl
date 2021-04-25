@@ -18,9 +18,11 @@ function maybe_widen_type(b::JLIRBuilder, loc::JLIR.Location,
 end
 
 function emit_value(b::JLIRBuilder, loc::JLIR.Location, 
-        value, type::Type)
+        value, ::Type)
+    type = typeof(value)
     jlir_type = convert_type_to_jlirtype(b.ctx, type)
-    op = create!(b, UnimplementedOp(), loc, jlir_type)
+    jlir_value = convert_value_to_jlirattr(b.ctx, value)
+    op = create!(b, ConstantOp(), loc, jlir_value, jlir_type)
     return JLIR.get_result(op, 0)
 end
 
@@ -111,14 +113,15 @@ end
 function process_stmt!(b::JLIRBuilder, ind::Int,
         stmt::Core.GotoIfNot, loc::JLIR.Location, type::Type)
     cond = emit_value(b, loc, stmt.cond, Any)
-    dest = stmt.dest
+    dest = stmt.dest + 1 # Accounts for entry block.
+    fallthrough = b.insertion[] + 1
     op = create!(b, GotoIfNotOp(), loc, 
                  cond, b.blocks[dest],
                  walk_cfg_emit_branchargs(b, b.insertion[], 
                                           dest, loc),
-                 b.blocks[b.insertion[] + 1],
+                 b.blocks[fallthrough],
                  walk_cfg_emit_branchargs(b, b.insertion[], 
-                                          b.insertion[] + 1, loc))
+                                          fallthrough, loc))
     return true
 end
 
@@ -167,11 +170,13 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
         @assert(args[1] isa Core.MethodInstance)
         mi = args[1]
         callee = emit_value(b, loc, args[2], Any)
-        args = JLIR.Value[emit_value(b, loc, a, Any) for a in args[2 : end]]
+        args = JLIR.Value[emit_value(b, loc, a, Any) 
+                          for a in args[2 : end]]
         op = create!(b, InvokeOp, loc, mi, callee, args, jlir_type)
     elseif head == :call
         callee = emit_value(b, loc, args[1], Any)
-        args = JLIR.Value[emit_value(b, loc, a, Any) for a in args]
+        args = JLIR.Value[emit_value(b, loc, a, Any) 
+                          for a in args[2 : end]]
         op = create!(b, CallOp(), loc, callee, args, jlir_type)
     else
         op = create!(b, UnimplementedOp(), loc, jlir_type)
