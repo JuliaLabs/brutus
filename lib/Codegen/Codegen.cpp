@@ -1,4 +1,3 @@
-#include <iostream>
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
