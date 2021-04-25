@@ -96,7 +96,7 @@ end
 
 function process_stmt!(b::JLIRBuilder, ind::Int,
         stmt, loc::JLIR.Location, type::Type)
-    push!(b.values, emit_value(b, loc, stmt, type))
+    setindex!(b.values, emit_value(b, loc, stmt, type), ind)
     return false
 end
 
@@ -114,7 +114,8 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
     dest = stmt.dest
     op = create!(b, GotoIfNotOp(), loc, 
                  cond, b.blocks[dest],
-                 walk_cfg_emit_branchargs(b, b.insertion[], dest, loc),
+                 walk_cfg_emit_branchargs(b, b.insertion[], 
+                                          dest, loc),
                  b.blocks[b.insertion[] + 1],
                  walk_cfg_emit_branchargs(b, b.insertion[], 
                                           b.insertion[] + 1, loc))
@@ -129,7 +130,7 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
                 JLIR.Value,
                 (JLIR.Block, JLIR.Type),
                 blk, t)
-    push!(b.values, arg)
+    setindex!(b.values, arg, ind)
     return false
 end
 
@@ -138,8 +139,9 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
     val = stmt.val
     @assert(type == stmt.type)
     jlir_type = convert_type_to_jlirtype(b.ctx, type)
-    op = create!(b, PiOp(), loc, emit_value(b, loc, val, Any), jlir_type)
-    ctx.values[ind] = JLIR.get_result(op, 0)
+    op = create!(b, PiOp(), loc, 
+                 emit_value(b, loc, val, Any), jlir_type)
+    setindex!(b.values, JLIR.get_result(op, 0), ind)
     return false
 end
 
@@ -175,7 +177,7 @@ function process_stmt!(b::JLIRBuilder, ind::Int,
         op = create!(b, UnimplementedOp(), loc, jlir_type)
     end
     res = JLIR.get_result(op, 0)
-    push!(b.values, res)
+    setindex!(b.values, res, ind)
     return false
 end
 
@@ -207,6 +209,5 @@ function emit_jlir(ir_code::Core.Compiler.IRCode, rt::Type, name::String)
     JLIR.push_operation!(m, finish(b))
     op = JLIR.get_operation(m)
     JLIR.verify(op)
-    JLIR.dump(op)
     return op
 end

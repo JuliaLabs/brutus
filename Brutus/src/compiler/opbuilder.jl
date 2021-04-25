@@ -7,7 +7,7 @@
 struct JLIRBuilder
     ctx::JLIR.Context
     insertion::Ref{Int}
-    values::Vector{JLIR.Value}
+    values::Dict{Int, JLIR.Value}
     arguments::Vector{JLIR.Type}
     locations::Vector{JLIR.Location}
     blocks::Vector{JLIR.Block}
@@ -48,7 +48,7 @@ function JLIRBuilder(code::Core.Compiler.IRCode, rt::Type, name::String)
         JLIR.push!(reg, blk)
         push!(blocks, blk)
     end
-    return JLIRBuilder(ctx, Ref(2), JLIR.Value[], args, locations, blocks, reg, code, rt, state)
+    return JLIRBuilder(ctx, Ref(2), Dict{Int, JLIR.Value}(), args, locations, blocks, reg, code, rt, state)
 end
 
 set_insertion!(b::JLIRBuilder, blk::Int) = b.insertion[] = blk
@@ -124,7 +124,7 @@ function extract_linetable_locations(ctx::JLIR.Context, v::Vector{Core.LineInfoN
             fname = String(method)
         end
         current = JLIR.Location(ctx, fname, UInt32(line), UInt32(0)) # TODO: col.
-        if inlined_at > 0
+        if inlined_at > 1
             current = JLIR.Location(current, locations[inlined_at - 1])
         end
         push!(locations, current)
