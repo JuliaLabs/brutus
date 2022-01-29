@@ -16,7 +16,7 @@ extern "C" {
 const char *jl_intrinsic_name(int f);
 unsigned jl_intrinsic_nargs(int f);
 
-#define jl_is_concrete_immutable(t) (jl_is_datatype(t) && (!((jl_datatype_t*)t)->mutabl) && ((jl_datatype_t*)t)->layout)
+#define jl_is_concrete_immutable(t) (jl_is_datatype(t) && (!((jl_datatype_t*)t)->name->mutabl) && ((jl_datatype_t*)t)->layout)
 
 #define JL_CALLABLE(name)                                               \
     jl_value_t *name(jl_value_t *F, jl_value_t **args, uint32_t nargs)
