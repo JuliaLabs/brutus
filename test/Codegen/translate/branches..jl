@@ -10,7 +10,7 @@ end
 emit(branches, Bool)
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.branches), Bool}, svec(), branches(c) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/translate/branches..jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.branches), Bool}, svec(), branches(c) in Main.Main at /{{.*}}/test/Codegen/translate/branches..jl:3, true)after translating to MLIR in JLIR dialect:module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.branches), Bool}"(%arg0: !jlir<"typeof(Main.branches)">, %arg1: !jlir.Bool) -> !jlir.Bool attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

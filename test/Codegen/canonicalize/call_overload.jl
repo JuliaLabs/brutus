@@ -9,7 +9,7 @@ emit(a, Int64)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{Main.Main.A, Int64}, svec(), (a::Main.Main.A)(y) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/canonicalize/call_overload.jl:6, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: Core.MethodMatch(Tuple{Main.Main.A, Int64}, svec(), (a::Main.Main.A)(y) in Main.Main at /{{.*}}/test/Codegen/canonicalize/call_overload.jl:6, true)after translating to MLIR in JLIR dialect:module  {
 # CHECK-NEXT:   func nested @"Tuple{Main.A, Int64}"(%arg0: !jlir.Main.A, %arg1: !jlir.Int64) -> !jlir.Any attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

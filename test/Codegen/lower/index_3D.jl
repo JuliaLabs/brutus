@@ -7,7 +7,7 @@ emit(index, Array{Int64, 3}, Int64, Int64, Int64)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.index), Array{Int64, 3}, Int64, Int64, Int64}, svec(), index(A, i, j, k) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/lower/index_3D.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.index), Array{Int64, 3}, Int64, Int64, Int64}, svec(), index(A, i, j, k) in Main.Main at /{{.*}}/test/Codegen/lower/index_3D.jl:3, true)after translating to MLIR in JLIR dialect:module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64, Int64, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: !jlir.Int64, %arg3: !jlir.Int64, %arg4: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

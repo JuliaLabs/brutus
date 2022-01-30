@@ -11,7 +11,7 @@ emit(loop, Int64)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.loop), Int64}, svec(), loop(N) in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/canonicalize/loop.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.loop), Int64}, svec(), loop(N) in Main.Main at /{{.*}}/test/Codegen/canonicalize/loop.jl:3, true)after translating to MLIR in JLIR dialect:module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
