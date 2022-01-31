@@ -16,7 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/CAPI/IR.h"
@@ -265,7 +265,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 fname = "macro expansion";
             assert(inlined_at <= i);
             mlir::Location current = mlir::NameLoc::get(mlir::Identifier::get(fname, ctx.context),
-                    mlir::FileLineColLoc::get(file, line, 0, ctx.context));
+                    mlir::FileLineColLoc::get(ctx.context, file, line, 0));
 
             // codegen.cpp uses a better heuristic for now just live with this
             if (inlined_at > 0)
@@ -673,7 +673,7 @@ extern "C"
         {
             mlir::ModuleOp module = unwrap(Module);
             llvm::LLVMContext llvmContext;
-            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
+            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext, "JuliaModule");
             llvm::dbgs() << "after lowering to LLVM IR:";
             Mod->print(llvm::dbgs(), nullptr);
             llvm::dbgs() << "\n\n";

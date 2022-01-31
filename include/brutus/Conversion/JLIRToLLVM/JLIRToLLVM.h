@@ -3,9 +3,10 @@
 
 #include "brutus/Dialect/Julia/JuliaOps.h"
 
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
-#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {

@@ -1,6 +1,8 @@
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Math/IR/Math.h"
+#include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Types.h"
 
@@ -174,7 +176,7 @@ struct ToStdOpPattern : public JLIRToStdConversionPattern<SourceOp> {
         if (!result)
             return failure();
 
-        rewriter.replaceOpWithNewOp<StdOp>(op, result, operands, op.getAttrs());
+        rewriter.replaceOpWithNewOp<StdOp>(op, result, operands, op->getAttrs());
 
         return success();
     }
@@ -378,7 +380,7 @@ struct ArrayrefOpLowering : public JLIRToStdConversionPattern<Builtin_arrayref> 
                 }
             }
 
-            rewriter.replaceOpWithNewOp<LoadOp>(op, memrefType.getElementType(), memref, indices);
+            rewriter.replaceOpWithNewOp<memref::LoadOp>(op, memrefType.getElementType(), memref, indices);
             return success();
         }
         return failure();
@@ -413,7 +415,7 @@ struct ArraysetOpLowering : public JLIRToStdConversionPattern<Builtin_arrayset> 
                 }
             }
 
-            rewriter.create<StoreOp>(op.getLoc(), operands[2], memref, indices);
+            rewriter.create<memref::StoreOp>(op.getLoc(), operands[2], memref, indices);
             rewriter.replaceOp(op, operands[1]);
             return success();
         }
@@ -441,7 +443,7 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
             ConvertStdOp index = rewriter.create<ConvertStdOp>(op.getLoc(), indexType, operands[1]);
             SubIOp subOp = rewriter.create<SubIOp>(op.getLoc(), indexType, rank, index);
 
-            rewriter.replaceOpWithNewOp<DimOp>(op, memref, subOp.getResult());
+            rewriter.replaceOpWithNewOp<memref::DimOp>(op, memref, subOp.getResult());
             return success();
         }
         return failure();
@@ -450,7 +452,7 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
 
 } // namespace
 
-void mlir::jlir::populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns, 
+void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns, 
                                          MLIRContext &context,
                                          JLIRToStandardTypeConverter &converter) {
      patterns.insert<
@@ -538,7 +540,7 @@ void mlir::jlir::populateJLIRToStdConversionPatterns(OwningRewritePatternList &p
         // Intrinsic_floor_llvm
         // Intrinsic_trunc_llvm (JLIRToLLVM, but maybe could be here?)
         // Intrinsic_rint_llvm
-        ToStdOpPattern<Intrinsic_sqrt_llvm, SqrtOp>,
+        ToStdOpPattern<Intrinsic_sqrt_llvm, math::SqrtOp>,
         // Intrinsic_sqrt_llvm_fast
         // Intrinsic_pointerref
         // Intrinsic_pointerset
@@ -617,13 +619,13 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     // Only partial lowering occurs at this stage.
     target.addLegalOp<Builtin_is>();
 
-    OwningRewritePatternList patterns;
+    RewritePatternSet patterns(&getContext());
     populateJLIRToStdConversionPatterns(patterns, getContext(), converter);
 
     target.addDynamicallyLegalOp<FuncOp>([&converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
-    populateFuncOpTypeConversionPattern(patterns, &getContext(), converter);
+    populateFuncOpTypeConversionPattern(patterns, converter);
 
     if (failed(applyPartialConversion(
                     module, target, std::move(patterns))))

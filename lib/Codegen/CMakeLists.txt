@@ -8,7 +8,16 @@ add_mlir_library(
 
   LINK_LIBS PUBLIC
   MLIR
-  MLIRPublicAPI
+  MLIRCAPIDebug
+  MLIRCAPIIR
+  MLIRCAPIRegistration  # TODO: See about dis-aggregating
+
+  # Dialects
+  MLIRCAPILinalg  # TODO: Remove when above is removed.
+  MLIRCAPISparseTensor  # TODO: Remove when above is removed.
+  MLIRCAPIStandard
   MLIRExecutionEngine
+  MLIRTargetLLVMIRExport
+
 )
 llvm_update_compile_flags(BRUTUSCodegen)

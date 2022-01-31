@@ -77,7 +77,7 @@ def UnimplementedOp : JLIR_Op<"unimplemented"> {
 
     let results = (outs JLIR_JuliaType:$type);
     let builders = [
-        OpBuilderDAG<(ins "jl_datatype_t *":$type)>
+        OpBuilder<(ins "jl_datatype_t *":$type)>
     ];
 }
 
@@ -89,7 +89,7 @@ def UndefOp : JLIR_Op<"undef"> {
 
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilderDAG<(ins)>
+        OpBuilder<(ins)>
     ];
 }
 
@@ -102,7 +102,7 @@ def ConstantOp : JLIR_Op<"constant", [NoSideEffect]> {
     let arguments = (ins JLIR_JuliaValueAttr:$value);
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilderDAG<(ins "jl_value_t *":$value, "jl_datatype_t *":$type)>
+        OpBuilder<(ins "jl_value_t *":$value, "jl_datatype_t *":$type)>
     ];
 
     // Set the folder bit so that we can implement constant folders.
@@ -123,7 +123,7 @@ def CallOp : JLIR_Op<"call"> {
     let results = (outs JLIR_JuliaType);
 
     let builders = [
-        OpBuilderDAG<(ins "Value":$callee,
+        OpBuilder<(ins "Value":$callee,
                           "ArrayRef<Value>":$arguments,
                           "jl_datatype_t *":$type)>
     ];
@@ -144,7 +144,7 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let results = (outs JLIR_JuliaType);
     
     let builders = [
-        OpBuilderDAG<(ins "jl_method_instance_t *":$methodInstance, 
+        OpBuilder<(ins "jl_method_instance_t *":$methodInstance, 
                           "Value":$callee,
                           "ArrayRef<Value>":$arguments,
                           "jl_datatype_t *":$type)>
@@ -160,7 +160,7 @@ def GotoOp : JLIR_Op<"goto", [Terminator]> {
     let arguments = (ins Variadic<JLIR_JuliaType>:$operands);
     let successors = (successor AnySuccessor:$dest);
     let builders = [
-        OpBuilderDAG<(ins "Block *":$dest, "ValueRange":$operands),
+        OpBuilder<(ins "Block *":$dest, "ValueRange":$operands),
                   [{ build($_builder, $_state, operands, dest); }]>
     ];
 }
@@ -179,7 +179,7 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
                       AnySuccessor:$fallthroughDest);
 
     let builders = [
-        OpBuilderDAG<(ins "Value":$condition,
+        OpBuilder<(ins "Value":$condition,
                           "Block *":$branchDest, 
                           "ValueRange":$branchOperands,
                           "Block *":$fallthroughDest, 
@@ -224,7 +224,7 @@ def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
     let arguments = (ins JLIR_JuliaType:$input);
     let results = (outs JLIR_JuliaType);
     let builders = [
-        OpBuilderDAG<(ins "Value":$value, "jl_datatype_t *":$type)>
+        OpBuilder<(ins "Value":$value, "jl_datatype_t *":$type)>
     ];
 }
 
