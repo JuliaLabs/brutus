@@ -7,8 +7,7 @@ configure_lit_site_cfg(
 
 add_custom_target(precompile-brutus
     COMMAND
-        ${Julia_EXECUTABLE} --project=${BRUTUS_SOURCE_DIR}/Brutus -e "using Pkg; pkg\"instantiate\"; pkg\"precompile\""
-    DEPENDS
+        ${Julia_EXECUTABLE} --project=${BRUTUS_SOURCE_DIR}/Brutus -e "using Pkg; Pkg.instantiate(); Pkg.precompile()"
     brutus
     VERBATIM
 )
