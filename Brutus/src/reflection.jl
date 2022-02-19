@@ -34,17 +34,26 @@ function code_ircode(mi::Core.Compiler.MethodInstance;
                      interp=Core.Compiler.NativeInterpreter(world))
     ccall(:jl_typeinf_begin, Cvoid, ())
     result = Core.Compiler.InferenceResult(mi)
-    frame = Core.Compiler.InferenceState(result, false, interp)
+@static if VERSION >= v"1.8.0-DEV.472"
+    cache = :local
+else
+    cache = false
+end
+    frame = Core.Compiler.InferenceState(result, cache, interp)
     frame === nothing && return nothing
     if Core.Compiler.typeinf(interp, frame)
         opt_params = Core.Compiler.OptimizationParams(interp)
         opt = Core.Compiler.OptimizationState(frame, opt_params, interp)
+@static if VERSION >= v"1.8.0-DEV.1570"
+        ir = Core.Compiler.run_passes(opt.src, opt, frame.result)
+else
         ir = Core.Compiler.run_passes(opt.src, opt.nargs - 1, opt)
+end
         opt.src.inferred = true
     end
     ccall(:jl_typeinf_end, Cvoid, ())
     frame.inferred || return nothing
-    resize!(ir.argtypes, opt.nargs)
+#     resize!(ir.argtypes, opt.nargs)
     return ir => Core.Compiler.widenconst(result.result)
 end
 
