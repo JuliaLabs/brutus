@@ -33,7 +33,7 @@ jobs:
 
       - name: Cache Julia
         id: cache-julia
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: julia/usr
           key: ${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
@@ -41,7 +41,7 @@ jobs:
       # needed because they're just symlinks in usr/share
       # long term, we will probably want to cache an installed Julia
       - name: Cache stdlibs
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: julia/stdlib
           key: ${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
@@ -81,7 +81,7 @@ jobs:
         run: echo "::set-output name=timestamp::`date -u +%Y%m%d-%H%M%S`"
 
       - name: Cache ccache files
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: .ccache
           key: ${{ matrix.os }}-ccache-${{ steps.ccache-cache-timestamp.outputs.timestamp }}
