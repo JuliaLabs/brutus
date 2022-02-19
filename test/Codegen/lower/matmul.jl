@@ -17,8 +17,8 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.matmul!), Matrix{Float64}, Matrix{Float64}, Matrix{Float64}}, svec(), matmul!(C, A, B) in Main.Main at /{{.*}}/test/Codegen/lower/matmul.jl:4, true)after translating to MLIR in JLIR dialect:module  {
-# CHECK-NEXT:   func nested @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: !jlir<"Array{Float64, 2}">, %arg2: !jlir<"Array{Float64, 2}">, %arg3: !jlir<"Array{Float64, 2}">) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
+# CHECK: module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: !jlir<"Array{Float64, 2}">, %arg2: !jlir<"Array{Float64, 2}">, %arg3: !jlir<"Array{Float64, 2}">, %arg4: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg5: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg6: !jlir.Int64, %arg7: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg8: !jlir.Int64, %arg9: !jlir.Float64, %arg10: !jlir.Int64) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir.Core.arraysize} : () -> !jlir<"typeof(Core.arraysize)">
@@ -27,84 +27,111 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 # CHECK-NEXT:     %3 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %4 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %5 = "jlir.call"(%3, %4, %2) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %6 = "jlir.constant"() {value = #jlir.ifelse} : () -> !jlir<"typeof(ifelse)">
-# CHECK-NEXT:     %7 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
-# CHECK-NEXT:     %8 = "jlir.call"(%6, %5, %2, %7) : (!jlir<"typeof(ifelse)">, !jlir.Bool, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %9 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %10 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %11 = "jlir.call"(%9, %8, %10) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%11)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:     "jlir.gotoifnot"(%5)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
 # CHECK-NEXT:   ^bb2:  // pred: ^bb1
+# CHECK-NEXT:     "jlir.goto"(%2)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb3:  // pred: ^bb1
+# CHECK-NEXT:     %6 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%6)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb4(%7: !jlir.Int64):  // 2 preds: ^bb2, ^bb3
+# CHECK-NEXT:     "jlir.goto"()[^bb5] : () -> ()
+# CHECK-NEXT:   ^bb5:  // pred: ^bb4
+# CHECK-NEXT:     "jlir.goto"()[^bb6] : () -> ()
+# CHECK-NEXT:   ^bb6:  // pred: ^bb5
+# CHECK-NEXT:     %8 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %9 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %10 = "jlir.call"(%8, %7, %9) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%10)[^bb8, ^bb7] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb7:  // pred: ^bb6
+# CHECK-NEXT:     %11 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK-NEXT:     %12 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
 # CHECK-NEXT:     %13 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK-NEXT:     %14 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%12, %13, %14)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb3:  // pred: ^bb1
+# CHECK-NEXT:     "jlir.goto"(%12, %13, %14)[^bb9] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb8:  // pred: ^bb6
 # CHECK-NEXT:     %15 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK-NEXT:     %16 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %17 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%15, %16, %17)[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb4(%18: !jlir.Bool, %19: !jlir.Int64, %20: !jlir.Int64):  // 2 preds: ^bb2, ^bb3
-# CHECK-NEXT:     %21 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     "jlir.goto"(%15, %16, %17)[^bb9] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb9(%18: !jlir.Bool, %19: !jlir.Int64, %20: !jlir.Int64):  // 2 preds: ^bb7, ^bb8
+# CHECK-NEXT:     %21 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %22 = "jlir.call"(%21, %18) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%22, %19, %20)[^bb28, ^bb5] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb5(%23: !jlir.Int64, %24: !jlir.Int64):  // 2 preds: ^bb4, ^bb27
+# CHECK-NEXT:     "jlir.gotoifnot"(%22, %19, %20)[^bb43, ^bb10] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb10(%23: !jlir.Int64, %24: !jlir.Int64):  // 2 preds: ^bb9, ^bb42
 # CHECK-NEXT:     %25 = "jlir.constant"() {value = #jlir.Core.arraysize} : () -> !jlir<"typeof(Core.arraysize)">
 # CHECK-NEXT:     %26 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
 # CHECK-NEXT:     %27 = "jlir.call"(%25, %arg2, %26) : (!jlir<"typeof(Core.arraysize)">, !jlir<"Array{Float64, 2}">, !jlir.Int64) -> !jlir.Int64
 # CHECK-NEXT:     %28 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %29 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %30 = "jlir.call"(%28, %29, %27) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %31 = "jlir.constant"() {value = #jlir.ifelse} : () -> !jlir<"typeof(ifelse)">
-# CHECK-NEXT:     %32 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
-# CHECK-NEXT:     %33 = "jlir.call"(%31, %30, %27, %32) : (!jlir<"typeof(ifelse)">, !jlir.Bool, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %34 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %35 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %36 = "jlir.call"(%34, %33, %35) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%36)[^bb7, ^bb6] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb6:  // pred: ^bb5
+# CHECK-NEXT:     "jlir.gotoifnot"(%30)[^bb12, ^bb11] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb11:  // pred: ^bb10
+# CHECK-NEXT:     "jlir.goto"(%27)[^bb13] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb12:  // pred: ^bb10
+# CHECK-NEXT:     %31 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%31)[^bb13] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb13(%32: !jlir.Int64):  // 2 preds: ^bb11, ^bb12
+# CHECK-NEXT:     "jlir.goto"()[^bb14] : () -> ()
+# CHECK-NEXT:   ^bb14:  // pred: ^bb13
+# CHECK-NEXT:     "jlir.goto"()[^bb15] : () -> ()
+# CHECK-NEXT:   ^bb15:  // pred: ^bb14
+# CHECK-NEXT:     %33 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %34 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %35 = "jlir.call"(%33, %32, %34) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%35)[^bb17, ^bb16] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb16:  // pred: ^bb15
+# CHECK-NEXT:     %36 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK-NEXT:     %37 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
 # CHECK-NEXT:     %38 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK-NEXT:     %39 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%37, %38, %39)[^bb8] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb7:  // pred: ^bb5
+# CHECK-NEXT:     "jlir.goto"(%37, %38, %39)[^bb18] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb17:  // pred: ^bb15
 # CHECK-NEXT:     %40 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK-NEXT:     %41 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %42 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%40, %41, %42)[^bb8] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb8(%43: !jlir.Bool, %44: !jlir.Int64, %45: !jlir.Int64):  // 2 preds: ^bb6, ^bb7
-# CHECK-NEXT:     %46 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     "jlir.goto"(%40, %41, %42)[^bb18] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb18(%43: !jlir.Bool, %44: !jlir.Int64, %45: !jlir.Int64):  // 2 preds: ^bb16, ^bb17
+# CHECK-NEXT:     %46 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %47 = "jlir.call"(%46, %43) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%47, %44, %45)[^bb23, ^bb9] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb9(%48: !jlir.Int64, %49: !jlir.Int64):  // 2 preds: ^bb8, ^bb22
+# CHECK-NEXT:     "jlir.gotoifnot"(%47, %44, %45)[^bb38, ^bb19] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb19(%48: !jlir.Int64, %49: !jlir.Int64):  // 2 preds: ^bb18, ^bb37
 # CHECK-NEXT:     %50 = "jlir.constant"() {value = #jlir.Core.arraysize} : () -> !jlir<"typeof(Core.arraysize)">
 # CHECK-NEXT:     %51 = "jlir.constant"() {value = #jlir<"2">} : () -> !jlir.Int64
 # CHECK-NEXT:     %52 = "jlir.call"(%50, %arg3, %51) : (!jlir<"typeof(Core.arraysize)">, !jlir<"Array{Float64, 2}">, !jlir.Int64) -> !jlir.Int64
 # CHECK-NEXT:     %53 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %54 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %55 = "jlir.call"(%53, %54, %52) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %56 = "jlir.constant"() {value = #jlir.ifelse} : () -> !jlir<"typeof(ifelse)">
-# CHECK-NEXT:     %57 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
-# CHECK-NEXT:     %58 = "jlir.call"(%56, %55, %52, %57) : (!jlir<"typeof(ifelse)">, !jlir.Bool, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %59 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %60 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %61 = "jlir.call"(%59, %58, %60) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%61)[^bb11, ^bb10] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb10:  // pred: ^bb9
+# CHECK-NEXT:     "jlir.gotoifnot"(%55)[^bb21, ^bb20] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb20:  // pred: ^bb19
+# CHECK-NEXT:     "jlir.goto"(%52)[^bb22] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb21:  // pred: ^bb19
+# CHECK-NEXT:     %56 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%56)[^bb22] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb22(%57: !jlir.Int64):  // 2 preds: ^bb20, ^bb21
+# CHECK-NEXT:     "jlir.goto"()[^bb23] : () -> ()
+# CHECK-NEXT:   ^bb23:  // pred: ^bb22
+# CHECK-NEXT:     "jlir.goto"()[^bb24] : () -> ()
+# CHECK-NEXT:   ^bb24:  // pred: ^bb23
+# CHECK-NEXT:     %58 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %59 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %60 = "jlir.call"(%58, %57, %59) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%60)[^bb26, ^bb25] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb25:  // pred: ^bb24
+# CHECK-NEXT:     %61 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK-NEXT:     %62 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
 # CHECK-NEXT:     %63 = "jlir.undef"() : () -> !jlir.Int64
 # CHECK-NEXT:     %64 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%62, %63, %64)[^bb12] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb11:  // pred: ^bb9
+# CHECK-NEXT:     "jlir.goto"(%62, %63, %64)[^bb27] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb26:  // pred: ^bb24
 # CHECK-NEXT:     %65 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK-NEXT:     %66 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
 # CHECK-NEXT:     %67 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     "jlir.goto"(%65, %66, %67)[^bb12] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb12(%68: !jlir.Bool, %69: !jlir.Int64, %70: !jlir.Int64):  // 2 preds: ^bb10, ^bb11
-# CHECK-NEXT:     %71 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     "jlir.goto"(%65, %66, %67)[^bb27] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb27(%68: !jlir.Bool, %69: !jlir.Int64, %70: !jlir.Int64):  // 2 preds: ^bb25, ^bb26
+# CHECK-NEXT:     %71 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
 # CHECK-NEXT:     %72 = "jlir.call"(%71, %68) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%72, %69, %70)[^bb18, ^bb13] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb13(%73: !jlir.Int64, %74: !jlir.Int64):  // 2 preds: ^bb12, ^bb17
+# CHECK-NEXT:     "jlir.gotoifnot"(%72, %69, %70)[^bb33, ^bb28] {operand_segment_sizes = dense<[1, 0, 2]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb28(%73: !jlir.Int64, %74: !jlir.Int64):  // 2 preds: ^bb27, ^bb32
 # CHECK-NEXT:     %75 = "jlir.constant"() {value = #jlir.Core.arrayref} : () -> !jlir<"typeof(Core.arrayref)">
 # CHECK-NEXT:     %76 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK-NEXT:     %77 = "jlir.call"(%75, %76, %arg1, %23, %73) : (!jlir<"typeof(Core.arrayref)">, !jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Int64, !jlir.Int64) -> !jlir.Float64
@@ -122,206 +149,223 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 # CHECK-NEXT:     %89 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
 # CHECK-NEXT:     %90 = "jlir.call"(%88, %89, %arg1, %87, %23, %73) : (!jlir<"typeof(Core.arrayset)">, !jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Float64, !jlir.Int64, !jlir.Int64) -> !jlir<"Array{Float64, 2}">
 # CHECK-NEXT:     %91 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
-# CHECK-NEXT:     %92 = "jlir.call"(%91, %74, %58) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%92)[^bb15, ^bb14] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb14:  // pred: ^bb13
-# CHECK-NEXT:     %93 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %92 = "jlir.call"(%91, %74, %57) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%92)[^bb30, ^bb29] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb29:  // pred: ^bb28
+# CHECK-NEXT:     %93 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
 # CHECK-NEXT:     %94 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %95 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%93, %94, %95)[^bb16] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb15:  // pred: ^bb13
-# CHECK-NEXT:     %96 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %97 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %98 = "jlir.call"(%96, %74, %97) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %99 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%98, %98, %99)[^bb16] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb16(%100: !jlir.Int64, %101: !jlir.Int64, %102: !jlir.Bool):  // 2 preds: ^bb14, ^bb15
-# CHECK-NEXT:     %103 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %104 = "jlir.call"(%103, %102) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%104)[^bb18, ^bb17] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb17:  // pred: ^bb16
-# CHECK-NEXT:     "jlir.goto"(%100, %101)[^bb13] : (!jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb18:  // 2 preds: ^bb12, ^bb16
-# CHECK-NEXT:     %105 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
-# CHECK-NEXT:     %106 = "jlir.call"(%105, %49, %33) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%106)[^bb20, ^bb19] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb19:  // pred: ^bb18
-# CHECK-NEXT:     %107 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %108 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %109 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%107, %108, %109)[^bb21] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb20:  // pred: ^bb18
-# CHECK-NEXT:     %110 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %111 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %112 = "jlir.call"(%110, %49, %111) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %113 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%112, %112, %113)[^bb21] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb21(%114: !jlir.Int64, %115: !jlir.Int64, %116: !jlir.Bool):  // 2 preds: ^bb19, ^bb20
-# CHECK-NEXT:     %117 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %118 = "jlir.call"(%117, %116) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%118)[^bb23, ^bb22] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb22:  // pred: ^bb21
-# CHECK-NEXT:     "jlir.goto"(%114, %115)[^bb9] : (!jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb23:  // 2 preds: ^bb8, ^bb21
-# CHECK-NEXT:     %119 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
-# CHECK-NEXT:     %120 = "jlir.call"(%119, %24, %8) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%120)[^bb25, ^bb24] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb24:  // pred: ^bb23
-# CHECK-NEXT:     %121 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %122 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %123 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%121, %122, %123)[^bb26] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb25:  // pred: ^bb23
-# CHECK-NEXT:     %124 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %125 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK-NEXT:     %126 = "jlir.call"(%124, %24, %125) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK-NEXT:     %127 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK-NEXT:     "jlir.goto"(%126, %126, %127)[^bb26] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb26(%128: !jlir.Int64, %129: !jlir.Int64, %130: !jlir.Bool):  // 2 preds: ^bb24, ^bb25
-# CHECK-NEXT:     %131 = "jlir.constant"() {value = #jlir<"#<intrinsic #44 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK-NEXT:     %132 = "jlir.call"(%131, %130) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK-NEXT:     "jlir.gotoifnot"(%132)[^bb28, ^bb27] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK-NEXT:   ^bb27:  // pred: ^bb26
-# CHECK-NEXT:     "jlir.goto"(%128, %129)[^bb5] : (!jlir.Int64, !jlir.Int64) -> ()
-# CHECK-NEXT:   ^bb28:  // 2 preds: ^bb4, ^bb26
-# CHECK-NEXT:     %133 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
-# CHECK-NEXT:     "jlir.return"(%133) : (!jlir.Nothing) -> ()
+# CHECK-NEXT:     %95 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %96 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%94, %95, %96)[^bb31] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb30:  // pred: ^bb28
+# CHECK-NEXT:     %97 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %98 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %99 = "jlir.call"(%97, %74, %98) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %100 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%99, %99, %100)[^bb31] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb31(%101: !jlir.Int64, %102: !jlir.Int64, %103: !jlir.Bool):  // 2 preds: ^bb29, ^bb30
+# CHECK-NEXT:     %104 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %105 = "jlir.call"(%104, %103) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%105)[^bb33, ^bb32] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb32:  // pred: ^bb31
+# CHECK-NEXT:     "jlir.goto"(%101, %102)[^bb28] : (!jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb33:  // 2 preds: ^bb27, ^bb31
+# CHECK-NEXT:     %106 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
+# CHECK-NEXT:     %107 = "jlir.call"(%106, %49, %32) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%107)[^bb35, ^bb34] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb34:  // pred: ^bb33
+# CHECK-NEXT:     %108 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     %109 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %110 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %111 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%109, %110, %111)[^bb36] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb35:  // pred: ^bb33
+# CHECK-NEXT:     %112 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %113 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %114 = "jlir.call"(%112, %49, %113) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %115 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%114, %114, %115)[^bb36] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb36(%116: !jlir.Int64, %117: !jlir.Int64, %118: !jlir.Bool):  // 2 preds: ^bb34, ^bb35
+# CHECK-NEXT:     %119 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %120 = "jlir.call"(%119, %118) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%120)[^bb38, ^bb37] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb37:  // pred: ^bb36
+# CHECK-NEXT:     "jlir.goto"(%116, %117)[^bb19] : (!jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb38:  // 2 preds: ^bb18, ^bb36
+# CHECK-NEXT:     %121 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
+# CHECK-NEXT:     %122 = "jlir.call"(%121, %24, %7) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%122)[^bb40, ^bb39] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb39:  // pred: ^bb38
+# CHECK-NEXT:     %123 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     %124 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %125 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %126 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%124, %125, %126)[^bb41] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb40:  // pred: ^bb38
+# CHECK-NEXT:     %127 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %128 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %129 = "jlir.call"(%127, %24, %128) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %130 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%129, %129, %130)[^bb41] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb41(%131: !jlir.Int64, %132: !jlir.Int64, %133: !jlir.Bool):  // 2 preds: ^bb39, ^bb40
+# CHECK-NEXT:     %134 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %135 = "jlir.call"(%134, %133) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%135)[^bb43, ^bb42] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb42:  // pred: ^bb41
+# CHECK-NEXT:     "jlir.goto"(%131, %132)[^bb10] : (!jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb43:  // 2 preds: ^bb9, ^bb41
+# CHECK-NEXT:     %136 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     "jlir.return"(%136) : (!jlir.Nothing) -> ()
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
 # CHECK: module  {
-# CHECK-NEXT:   func nested @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: memref<?x?xf64>, %arg2: memref<?x?xf64>, %arg3: memref<?x?xf64>) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
-# CHECK-NEXT:     %c1_i64 = constant 1 : i64
-# CHECK-NEXT:     %c0_i64 = constant 0 : i64
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !jlir<"typeof(Main.matmul!)">, %arg1: memref<?x?xf64>, %arg2: memref<?x?xf64>, %arg3: memref<?x?xf64>, %arg4: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg5: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg6: i64, %arg7: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg8: i64, %arg9: f64, %arg10: i64) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     %c2_i64 = constant 2 : i64
-# CHECK-NEXT:     %c2 = constant 2 : index
-# CHECK-NEXT:     %c1 = constant 1 : index
 # CHECK-NEXT:     %false = constant false
 # CHECK-NEXT:     %true = constant true
-# CHECK-NEXT:     %0 = "jlir.convertstd"(%c1_i64) : (i64) -> index
-# CHECK-NEXT:     %1 = subi %c2, %0 : index
-# CHECK-NEXT:     %2 = dim %arg2, %1 : memref<?x?xf64>
-# CHECK-NEXT:     %3 = "jlir.convertstd"(%2) : (index) -> i64
-# CHECK-NEXT:     %4 = cmpi sle, %c1_i64, %3 : i64
-# CHECK-NEXT:     %5 = select %4, %3, %c0_i64 : i64
-# CHECK-NEXT:     %6 = "jlir.convertstd"(%5) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %7 = cmpi slt, %5, %c1_i64 : i64
-# CHECK-NEXT:     cond_br %7, ^bb1, ^bb2(%false, %c1_i64, %c1_i64 : i1, i64, i64)
+# CHECK-NEXT:     %c0_i64 = constant 0 : i64
+# CHECK-NEXT:     %c1_i64 = constant 1 : i64
+# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg1) : (memref<?x?xf64>) -> !jlir<"Array{Float64, 2}">
+# CHECK-NEXT:     %1 = "jlir.convertstd"(%arg2) : (memref<?x?xf64>) -> !jlir<"Array{Float64, 2}">
+# CHECK-NEXT:     %2 = "jlir.convertstd"(%arg3) : (memref<?x?xf64>) -> !jlir<"Array{Float64, 2}">
+# CHECK-NEXT:     %3 = "jlir.convertstd"(%c1_i64) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %4 = "jlir.arraysize"(%1, %3) : (!jlir<"Array{Float64, 2}">, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %5 = "jlir.convertstd"(%4) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %6 = cmpi sle, %c1_i64, %5 : i64
+# CHECK-NEXT:     cond_br %6, ^bb1, ^bb2(%c0_i64 : i64)
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
-# CHECK-NEXT:     %8 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %9 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %10 = "jlir.convertstd"(%8) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %11 = "jlir.convertstd"(%9) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb2(%true, %10, %11 : i1, i64, i64)
-# CHECK-NEXT:   ^bb2(%12: i1, %13: i64, %14: i64):  // 2 preds: ^bb0, ^bb1
-# CHECK-NEXT:     %15 = xor %12, %true : i1
-# CHECK-NEXT:     cond_br %15, ^bb3(%13, %14 : i64, i64), ^bb21
-# CHECK-NEXT:   ^bb3(%16: i64, %17: i64):  // 2 preds: ^bb2, ^bb20
-# CHECK-NEXT:     %18 = "jlir.convertstd"(%17) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %19 = "jlir.convertstd"(%c2_i64) : (i64) -> index
-# CHECK-NEXT:     %20 = subi %c2, %19 : index
-# CHECK-NEXT:     %21 = dim %arg2, %20 : memref<?x?xf64>
-# CHECK-NEXT:     %22 = "jlir.convertstd"(%21) : (index) -> i64
-# CHECK-NEXT:     %23 = cmpi sle, %c1_i64, %22 : i64
-# CHECK-NEXT:     %24 = select %23, %22, %c0_i64 : i64
-# CHECK-NEXT:     %25 = "jlir.convertstd"(%24) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %26 = cmpi slt, %24, %c1_i64 : i64
-# CHECK-NEXT:     cond_br %26, ^bb4, ^bb5(%false, %c1_i64, %c1_i64 : i1, i64, i64)
-# CHECK-NEXT:   ^bb4:  // pred: ^bb3
-# CHECK-NEXT:     %27 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %28 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %29 = "jlir.convertstd"(%27) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %30 = "jlir.convertstd"(%28) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb5(%true, %29, %30 : i1, i64, i64)
-# CHECK-NEXT:   ^bb5(%31: i1, %32: i64, %33: i64):  // 2 preds: ^bb3, ^bb4
-# CHECK-NEXT:     %34 = xor %31, %true : i1
-# CHECK-NEXT:     cond_br %34, ^bb6(%32, %33 : i64, i64), ^bb17
-# CHECK-NEXT:   ^bb6(%35: i64, %36: i64):  // 2 preds: ^bb5, ^bb16
-# CHECK-NEXT:     %37 = "jlir.convertstd"(%36) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %38 = dim %arg3, %20 : memref<?x?xf64>
-# CHECK-NEXT:     %39 = "jlir.convertstd"(%38) : (index) -> i64
-# CHECK-NEXT:     %40 = cmpi sle, %c1_i64, %39 : i64
-# CHECK-NEXT:     %41 = select %40, %39, %c0_i64 : i64
-# CHECK-NEXT:     %42 = "jlir.convertstd"(%41) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %43 = cmpi slt, %41, %c1_i64 : i64
-# CHECK-NEXT:     cond_br %43, ^bb7, ^bb8(%false, %c1_i64, %c1_i64 : i1, i64, i64)
-# CHECK-NEXT:   ^bb7:  // pred: ^bb6
-# CHECK-NEXT:     %44 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %45 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %46 = "jlir.convertstd"(%44) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %47 = "jlir.convertstd"(%45) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb8(%true, %46, %47 : i1, i64, i64)
-# CHECK-NEXT:   ^bb8(%48: i1, %49: i64, %50: i64):  // 2 preds: ^bb6, ^bb7
-# CHECK-NEXT:     %51 = xor %48, %true : i1
-# CHECK-NEXT:     cond_br %51, ^bb9(%49, %50 : i64, i64), ^bb13
-# CHECK-NEXT:   ^bb9(%52: i64, %53: i64):  // 2 preds: ^bb8, ^bb12
-# CHECK-NEXT:     %54 = "jlir.convertstd"(%53) : (i64) -> !jlir.Int64
-# CHECK-NEXT:     %55 = "jlir.convertstd"(%16) : (i64) -> index
-# CHECK-NEXT:     %56 = subi %55, %c1 : index
-# CHECK-NEXT:     %57 = "jlir.convertstd"(%52) : (i64) -> index
-# CHECK-NEXT:     %58 = subi %57, %c1 : index
-# CHECK-NEXT:     %59 = load %arg1[%58, %56] : memref<?x?xf64>
-# CHECK-NEXT:     %60 = "jlir.convertstd"(%35) : (i64) -> index
-# CHECK-NEXT:     %61 = subi %60, %c1 : index
-# CHECK-NEXT:     %62 = load %arg2[%61, %56] : memref<?x?xf64>
-# CHECK-NEXT:     %63 = load %arg3[%58, %61] : memref<?x?xf64>
-# CHECK-NEXT:     %64 = mulf %62, %63 : f64
-# CHECK-NEXT:     %65 = addf %59, %64 : f64
-# CHECK-NEXT:     store %65, %arg1[%58, %56] : memref<?x?xf64>
-# CHECK-NEXT:     %66 = "jlir.==="(%54, %42) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %67 = "jlir.convertstd"(%66) : (!jlir.Bool) -> i1
-# CHECK-NEXT:     cond_br %67, ^bb10, ^bb11
-# CHECK-NEXT:   ^bb10:  // pred: ^bb9
-# CHECK-NEXT:     %68 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %69 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %70 = "jlir.convertstd"(%68) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %71 = "jlir.convertstd"(%69) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb12(%70, %71, %true : i64, i64, i1)
-# CHECK-NEXT:   ^bb11:  // pred: ^bb9
-# CHECK-NEXT:     %72 = addi %53, %c1_i64 : i64
-# CHECK-NEXT:     br ^bb12(%72, %72, %false : i64, i64, i1)
-# CHECK-NEXT:   ^bb12(%73: i64, %74: i64, %75: i1):  // 2 preds: ^bb10, ^bb11
-# CHECK-NEXT:     %76 = xor %75, %true : i1
-# CHECK-NEXT:     cond_br %76, ^bb9(%73, %74 : i64, i64), ^bb13
-# CHECK-NEXT:   ^bb13:  // 2 preds: ^bb8, ^bb12
-# CHECK-NEXT:     %77 = "jlir.==="(%37, %25) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %78 = "jlir.convertstd"(%77) : (!jlir.Bool) -> i1
-# CHECK-NEXT:     cond_br %78, ^bb14, ^bb15
-# CHECK-NEXT:   ^bb14:  // pred: ^bb13
-# CHECK-NEXT:     %79 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %80 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %81 = "jlir.convertstd"(%79) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %82 = "jlir.convertstd"(%80) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb16(%81, %82, %true : i64, i64, i1)
-# CHECK-NEXT:   ^bb15:  // pred: ^bb13
-# CHECK-NEXT:     %83 = addi %36, %c1_i64 : i64
-# CHECK-NEXT:     br ^bb16(%83, %83, %false : i64, i64, i1)
-# CHECK-NEXT:   ^bb16(%84: i64, %85: i64, %86: i1):  // 2 preds: ^bb14, ^bb15
-# CHECK-NEXT:     %87 = xor %86, %true : i1
-# CHECK-NEXT:     cond_br %87, ^bb6(%84, %85 : i64, i64), ^bb17
-# CHECK-NEXT:   ^bb17:  // 2 preds: ^bb5, ^bb16
-# CHECK-NEXT:     %88 = "jlir.==="(%18, %6) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK-NEXT:     %89 = "jlir.convertstd"(%88) : (!jlir.Bool) -> i1
-# CHECK-NEXT:     cond_br %89, ^bb18, ^bb19
-# CHECK-NEXT:   ^bb18:  // pred: ^bb17
-# CHECK-NEXT:     %90 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %91 = "jlir.undef"() : () -> !jlir.Int64
-# CHECK-NEXT:     %92 = "jlir.convertstd"(%90) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     %93 = "jlir.convertstd"(%91) : (!jlir.Int64) -> i64
-# CHECK-NEXT:     br ^bb20(%92, %93, %true : i64, i64, i1)
-# CHECK-NEXT:   ^bb19:  // pred: ^bb17
-# CHECK-NEXT:     %94 = addi %17, %c1_i64 : i64
-# CHECK-NEXT:     br ^bb20(%94, %94, %false : i64, i64, i1)
-# CHECK-NEXT:   ^bb20(%95: i64, %96: i64, %97: i1):  // 2 preds: ^bb18, ^bb19
-# CHECK-NEXT:     %98 = xor %97, %true : i1
-# CHECK-NEXT:     cond_br %98, ^bb3(%95, %96 : i64, i64), ^bb21
-# CHECK-NEXT:   ^bb21:  // 2 preds: ^bb2, ^bb20
-# CHECK-NEXT:     %99 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
-# CHECK-NEXT:     return %99 : !jlir.Nothing
+# CHECK-NEXT:     br ^bb2(%5 : i64)
+# CHECK-NEXT:   ^bb2(%7: i64):  // 2 preds: ^bb0, ^bb1
+# CHECK-NEXT:     %8 = "jlir.convertstd"(%7) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %9 = cmpi slt, %7, %c1_i64 : i64
+# CHECK-NEXT:     cond_br %9, ^bb3, ^bb4(%false, %c1_i64, %c1_i64 : i1, i64, i64)
+# CHECK-NEXT:   ^bb3:  // pred: ^bb2
+# CHECK-NEXT:     %10 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %11 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %12 = "jlir.convertstd"(%10) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %13 = "jlir.convertstd"(%11) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb4(%true, %12, %13 : i1, i64, i64)
+# CHECK-NEXT:   ^bb4(%14: i1, %15: i64, %16: i64):  // 2 preds: ^bb2, ^bb3
+# CHECK-NEXT:     %17 = xor %14, %true : i1
+# CHECK-NEXT:     cond_br %17, ^bb5(%15, %16 : i64, i64), ^bb27
+# CHECK-NEXT:   ^bb5(%18: i64, %19: i64):  // 2 preds: ^bb4, ^bb26
+# CHECK-NEXT:     %20 = "jlir.convertstd"(%18) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %21 = "jlir.convertstd"(%19) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %22 = "jlir.convertstd"(%c2_i64) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %23 = "jlir.arraysize"(%1, %22) : (!jlir<"Array{Float64, 2}">, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %24 = "jlir.convertstd"(%23) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %25 = cmpi sle, %c1_i64, %24 : i64
+# CHECK-NEXT:     cond_br %25, ^bb6, ^bb7(%c0_i64 : i64)
+# CHECK-NEXT:   ^bb6:  // pred: ^bb5
+# CHECK-NEXT:     br ^bb7(%24 : i64)
+# CHECK-NEXT:   ^bb7(%26: i64):  // 2 preds: ^bb5, ^bb6
+# CHECK-NEXT:     %27 = "jlir.convertstd"(%26) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %28 = cmpi slt, %26, %c1_i64 : i64
+# CHECK-NEXT:     cond_br %28, ^bb8, ^bb9(%false, %c1_i64, %c1_i64 : i1, i64, i64)
+# CHECK-NEXT:   ^bb8:  // pred: ^bb7
+# CHECK-NEXT:     %29 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %30 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %31 = "jlir.convertstd"(%29) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %32 = "jlir.convertstd"(%30) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb9(%true, %31, %32 : i1, i64, i64)
+# CHECK-NEXT:   ^bb9(%33: i1, %34: i64, %35: i64):  // 2 preds: ^bb7, ^bb8
+# CHECK-NEXT:     %36 = xor %33, %true : i1
+# CHECK-NEXT:     cond_br %36, ^bb10(%34, %35 : i64, i64), ^bb23
+# CHECK-NEXT:   ^bb10(%37: i64, %38: i64):  // 2 preds: ^bb9, ^bb22
+# CHECK-NEXT:     %39 = "jlir.convertstd"(%37) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %40 = "jlir.convertstd"(%38) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %41 = "jlir.arraysize"(%2, %22) : (!jlir<"Array{Float64, 2}">, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %42 = "jlir.convertstd"(%41) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %43 = cmpi sle, %c1_i64, %42 : i64
+# CHECK-NEXT:     cond_br %43, ^bb11, ^bb12(%c0_i64 : i64)
+# CHECK-NEXT:   ^bb11:  // pred: ^bb10
+# CHECK-NEXT:     br ^bb12(%42 : i64)
+# CHECK-NEXT:   ^bb12(%44: i64):  // 2 preds: ^bb10, ^bb11
+# CHECK-NEXT:     %45 = "jlir.convertstd"(%44) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %46 = cmpi slt, %44, %c1_i64 : i64
+# CHECK-NEXT:     cond_br %46, ^bb13, ^bb14(%false, %c1_i64, %c1_i64 : i1, i64, i64)
+# CHECK-NEXT:   ^bb13:  // pred: ^bb12
+# CHECK-NEXT:     %47 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %48 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %49 = "jlir.convertstd"(%47) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %50 = "jlir.convertstd"(%48) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb14(%true, %49, %50 : i1, i64, i64)
+# CHECK-NEXT:   ^bb14(%51: i1, %52: i64, %53: i64):  // 2 preds: ^bb12, ^bb13
+# CHECK-NEXT:     %54 = xor %51, %true : i1
+# CHECK-NEXT:     cond_br %54, ^bb15(%52, %53 : i64, i64), ^bb19
+# CHECK-NEXT:   ^bb15(%55: i64, %56: i64):  // 2 preds: ^bb14, ^bb18
+# CHECK-NEXT:     %57 = "jlir.convertstd"(%55) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %58 = "jlir.convertstd"(%56) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %59 = "jlir.convertstd"(%false) : (i1) -> !jlir.Bool
+# CHECK-NEXT:     %60 = "jlir.arrayref"(%59, %0, %20, %57) : (!jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Int64, !jlir.Int64) -> !jlir.Float64
+# CHECK-NEXT:     %61 = "jlir.arrayref"(%59, %1, %20, %39) : (!jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Int64, !jlir.Int64) -> !jlir.Float64
+# CHECK-NEXT:     %62 = "jlir.arrayref"(%59, %2, %39, %57) : (!jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Int64, !jlir.Int64) -> !jlir.Float64
+# CHECK-NEXT:     %63 = "jlir.convertstd"(%61) : (!jlir.Float64) -> f64
+# CHECK-NEXT:     %64 = "jlir.convertstd"(%62) : (!jlir.Float64) -> f64
+# CHECK-NEXT:     %65 = mulf %63, %64 : f64
+# CHECK-NEXT:     %66 = "jlir.convertstd"(%60) : (!jlir.Float64) -> f64
+# CHECK-NEXT:     %67 = addf %66, %65 : f64
+# CHECK-NEXT:     %68 = "jlir.convertstd"(%67) : (f64) -> !jlir.Float64
+# CHECK-NEXT:     %69 = "jlir.arrayset"(%59, %0, %68, %20, %57) : (!jlir.Bool, !jlir<"Array{Float64, 2}">, !jlir.Float64, !jlir.Int64, !jlir.Int64) -> !jlir<"Array{Float64, 2}">
+# CHECK-NEXT:     %70 = "jlir.==="(%58, %45) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     %71 = "jlir.convertstd"(%70) : (!jlir.Bool) -> i1
+# CHECK-NEXT:     cond_br %71, ^bb16, ^bb17
+# CHECK-NEXT:   ^bb16:  // pred: ^bb15
+# CHECK-NEXT:     %72 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %73 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %74 = "jlir.convertstd"(%72) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %75 = "jlir.convertstd"(%73) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb18(%74, %75, %true : i64, i64, i1)
+# CHECK-NEXT:   ^bb17:  // pred: ^bb15
+# CHECK-NEXT:     %76 = addi %56, %c1_i64 : i64
+# CHECK-NEXT:     br ^bb18(%76, %76, %false : i64, i64, i1)
+# CHECK-NEXT:   ^bb18(%77: i64, %78: i64, %79: i1):  // 2 preds: ^bb16, ^bb17
+# CHECK-NEXT:     %80 = xor %79, %true : i1
+# CHECK-NEXT:     cond_br %80, ^bb15(%77, %78 : i64, i64), ^bb19
+# CHECK-NEXT:   ^bb19:  // 2 preds: ^bb14, ^bb18
+# CHECK-NEXT:     %81 = "jlir.==="(%40, %27) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     %82 = "jlir.convertstd"(%81) : (!jlir.Bool) -> i1
+# CHECK-NEXT:     cond_br %82, ^bb20, ^bb21
+# CHECK-NEXT:   ^bb20:  // pred: ^bb19
+# CHECK-NEXT:     %83 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %84 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %85 = "jlir.convertstd"(%83) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %86 = "jlir.convertstd"(%84) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb22(%85, %86, %true : i64, i64, i1)
+# CHECK-NEXT:   ^bb21:  // pred: ^bb19
+# CHECK-NEXT:     %87 = addi %38, %c1_i64 : i64
+# CHECK-NEXT:     br ^bb22(%87, %87, %false : i64, i64, i1)
+# CHECK-NEXT:   ^bb22(%88: i64, %89: i64, %90: i1):  // 2 preds: ^bb20, ^bb21
+# CHECK-NEXT:     %91 = xor %90, %true : i1
+# CHECK-NEXT:     cond_br %91, ^bb10(%88, %89 : i64, i64), ^bb23
+# CHECK-NEXT:   ^bb23:  // 2 preds: ^bb9, ^bb22
+# CHECK-NEXT:     %92 = "jlir.==="(%21, %8) : (!jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     %93 = "jlir.convertstd"(%92) : (!jlir.Bool) -> i1
+# CHECK-NEXT:     cond_br %93, ^bb24, ^bb25
+# CHECK-NEXT:   ^bb24:  // pred: ^bb23
+# CHECK-NEXT:     %94 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %95 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %96 = "jlir.convertstd"(%94) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     %97 = "jlir.convertstd"(%95) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     br ^bb26(%96, %97, %true : i64, i64, i1)
+# CHECK-NEXT:   ^bb25:  // pred: ^bb23
+# CHECK-NEXT:     %98 = addi %19, %c1_i64 : i64
+# CHECK-NEXT:     br ^bb26(%98, %98, %false : i64, i64, i1)
+# CHECK-NEXT:   ^bb26(%99: i64, %100: i64, %101: i1):  // 2 preds: ^bb24, ^bb25
+# CHECK-NEXT:     %102 = xor %101, %true : i1
+# CHECK-NEXT:     cond_br %102, ^bb5(%99, %100 : i64, i64), ^bb27
+# CHECK-NEXT:   ^bb27:  // 2 preds: ^bb4, ^bb26
+# CHECK-NEXT:     %103 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     return %103 : !jlir.Nothing
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<f64>, %arg2: !llvm.ptr<f64>, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: !llvm.ptr<f64>, %arg9: !llvm.ptr<f64>, %arg10: i64, %arg11: i64, %arg12: i64, %arg13: i64, %arg14: i64, %arg15: !llvm.ptr<f64>, %arg16: !llvm.ptr<f64>, %arg17: i64, %arg18: i64, %arg19: i64, %arg20: i64, %arg21: i64) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK: error: lowering to LLVM dialect failed
+# CHECK-NEXT: error: module verification failed
+
+# CHECK: module  {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<f64>, %arg2: !llvm.ptr<f64>, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: !llvm.ptr<f64>, %arg9: !llvm.ptr<f64>, %arg10: i64, %arg11: i64, %arg12: i64, %arg13: i64, %arg14: i64, %arg15: !llvm.ptr<f64>, %arg16: !llvm.ptr<f64>, %arg17: i64, %arg18: i64, %arg19: i64, %arg20: i64, %arg21: i64, %arg22: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg23: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg24: i64, %arg25: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg26: i64, %arg27: f64, %arg28: i64) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.mlir.undef : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %1 = llvm.insertvalue %arg1, %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %2 = llvm.insertvalue %arg2, %1[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
@@ -330,142 +374,125 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 # CHECK-NEXT:     %5 = llvm.insertvalue %arg6, %4[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %6 = llvm.insertvalue %arg5, %5[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %7 = llvm.insertvalue %arg7, %6[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %8 = llvm.insertvalue %arg8, %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %9 = llvm.insertvalue %arg9, %8[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %10 = llvm.insertvalue %arg10, %9[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %11 = llvm.insertvalue %arg11, %10[3, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %12 = llvm.insertvalue %arg13, %11[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %13 = llvm.insertvalue %arg12, %12[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %14 = llvm.insertvalue %arg14, %13[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %15 = llvm.insertvalue %arg15, %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %16 = llvm.insertvalue %arg16, %15[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %17 = llvm.insertvalue %arg17, %16[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %18 = llvm.insertvalue %arg18, %17[3, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %19 = llvm.insertvalue %arg20, %18[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %20 = llvm.insertvalue %arg19, %19[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %21 = llvm.insertvalue %arg21, %20[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %22 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
-# CHECK-NEXT:     %23 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
+# CHECK-NEXT:     %8 = llvm.mlir.undef : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %9 = llvm.insertvalue %arg8, %8[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %10 = llvm.insertvalue %arg9, %9[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %11 = llvm.insertvalue %arg10, %10[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %12 = llvm.insertvalue %arg11, %11[3, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %13 = llvm.insertvalue %arg13, %12[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %14 = llvm.insertvalue %arg12, %13[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %15 = llvm.insertvalue %arg14, %14[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %16 = llvm.mlir.undef : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %17 = llvm.insertvalue %arg15, %16[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %18 = llvm.insertvalue %arg16, %17[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %19 = llvm.insertvalue %arg17, %18[2] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %20 = llvm.insertvalue %arg18, %19[3, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %21 = llvm.insertvalue %arg20, %20[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %22 = llvm.insertvalue %arg19, %21[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
+# CHECK-NEXT:     %23 = llvm.insertvalue %arg21, %22[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %24 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
-# CHECK-NEXT:     %25 = llvm.mlir.constant(2 : index) : i64
-# CHECK-NEXT:     %26 = llvm.mlir.constant(1 : index) : i64
-# CHECK-NEXT:     %27 = llvm.mlir.constant(false) : i1
-# CHECK-NEXT:     %28 = llvm.mlir.constant(true) : i1
-# CHECK-NEXT:     %29 = llvm.sub %25, %22  : i64
-# CHECK-NEXT:     %30 = llvm.mlir.constant(0 : index) : i64
-# CHECK-NEXT:     %31 = llvm.extractvalue %14[3] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %32 = llvm.alloca %26 x !llvm.array<2 x i64> : (i64) -> !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     llvm.store %31, %32 : !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     %33 = llvm.getelementptr %32[%30, %29] : (!llvm.ptr<array<2 x i64>>, i64, i64) -> !llvm.ptr<i64>
-# CHECK-NEXT:     %34 = llvm.load %33 : !llvm.ptr<i64>
-# CHECK-NEXT:     %35 = llvm.icmp "sle" %22, %34 : i64
-# CHECK-NEXT:     %36 = llvm.select %35, %34, %23 : i1, i64
-# CHECK-NEXT:     %37 = llvm.icmp "slt" %36, %22 : i64
-# CHECK-NEXT:     llvm.cond_br %37, ^bb1, ^bb2(%27, %22, %22 : i1, i64, i64)
+# CHECK-NEXT:     %25 = llvm.mlir.constant(false) : i1
+# CHECK-NEXT:     %26 = llvm.mlir.constant(true) : i1
+# CHECK-NEXT:     %27 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
+# CHECK-NEXT:     %28 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
+# CHECK-NEXT:     %29 = "jlir.arraysize"(%15, %28) : (!llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64) -> !jlir.Int64
+# CHECK-NEXT:     %30 = llvm.icmp "sle" %28, %29 : i64
+# CHECK-NEXT:     llvm.cond_br %30, ^bb1, ^bb2(%27 : i64)
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
-# CHECK-NEXT:     %38 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb2(%28, %38, %38 : i1, i64, i64)
-# CHECK-NEXT:   ^bb2(%39: i1, %40: i64, %41: i64):  // 2 preds: ^bb0, ^bb1
-# CHECK-NEXT:     %42 = llvm.xor %39, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %42, ^bb3(%40, %41 : i64, i64), ^bb21
-# CHECK-NEXT:   ^bb3(%43: i64, %44: i64):  // 2 preds: ^bb2, ^bb20
-# CHECK-NEXT:     %45 = llvm.sub %25, %24  : i64
-# CHECK-NEXT:     %46 = llvm.alloca %26 x !llvm.array<2 x i64> : (i64) -> !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     llvm.store %31, %46 : !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     %47 = llvm.getelementptr %46[%30, %45] : (!llvm.ptr<array<2 x i64>>, i64, i64) -> !llvm.ptr<i64>
-# CHECK-NEXT:     %48 = llvm.load %47 : !llvm.ptr<i64>
-# CHECK-NEXT:     %49 = llvm.icmp "sle" %22, %48 : i64
-# CHECK-NEXT:     %50 = llvm.select %49, %48, %23 : i1, i64
-# CHECK-NEXT:     %51 = llvm.icmp "slt" %50, %22 : i64
-# CHECK-NEXT:     llvm.cond_br %51, ^bb4, ^bb5(%27, %22, %22 : i1, i64, i64)
-# CHECK-NEXT:   ^bb4:  // pred: ^bb3
-# CHECK-NEXT:     %52 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb5(%28, %52, %52 : i1, i64, i64)
-# CHECK-NEXT:   ^bb5(%53: i1, %54: i64, %55: i64):  // 2 preds: ^bb3, ^bb4
-# CHECK-NEXT:     %56 = llvm.xor %53, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %56, ^bb6(%54, %55 : i64, i64), ^bb17
-# CHECK-NEXT:   ^bb6(%57: i64, %58: i64):  // 2 preds: ^bb5, ^bb16
-# CHECK-NEXT:     %59 = llvm.extractvalue %21[3] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %60 = llvm.alloca %26 x !llvm.array<2 x i64> : (i64) -> !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     llvm.store %59, %60 : !llvm.ptr<array<2 x i64>>
-# CHECK-NEXT:     %61 = llvm.getelementptr %60[%30, %45] : (!llvm.ptr<array<2 x i64>>, i64, i64) -> !llvm.ptr<i64>
-# CHECK-NEXT:     %62 = llvm.load %61 : !llvm.ptr<i64>
-# CHECK-NEXT:     %63 = llvm.icmp "sle" %22, %62 : i64
-# CHECK-NEXT:     %64 = llvm.select %63, %62, %23 : i1, i64
-# CHECK-NEXT:     %65 = llvm.icmp "slt" %64, %22 : i64
-# CHECK-NEXT:     llvm.cond_br %65, ^bb7, ^bb8(%27, %22, %22 : i1, i64, i64)
-# CHECK-NEXT:   ^bb7:  // pred: ^bb6
-# CHECK-NEXT:     %66 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb8(%28, %66, %66 : i1, i64, i64)
-# CHECK-NEXT:   ^bb8(%67: i1, %68: i64, %69: i64):  // 2 preds: ^bb6, ^bb7
-# CHECK-NEXT:     %70 = llvm.xor %67, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %70, ^bb9(%68, %69 : i64, i64), ^bb13
-# CHECK-NEXT:   ^bb9(%71: i64, %72: i64):  // 2 preds: ^bb8, ^bb12
-# CHECK-NEXT:     %73 = llvm.sub %43, %26  : i64
-# CHECK-NEXT:     %74 = llvm.sub %71, %26  : i64
-# CHECK-NEXT:     %75 = llvm.extractvalue %7[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %76 = llvm.extractvalue %7[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %77 = llvm.mul %74, %76  : i64
-# CHECK-NEXT:     %78 = llvm.add %77, %73  : i64
-# CHECK-NEXT:     %79 = llvm.getelementptr %75[%78] : (!llvm.ptr<f64>, i64) -> !llvm.ptr<f64>
-# CHECK-NEXT:     %80 = llvm.load %79 : !llvm.ptr<f64>
-# CHECK-NEXT:     %81 = llvm.sub %57, %26  : i64
-# CHECK-NEXT:     %82 = llvm.extractvalue %14[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %83 = llvm.extractvalue %14[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %84 = llvm.mul %81, %83  : i64
-# CHECK-NEXT:     %85 = llvm.add %84, %73  : i64
-# CHECK-NEXT:     %86 = llvm.getelementptr %82[%85] : (!llvm.ptr<f64>, i64) -> !llvm.ptr<f64>
-# CHECK-NEXT:     %87 = llvm.load %86 : !llvm.ptr<f64>
-# CHECK-NEXT:     %88 = llvm.extractvalue %21[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %89 = llvm.extractvalue %21[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %90 = llvm.mul %74, %89  : i64
-# CHECK-NEXT:     %91 = llvm.add %90, %81  : i64
-# CHECK-NEXT:     %92 = llvm.getelementptr %88[%91] : (!llvm.ptr<f64>, i64) -> !llvm.ptr<f64>
-# CHECK-NEXT:     %93 = llvm.load %92 : !llvm.ptr<f64>
-# CHECK-NEXT:     %94 = llvm.fmul %87, %93  : f64
-# CHECK-NEXT:     %95 = llvm.fadd %80, %94  : f64
-# CHECK-NEXT:     llvm.store %95, %79 : !llvm.ptr<f64>
-# CHECK-NEXT:     %96 = llvm.icmp "eq" %72, %64 : i64
-# CHECK-NEXT:     llvm.cond_br %96, ^bb10, ^bb11
-# CHECK-NEXT:   ^bb10:  // pred: ^bb9
-# CHECK-NEXT:     %97 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb12(%97, %97, %28 : i64, i64, i1)
-# CHECK-NEXT:   ^bb11:  // pred: ^bb9
-# CHECK-NEXT:     %98 = llvm.add %72, %22  : i64
-# CHECK-NEXT:     llvm.br ^bb12(%98, %98, %27 : i64, i64, i1)
-# CHECK-NEXT:   ^bb12(%99: i64, %100: i64, %101: i1):  // 2 preds: ^bb10, ^bb11
-# CHECK-NEXT:     %102 = llvm.xor %101, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %102, ^bb9(%99, %100 : i64, i64), ^bb13
-# CHECK-NEXT:   ^bb13:  // 2 preds: ^bb8, ^bb12
-# CHECK-NEXT:     %103 = llvm.icmp "eq" %58, %50 : i64
-# CHECK-NEXT:     llvm.cond_br %103, ^bb14, ^bb15
-# CHECK-NEXT:   ^bb14:  // pred: ^bb13
-# CHECK-NEXT:     %104 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb16(%104, %104, %28 : i64, i64, i1)
-# CHECK-NEXT:   ^bb15:  // pred: ^bb13
-# CHECK-NEXT:     %105 = llvm.add %58, %22  : i64
-# CHECK-NEXT:     llvm.br ^bb16(%105, %105, %27 : i64, i64, i1)
-# CHECK-NEXT:   ^bb16(%106: i64, %107: i64, %108: i1):  // 2 preds: ^bb14, ^bb15
-# CHECK-NEXT:     %109 = llvm.xor %108, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %109, ^bb6(%106, %107 : i64, i64), ^bb17
-# CHECK-NEXT:   ^bb17:  // 2 preds: ^bb5, ^bb16
-# CHECK-NEXT:     %110 = llvm.icmp "eq" %44, %36 : i64
-# CHECK-NEXT:     llvm.cond_br %110, ^bb18, ^bb19
-# CHECK-NEXT:   ^bb18:  // pred: ^bb17
-# CHECK-NEXT:     %111 = llvm.mlir.undef : i64
-# CHECK-NEXT:     llvm.br ^bb20(%111, %111, %28 : i64, i64, i1)
-# CHECK-NEXT:   ^bb19:  // pred: ^bb17
-# CHECK-NEXT:     %112 = llvm.add %44, %22  : i64
-# CHECK-NEXT:     llvm.br ^bb20(%112, %112, %27 : i64, i64, i1)
-# CHECK-NEXT:   ^bb20(%113: i64, %114: i64, %115: i1):  // 2 preds: ^bb18, ^bb19
-# CHECK-NEXT:     %116 = llvm.xor %115, %28  : i1
-# CHECK-NEXT:     llvm.cond_br %116, ^bb3(%113, %114 : i64, i64), ^bb21
-# CHECK-NEXT:   ^bb21:  // 2 preds: ^bb2, ^bb20
-# CHECK-NEXT:     %117 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
-# CHECK-NEXT:     %118 = llvm.inttoptr %117 : i64 to !llvm.ptr<struct<"struct_jl_value_type", opaque>>
-# CHECK-NEXT:     llvm.return %118 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
+# CHECK-NEXT:     llvm.br ^bb2(%29 : !jlir.Int64)
+# CHECK-NEXT:   ^bb2(%31: i64):  // 2 preds: ^bb0, ^bb1
+# CHECK-NEXT:     %32 = llvm.icmp "slt" %31, %28 : i64
+# CHECK-NEXT:     llvm.cond_br %32, ^bb3, ^bb4(%25, %28, %28 : i1, i64, i64)
+# CHECK-NEXT:   ^bb3:  // pred: ^bb2
+# CHECK-NEXT:     %33 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %34 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb4(%26, %33, %34 : i1, i64, i64)
+# CHECK-NEXT:   ^bb4(%35: i1, %36: i64, %37: i64):  // 2 preds: ^bb2, ^bb3
+# CHECK-NEXT:     %38 = llvm.xor %35, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %38, ^bb5(%36, %37 : i64, i64), ^bb27
+# CHECK-NEXT:   ^bb5(%39: i64, %40: i64):  // 2 preds: ^bb4, ^bb26
+# CHECK-NEXT:     %41 = "jlir.arraysize"(%15, %24) : (!llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64) -> !jlir.Int64
+# CHECK-NEXT:     %42 = llvm.icmp "sle" %28, %41 : i64
+# CHECK-NEXT:     llvm.cond_br %42, ^bb6, ^bb7(%27 : i64)
+# CHECK-NEXT:   ^bb6:  // pred: ^bb5
+# CHECK-NEXT:     llvm.br ^bb7(%41 : !jlir.Int64)
+# CHECK-NEXT:   ^bb7(%43: i64):  // 2 preds: ^bb5, ^bb6
+# CHECK-NEXT:     %44 = llvm.icmp "slt" %43, %28 : i64
+# CHECK-NEXT:     llvm.cond_br %44, ^bb8, ^bb9(%25, %28, %28 : i1, i64, i64)
+# CHECK-NEXT:   ^bb8:  // pred: ^bb7
+# CHECK-NEXT:     %45 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %46 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb9(%26, %45, %46 : i1, i64, i64)
+# CHECK-NEXT:   ^bb9(%47: i1, %48: i64, %49: i64):  // 2 preds: ^bb7, ^bb8
+# CHECK-NEXT:     %50 = llvm.xor %47, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %50, ^bb10(%48, %49 : i64, i64), ^bb23
+# CHECK-NEXT:   ^bb10(%51: i64, %52: i64):  // 2 preds: ^bb9, ^bb22
+# CHECK-NEXT:     %53 = "jlir.arraysize"(%23, %24) : (!llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64) -> !jlir.Int64
+# CHECK-NEXT:     %54 = llvm.icmp "sle" %28, %53 : i64
+# CHECK-NEXT:     llvm.cond_br %54, ^bb11, ^bb12(%27 : i64)
+# CHECK-NEXT:   ^bb11:  // pred: ^bb10
+# CHECK-NEXT:     llvm.br ^bb12(%53 : !jlir.Int64)
+# CHECK-NEXT:   ^bb12(%55: i64):  // 2 preds: ^bb10, ^bb11
+# CHECK-NEXT:     %56 = llvm.icmp "slt" %55, %28 : i64
+# CHECK-NEXT:     llvm.cond_br %56, ^bb13, ^bb14(%25, %28, %28 : i1, i64, i64)
+# CHECK-NEXT:   ^bb13:  // pred: ^bb12
+# CHECK-NEXT:     %57 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %58 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb14(%26, %57, %58 : i1, i64, i64)
+# CHECK-NEXT:   ^bb14(%59: i1, %60: i64, %61: i64):  // 2 preds: ^bb12, ^bb13
+# CHECK-NEXT:     %62 = llvm.xor %59, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %62, ^bb15(%60, %61 : i64, i64), ^bb19
+# CHECK-NEXT:   ^bb15(%63: i64, %64: i64):  // 2 preds: ^bb14, ^bb18
+# CHECK-NEXT:     %65 = "jlir.arrayref"(%25, %7, %39, %63) : (i1, !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64, i64) -> !jlir.Float64
+# CHECK-NEXT:     %66 = "jlir.arrayref"(%25, %15, %39, %51) : (i1, !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64, i64) -> !jlir.Float64
+# CHECK-NEXT:     %67 = "jlir.arrayref"(%25, %23, %51, %63) : (i1, !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, i64, i64) -> !jlir.Float64
+# CHECK-NEXT:     %68 = llvm.fmul %66, %67  : f64
+# CHECK-NEXT:     %69 = llvm.fadd %65, %68  : f64
+# CHECK-NEXT:     %70 = "jlir.arrayset"(%25, %7, %69, %39, %63) : (i1, !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>, f64, i64, i64) -> !jlir<"Array{Float64, 2}">
+# CHECK-NEXT:     %71 = llvm.icmp "eq" %64, %55 : i64
+# CHECK-NEXT:     llvm.cond_br %71, ^bb16, ^bb17
+# CHECK-NEXT:   ^bb16:  // pred: ^bb15
+# CHECK-NEXT:     %72 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %73 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb18(%72, %73, %26 : i64, i64, i1)
+# CHECK-NEXT:   ^bb17:  // pred: ^bb15
+# CHECK-NEXT:     %74 = llvm.add %64, %28  : i64
+# CHECK-NEXT:     llvm.br ^bb18(%74, %74, %25 : i64, i64, i1)
+# CHECK-NEXT:   ^bb18(%75: i64, %76: i64, %77: i1):  // 2 preds: ^bb16, ^bb17
+# CHECK-NEXT:     %78 = llvm.xor %77, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %78, ^bb15(%75, %76 : i64, i64), ^bb19
+# CHECK-NEXT:   ^bb19:  // 2 preds: ^bb14, ^bb18
+# CHECK-NEXT:     %79 = llvm.icmp "eq" %52, %43 : i64
+# CHECK-NEXT:     llvm.cond_br %79, ^bb20, ^bb21
+# CHECK-NEXT:   ^bb20:  // pred: ^bb19
+# CHECK-NEXT:     %80 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %81 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb22(%80, %81, %26 : i64, i64, i1)
+# CHECK-NEXT:   ^bb21:  // pred: ^bb19
+# CHECK-NEXT:     %82 = llvm.add %52, %28  : i64
+# CHECK-NEXT:     llvm.br ^bb22(%82, %82, %25 : i64, i64, i1)
+# CHECK-NEXT:   ^bb22(%83: i64, %84: i64, %85: i1):  // 2 preds: ^bb20, ^bb21
+# CHECK-NEXT:     %86 = llvm.xor %85, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %86, ^bb10(%83, %84 : i64, i64), ^bb23
+# CHECK-NEXT:   ^bb23:  // 2 preds: ^bb9, ^bb22
+# CHECK-NEXT:     %87 = llvm.icmp "eq" %40, %31 : i64
+# CHECK-NEXT:     llvm.cond_br %87, ^bb24, ^bb25
+# CHECK-NEXT:   ^bb24:  // pred: ^bb23
+# CHECK-NEXT:     %88 = llvm.mlir.undef : i64
+# CHECK-NEXT:     %89 = llvm.mlir.undef : i64
+# CHECK-NEXT:     llvm.br ^bb26(%88, %89, %26 : i64, i64, i1)
+# CHECK-NEXT:   ^bb25:  // pred: ^bb23
+# CHECK-NEXT:     %90 = llvm.add %40, %28  : i64
+# CHECK-NEXT:     llvm.br ^bb26(%90, %90, %25 : i64, i64, i1)
+# CHECK-NEXT:   ^bb26(%91: i64, %92: i64, %93: i1):  // 2 preds: ^bb24, ^bb25
+# CHECK-NEXT:     %94 = llvm.xor %93, %26  : i1
+# CHECK-NEXT:     llvm.cond_br %94, ^bb5(%91, %92 : i64, i64), ^bb27
+# CHECK-NEXT:   ^bb27:  // 2 preds: ^bb4, ^bb26
+# CHECK-NEXT:     %95 = llvm.mlir.constant({{[0-9]+}} : i64) : i64
+# CHECK-NEXT:     %96 = llvm.inttoptr %95 : i64 to !llvm.ptr<struct<"struct_jl_value_type", opaque>>
+# CHECK-NEXT:     llvm.return %96 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
-# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, %arg2: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, %arg3: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, %arg2: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, %arg3: !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>, %arg4: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg5: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg6: i64, %arg7: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg8: i64, %arg9: f64, %arg10: i64) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>>
 # CHECK-NEXT:     %1 = llvm.extractvalue %0[0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %2 = llvm.extractvalue %0[1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
@@ -490,7 +517,7 @@ emit(matmul!, Matrix{Float64}, Matrix{Float64}, Matrix{Float64})
 # CHECK-NEXT:     %21 = llvm.extractvalue %16[3, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %22 = llvm.extractvalue %16[4, 0] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
 # CHECK-NEXT:     %23 = llvm.extractvalue %16[4, 1] : !llvm.struct<(ptr<f64>, ptr<f64>, i64, array<2 x i64>, array<2 x i64>)>
-# CHECK-NEXT:     %24 = llvm.call @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0, %1, %2, %3, %4, %5, %6, %7, %9, %10, %11, %12, %13, %14, %15, %17, %18, %19, %20, %21, %22, %23) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>>
+# CHECK-NEXT:     %24 = llvm.call @"Tuple{typeof(Main.matmul!), Array{Float64, 2}, Array{Float64, 2}, Array{Float64, 2}}"(%arg0, %1, %2, %3, %4, %5, %6, %7, %9, %10, %11, %12, %13, %14, %15, %17, %18, %19, %20, %21, %22, %23, %arg4, %arg5, %arg6, %arg7, %arg8, %arg9, %arg10) : (!llvm.ptr<struct<"struct_jl_value_type", opaque>>, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64, !llvm.ptr<f64>, !llvm.ptr<f64>, i64, i64, i64, i64, i64, !llvm.ptr<struct<"struct_jl_value_type", opaque>>, !llvm.ptr<struct<"struct_jl_value_type", opaque>>, i64, !llvm.ptr<struct<"struct_jl_value_type", opaque>>, i64, f64, i64) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:     llvm.return %24 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
 # CHECK-NEXT: }

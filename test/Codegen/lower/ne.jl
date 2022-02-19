@@ -6,7 +6,7 @@ emit(ne, Float64, Float64)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.ne), Float64, Float64}, svec(), ne(x, y) in Main.Main at /{{.*}}/test/Codegen/lower/ne.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !jlir<"typeof(Main.ne)">, %arg1: !jlir.Float64, %arg2: !jlir.Float64) -> !jlir.Bool attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
@@ -23,7 +23,8 @@ emit(ne, Float64, Float64)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: f64, %arg2: f64) -> i1 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK: module  {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.ne), Float64, Float64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: f64, %arg2: f64) -> i1 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.fcmp "une" %arg1, %arg2 : f64
 # CHECK-NEXT:     llvm.return %0 : i1
 # CHECK-NEXT:   }

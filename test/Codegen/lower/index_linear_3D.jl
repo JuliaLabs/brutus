@@ -7,7 +7,7 @@ emit(index, Array{Int64, 3}, Int64)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.index), Array{Int64, 3}, Int64}, svec(), index(A, i) in Main.Main at /{{.*}}/test/Codegen/lower/index_linear_3D.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: !jlir<"Array{Int64, 3}">, %arg2: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
@@ -20,16 +20,21 @@ emit(index, Array{Int64, 3}, Int64)
 
 # CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !jlir<"typeof(Main.index)">, %arg1: memref<?x?x?xi64>, %arg2: i64) -> i64 attributes {llvm.emit_c_interface} {
-# CHECK-NEXT:     %c0 = constant 0 : index
-# CHECK-NEXT:     %c1 = constant 1 : index
-# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg2) : (i64) -> index
-# CHECK-NEXT:     %1 = subi %0, %c1 : index
-# CHECK-NEXT:     %2 = load %arg1[%c0, %c0, %1] : memref<?x?x?xi64>
-# CHECK-NEXT:     return %2 : i64
+# CHECK-NEXT:     %true = constant true
+# CHECK-NEXT:     %0 = "jlir.convertstd"(%arg1) : (memref<?x?x?xi64>) -> !jlir<"Array{Int64, 3}">
+# CHECK-NEXT:     %1 = "jlir.convertstd"(%arg2) : (i64) -> !jlir.Int64
+# CHECK-NEXT:     %2 = "jlir.convertstd"(%true) : (i1) -> !jlir.Bool
+# CHECK-NEXT:     %3 = "jlir.arrayref"(%2, %0, %1) : (!jlir.Bool, !jlir<"Array{Int64, 3}">, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %4 = "jlir.convertstd"(%3) : (!jlir.Int64) -> i64
+# CHECK-NEXT:     return %4 : i64
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<i64>, %arg2: !llvm.ptr<i64>, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: i64, %arg9: i64, %arg10: i64) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK: error: lowering to LLVM dialect failed
+# CHECK-NEXT: error: module verification failed
+
+# CHECK: module  {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<i64>, %arg2: !llvm.ptr<i64>, %arg3: i64, %arg4: i64, %arg5: i64, %arg6: i64, %arg7: i64, %arg8: i64, %arg9: i64, %arg10: i64) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.mlir.undef : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %1 = llvm.insertvalue %arg1, %0[0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %2 = llvm.insertvalue %arg2, %1[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
@@ -40,19 +45,9 @@ emit(index, Array{Int64, 3}, Int64)
 # CHECK-NEXT:     %7 = llvm.insertvalue %arg8, %6[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %8 = llvm.insertvalue %arg6, %7[3, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
 # CHECK-NEXT:     %9 = llvm.insertvalue %arg9, %8[4, 2] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %10 = llvm.mlir.constant(0 : index) : i64
-# CHECK-NEXT:     %11 = llvm.mlir.constant(1 : index) : i64
-# CHECK-NEXT:     %12 = llvm.sub %arg10, %11  : i64
-# CHECK-NEXT:     %13 = llvm.extractvalue %9[1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %14 = llvm.extractvalue %9[4, 0] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %15 = llvm.mul %10, %14  : i64
-# CHECK-NEXT:     %16 = llvm.extractvalue %9[4, 1] : !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>
-# CHECK-NEXT:     %17 = llvm.mul %10, %16  : i64
-# CHECK-NEXT:     %18 = llvm.add %15, %17  : i64
-# CHECK-NEXT:     %19 = llvm.add %18, %12  : i64
-# CHECK-NEXT:     %20 = llvm.getelementptr %13[%19] : (!llvm.ptr<i64>, i64) -> !llvm.ptr<i64>
-# CHECK-NEXT:     %21 = llvm.load %20 : !llvm.ptr<i64>
-# CHECK-NEXT:     llvm.return %21 : i64
+# CHECK-NEXT:     %10 = llvm.mlir.constant(true) : i1
+# CHECK-NEXT:     %11 = "jlir.arrayref"(%10, %9, %arg10) : (i1, !llvm.struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>, i64) -> !jlir.Int64
+# CHECK-NEXT:     llvm.return %11 : !jlir.Int64
 # CHECK-NEXT:   }
 # CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Main.index), Array{Int64, 3}, Int64}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>>, %arg2: i64) -> i64 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     %0 = llvm.load %arg1 : !llvm.ptr<struct<(ptr<i64>, ptr<i64>, i64, array<3 x i64>, array<3 x i64>)>>

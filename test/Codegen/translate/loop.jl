@@ -9,62 +9,71 @@ function loop(N)
 end
 emit(loop, Int64)
 
-# CHECK-LABEL:   func nested @"Tuple{typeof(Main.loop), Int64}"(
-# CHECK-SAME:                                                   %[[VAL_0:.*]]: !jlir<"typeof(Main.loop)">,
-# CHECK-SAME:                                                   %[[VAL_1:.*]]: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
-# CHECK:           "jlir.goto"()[^bb1] : () -> ()
-# CHECK:         ^bb1:
-# CHECK:           %[[VAL_2:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_3:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_4:.*]] = "jlir.call"(%[[VAL_2]], %[[VAL_3]], %[[VAL_1]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:           %[[VAL_5:.*]] = "jlir.constant"() {value = #jlir.ifelse} : () -> !jlir<"typeof(ifelse)">
-# CHECK:           %[[VAL_6:.*]] = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_7:.*]] = "jlir.call"(%[[VAL_5]], %[[VAL_4]], %[[VAL_1]], %[[VAL_6]]) : (!jlir<"typeof(ifelse)">, !jlir.Bool, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK:           %[[VAL_8:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_9:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_10:.*]] = "jlir.call"(%[[VAL_8]], %[[VAL_7]], %[[VAL_9]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:           "jlir.gotoifnot"(%[[VAL_10]])[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK:         ^bb2:
-# CHECK:           %[[VAL_11:.*]] = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
-# CHECK:           %[[VAL_12:.*]] = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK:           %[[VAL_13:.*]] = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:           %[[VAL_14:.*]] = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:           "jlir.goto"(%[[VAL_12]], %[[VAL_13]], %[[VAL_14]])[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK:         ^bb3:
-# CHECK:           %[[VAL_15:.*]] = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK:           %[[VAL_16:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_17:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           "jlir.goto"(%[[VAL_15]], %[[VAL_16]], %[[VAL_17]])[^bb4] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK:         ^bb4(%[[VAL_18:.*]]: !jlir.Bool, %[[VAL_19:.*]]: !jlir.Int64, %[[VAL_20:.*]]: !jlir.Int64):
-# CHECK:           %[[VAL_21:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_22:.*]] = "jlir.call"(%[[VAL_21]], %[[VAL_18]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK:           %[[VAL_23:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_24:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           "jlir.gotoifnot"(%[[VAL_22]], %[[VAL_24]], %[[VAL_19]], %[[VAL_20]], %[[VAL_23]])[^bb10, ^bb5] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK:         ^bb5(%[[VAL_25:.*]]: !jlir.Int64, %[[VAL_26:.*]]: !jlir.Int64, %[[VAL_27:.*]]: !jlir.Int64):
-# CHECK:           %[[VAL_28:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_29:.*]] = "jlir.call"(%[[VAL_28]], %[[VAL_27]], %[[VAL_25]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK:           %[[VAL_30:.*]] = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
-# CHECK:           %[[VAL_31:.*]] = "jlir.call"(%[[VAL_30]], %[[VAL_26]], %[[VAL_7]]) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
-# CHECK:           "jlir.gotoifnot"(%[[VAL_31]])[^bb7, ^bb6] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
-# CHECK:         ^bb6:
-# CHECK:           %[[VAL_32:.*]] = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
-# CHECK:           %[[VAL_33:.*]] = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:           %[[VAL_34:.*]] = "jlir.undef"() : () -> !jlir.Int64
-# CHECK:           %[[VAL_35:.*]] = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
-# CHECK:           "jlir.goto"(%[[VAL_33]], %[[VAL_34]], %[[VAL_35]])[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK:         ^bb7:
-# CHECK:           %[[VAL_36:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_37:.*]] = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
-# CHECK:           %[[VAL_38:.*]] = "jlir.call"(%[[VAL_36]], %[[VAL_26]], %[[VAL_37]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
-# CHECK:           %[[VAL_39:.*]] = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
-# CHECK:           "jlir.goto"(%[[VAL_38]], %[[VAL_38]], %[[VAL_39]])[^bb8] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
-# CHECK:         ^bb8(%[[VAL_40:.*]]: !jlir.Int64, %[[VAL_41:.*]]: !jlir.Int64, %[[VAL_42:.*]]: !jlir.Bool):
-# CHECK:           %[[VAL_43:.*]] = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
-# CHECK:           %[[VAL_44:.*]] = "jlir.call"(%[[VAL_43]], %[[VAL_42]]) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
-# CHECK:           "jlir.gotoifnot"(%[[VAL_44]], %[[VAL_29]])[^bb10, ^bb9] {operand_segment_sizes = dense<[1, 1, 0]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64) -> ()
-# CHECK:         ^bb9:
-# CHECK:           "jlir.goto"(%[[VAL_40]], %[[VAL_41]], %[[VAL_29]])[^bb5] : (!jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
-# CHECK:         ^bb10(%[[VAL_45:.*]]: !jlir.Int64):
-# CHECK:           "jlir.return"(%[[VAL_45]]) : (!jlir.Int64) -> ()
-# CHECK:         }
+
+# CHECK: module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.loop), Int64}"(%arg0: !jlir<"typeof(Main.loop)">, %arg1: !jlir.Int64, %arg2: !jlir<"Union{Nothing, Tuple{Int64, Int64}}">, %arg3: !jlir.Int64, %arg4: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
+# CHECK-NEXT:   ^bb1:  // pred: ^bb0
+# CHECK-NEXT:     %0 = "jlir.constant"() {value = #jlir<"#<intrinsic #29 sle_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %1 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %2 = "jlir.call"(%0, %1, %arg1) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%2)[^bb3, ^bb2] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb2:  // pred: ^bb1
+# CHECK-NEXT:     "jlir.goto"(%arg1)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb3:  // pred: ^bb1
+# CHECK-NEXT:     %3 = "jlir.constant"() {value = #jlir<"0">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%3)[^bb4] : (!jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb4(%4: !jlir.Int64):  // 2 preds: ^bb2, ^bb3
+# CHECK-NEXT:     "jlir.goto"()[^bb5] : () -> ()
+# CHECK-NEXT:   ^bb5:  // pred: ^bb4
+# CHECK-NEXT:     "jlir.goto"()[^bb6] : () -> ()
+# CHECK-NEXT:   ^bb6:  // pred: ^bb5
+# CHECK-NEXT:     %5 = "jlir.constant"() {value = #jlir<"#<intrinsic #27 slt_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %6 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %7 = "jlir.call"(%5, %4, %6) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%7)[^bb8, ^bb7] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb7:  // pred: ^bb6
+# CHECK-NEXT:     %8 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     %9 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     %10 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %11 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%9, %10, %11)[^bb9] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb8:  // pred: ^bb6
+# CHECK-NEXT:     %12 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
+# CHECK-NEXT:     %13 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %14 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.goto"(%12, %13, %14)[^bb9] : (!jlir.Bool, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb9(%15: !jlir.Bool, %16: !jlir.Int64, %17: !jlir.Int64):  // 2 preds: ^bb7, ^bb8
+# CHECK-NEXT:     %18 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %19 = "jlir.call"(%18, %15) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     %20 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %21 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     "jlir.gotoifnot"(%19, %21, %16, %17, %20)[^bb15, ^bb10] {operand_segment_sizes = dense<[1, 1, 3]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64, !jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb10(%22: !jlir.Int64, %23: !jlir.Int64, %24: !jlir.Int64):  // 2 preds: ^bb9, ^bb14
+# CHECK-NEXT:     %25 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %26 = "jlir.call"(%25, %24, %22) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %27 = "jlir.constant"() {value = #jlir<"===">} : () -> !jlir<"typeof(===)">
+# CHECK-NEXT:     %28 = "jlir.call"(%27, %23, %4) : (!jlir<"typeof(===)">, !jlir.Int64, !jlir.Int64) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%28)[^bb12, ^bb11] {operand_segment_sizes = dense<[1, 0, 0]> : vector<3xi32>} : (!jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb11:  // pred: ^bb10
+# CHECK-NEXT:     %29 = "jlir.constant"() {value = #jlir.nothing} : () -> !jlir.Nothing
+# CHECK-NEXT:     %30 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %31 = "jlir.undef"() : () -> !jlir.Int64
+# CHECK-NEXT:     %32 = "jlir.constant"() {value = #jlir.true} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%30, %31, %32)[^bb13] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb12:  // pred: ^bb10
+# CHECK-NEXT:     %33 = "jlir.constant"() {value = #jlir<"#<intrinsic #2 add_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %34 = "jlir.constant"() {value = #jlir<"1">} : () -> !jlir.Int64
+# CHECK-NEXT:     %35 = "jlir.call"(%33, %23, %34) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Int64, !jlir.Int64) -> !jlir.Int64
+# CHECK-NEXT:     %36 = "jlir.constant"() {value = #jlir.false} : () -> !jlir.Bool
+# CHECK-NEXT:     "jlir.goto"(%35, %35, %36)[^bb13] : (!jlir.Int64, !jlir.Int64, !jlir.Bool) -> ()
+# CHECK-NEXT:   ^bb13(%37: !jlir.Int64, %38: !jlir.Int64, %39: !jlir.Bool):  // 2 preds: ^bb11, ^bb12
+# CHECK-NEXT:     %40 = "jlir.constant"() {value = #jlir<"#<intrinsic #43 not_int>">} : () -> !jlir<"typeof(Core.IntrinsicFunction)">
+# CHECK-NEXT:     %41 = "jlir.call"(%40, %39) : (!jlir<"typeof(Core.IntrinsicFunction)">, !jlir.Bool) -> !jlir.Bool
+# CHECK-NEXT:     "jlir.gotoifnot"(%41, %26)[^bb15, ^bb14] {operand_segment_sizes = dense<[1, 1, 0]> : vector<3xi32>} : (!jlir.Bool, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb14:  // pred: ^bb13
+# CHECK-NEXT:     "jlir.goto"(%37, %38, %26)[^bb10] : (!jlir.Int64, !jlir.Int64, !jlir.Int64) -> ()
+# CHECK-NEXT:   ^bb15(%42: !jlir.Int64):  // 2 preds: ^bb9, ^bb13
+# CHECK-NEXT:     "jlir.return"(%42) : (!jlir.Int64) -> ()
+# CHECK-NEXT:   }
+# CHECK-NEXT: }

@@ -5,7 +5,7 @@ emit(identity, Bool)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(identity), Bool}, svec(), identity(x) in Base at operators.jl:513, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Base.identity), Bool}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Bool) -> !jlir.Bool attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
@@ -19,7 +19,8 @@ emit(identity, Bool)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i1 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK: module  {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i1 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     llvm.return %arg1 : i1
 # CHECK-NEXT:   }
 # CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Base.identity), Bool}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: i1) -> i1 attributes {llvm.emit_c_interface, sym_visibility = "nested"} {

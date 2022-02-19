@@ -7,8 +7,8 @@ end
 emit(calls)
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.calls)}, svec(), calls() in Main.Main at /{{.*}}/test/Codegen/translate/calls.jl:3, true)after translating to MLIR in JLIR dialect:module  {
-# CHECK-NEXT:   func nested @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
+# CHECK: module  {
+# CHECK-NEXT:   func nested @"Tuple{typeof(Main.calls)}"(%arg0: !jlir<"typeof(Main.calls)">, %arg1: !jlir<"typeof(Base.:(+))">, %arg2: !jlir<"typeof(Base.:(+))">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
 # CHECK-NEXT:     "jlir.goto"()[^bb2] : () -> ()

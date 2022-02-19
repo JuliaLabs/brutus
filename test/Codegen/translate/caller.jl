@@ -7,7 +7,7 @@ end
 emit(caller, Int64, Int64)
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.caller), Int64, Int64}, svec(), caller(x, y) in Main.Main at /{{.*}}/test/Codegen/translate/caller.jl:4, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.caller), Int64, Int64}"(%arg0: !jlir<"typeof(Main.caller)">, %arg1: !jlir.Int64, %arg2: !jlir.Int64) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

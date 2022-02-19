@@ -4,7 +4,6 @@ function get_methodinstance(@nospecialize(sig);
     ms = Base._methods_by_ftype(sig, 1, Base.get_world_counter())
     @assert length(ms) == 1
     m = ms[1]
-    display(m)
     mi = ccall(:jl_specializations_get_linfo,
                Ref{Core.MethodInstance}, (Any, Any, Any),
                m[3], m[1], m[2])

@@ -8,7 +8,7 @@ end
 emit(haspi, Union{Int64, Float64})
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.haspi), Union{Float64, Int64}}, svec(), haspi(x::Union{Float64, Int64}) in Main.Main at /{{.*}}/test/Codegen/translate/haspi.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.haspi), Union{Float64, Int64}}"(%arg0: !jlir<"typeof(Main.haspi)">, %arg1: !jlir<"Union{Float64, Int64}">) -> !jlir<"Union{Nothing, Int64}"> attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
