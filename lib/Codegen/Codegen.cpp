@@ -16,7 +16,7 @@
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Transforms/Passes.h"
-#include "mlir/Target/LLVMIR.h"
+#include "mlir/Target/LLVMIR/Export.h"
 #include "mlir-c/IR.h"
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/CAPI/IR.h"
@@ -265,7 +265,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 fname = "macro expansion";
             assert(inlined_at <= i);
             mlir::Location current = mlir::NameLoc::get(mlir::Identifier::get(fname, ctx.context),
-                    mlir::FileLineColLoc::get(file, line, 0, ctx.context));
+                    mlir::FileLineColLoc::get(ctx.context, file, line, 0));
 
             // codegen.cpp uses a better heuristic for now just live with this
             if (inlined_at > 0)
@@ -638,7 +638,7 @@ extern "C"
         if (dump_flags && DUMP_TRANSLATED)
         {
             mlir::ModuleOp module = unwrap(Module);
-            llvm::dbgs() << "after translating to MLIR in JLIR dialect:";
+            llvm::dbgs() << "after translating to MLIR in JLIR dialect:\n";
             module.dump();
             llvm::dbgs() << "\n\n";
         }
@@ -647,7 +647,7 @@ extern "C"
         if (dump_flags & DUMP_CANONICALIZED)
         {
             mlir::ModuleOp module = unwrap(Module);
-            llvm::dbgs() << "after canonicalizing:";
+            llvm::dbgs() << "after canonicalizing:\n";
             module.dump();
             llvm::dbgs() << "\n\n";
         }
@@ -665,7 +665,7 @@ extern "C"
         if (dump_flags & DUMP_LOWERED_TO_LLVM)
         {
             mlir::ModuleOp module = unwrap(Module);
-            llvm::dbgs() << "after lowering to LLVM dialect:";
+            llvm::dbgs() << "after lowering to LLVM dialect:\n";
             module.dump();
             llvm::dbgs() << "\n\n";
         }
@@ -673,8 +673,8 @@ extern "C"
         {
             mlir::ModuleOp module = unwrap(Module);
             llvm::LLVMContext llvmContext;
-            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext);
-            llvm::dbgs() << "after lowering to LLVM IR:";
+            auto Mod = mlir::translateModuleToLLVMIR(module, llvmContext, "JuliaModule");
+            llvm::dbgs() << "after lowering to LLVM IR:\n";
             Mod->print(llvm::dbgs(), nullptr);
             llvm::dbgs() << "\n\n";
             return nullptr;

@@ -4,7 +4,7 @@ f() = return 2
 emit(f)
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(Main.Main.f)}, svec(), f() in Main.Main at /home/mccoy/Dev/brutus/test/Codegen/translate/return_const.jl:3, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Main.f)}"(%arg0: !jlir<"typeof(Main.f)">) -> !jlir.Int64 attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0

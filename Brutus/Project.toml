@@ -7,4 +7,5 @@ version = "0.1.0"
 GPUCompiler = "61eb1bfa-7361-4325-ad38-22787b887f55"
 
 [compat]
-julia = "1.5"
+julia = "1.8"
+GPUCompiler = "0.13"

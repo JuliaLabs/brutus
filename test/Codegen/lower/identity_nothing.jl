@@ -5,7 +5,7 @@ emit(identity, Nothing)
 
 
 
-# CHECK: Core.MethodMatch(Tuple{typeof(identity), Nothing}, svec(), identity(x) in Base at operators.jl:513, true)after translating to MLIR in JLIR dialect:module  {
+# CHECK: module  {
 # CHECK-NEXT:   func nested @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !jlir<"typeof(Base.identity)">, %arg1: !jlir.Nothing) -> !jlir.Nothing attributes {llvm.emit_c_interface} {
 # CHECK-NEXT:     "jlir.goto"()[^bb1] : () -> ()
 # CHECK-NEXT:   ^bb1:  // pred: ^bb0
@@ -19,7 +19,8 @@ emit(identity, Nothing)
 # CHECK-NEXT:   }
 # CHECK-NEXT: }
 
-# CHECK:   llvm.func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
+# CHECK: module  {
+# CHECK-NEXT:   llvm.func @"Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {
 # CHECK-NEXT:     llvm.return %arg1 : !llvm.ptr<struct<"struct_jl_value_type", opaque>>
 # CHECK-NEXT:   }
 # CHECK-NEXT:   llvm.func @"_mlir_ciface_Tuple{typeof(Base.identity), Nothing}"(%arg0: !llvm.ptr<struct<"struct_jl_value_type", opaque>>, %arg1: !llvm.ptr<struct<"struct_jl_value_type", opaque>>) -> !llvm.ptr<struct<"struct_jl_value_type", opaque>> attributes {llvm.emit_c_interface, sym_visibility = "nested"} {

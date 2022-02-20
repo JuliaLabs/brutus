@@ -4,6 +4,8 @@
 #include "juliapriv/julia_private.h"
 
 #include "mlir/IR/Types.h"
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
+#include "mlir/Conversion/LLVMCommon/LoweringOptions.h"
 
 #include "llvm/Support/SwapByteOrder.h"
 
@@ -430,7 +432,7 @@ namespace
         {
             assert(operands.size() >= 1);
             rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
-                op, operands, op.getSuccessors(), op.getAttrs());
+                op, operands, op.getSuccessors(), op->getAttrs());
             return success();
         }
     };
@@ -444,7 +446,7 @@ namespace
                                       ConversionPatternRewriter &rewriter) const override
         {
             rewriter.replaceOpWithNewOp<LLVM::BrOp>(
-                op, operands, op.getSuccessor(), op.getAttrs());
+                op, operands, op.getSuccessor(), op->getAttrs());
             return success();
         }
     };
@@ -545,15 +547,11 @@ namespace
 
 void JLIRToLLVMLoweringPass::runOnFunction()
 {
-    OwningRewritePatternList patterns;
+    RewritePatternSet patterns(&getContext());
 
-    const LowerToLLVMOptions options = {
-        /*useBarePtrCallConv = */ false,
-        /*emitCWrappers = */ false,
-        /*indexBitwidth = */ kDeriveIndexBitwidthFromDataLayout,
-        /*useAlignedAlloc = */ true,
-    };
-
+    LowerToLLVMOptions options(&getContext());
+    options.allocLowering = LowerToLLVMOptions::AllocLowering::AlignedAlloc;
+    
     JLIRToLLVMTypeConverter converter(&getContext(), options);
 
     patterns.insert<

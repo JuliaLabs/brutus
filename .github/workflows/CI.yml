@@ -1,6 +1,12 @@
 name: Brutus CI
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches:
+      - master
+      - release-*
+    tags: '*'
 
 jobs:
   test:
@@ -10,8 +16,8 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         julia-repository: [JuliaLang/julia]
-        julia-commit: [f9720dc2ebd6cd9e3086365f281e62506444ef37] # Julia 1.6.0
-        llvm-commit: [d28af7c654d8db0b68c175db5ce212d74fb5e9bc] # LLVM 12
+        julia-commit: [f3e3554910a79fa38d5662d14abe04e137075e18] # Julia 1.8-dev
+        llvm-commit: [4743f8ded72e15f916fa1d4cc198bdfd7bfb2193] # LLVM 13.0.1-0
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
@@ -27,7 +33,7 @@ jobs:
 
       - name: Cache Julia
         id: cache-julia
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: julia/usr
           key: ${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
@@ -35,7 +41,7 @@ jobs:
       # needed because they're just symlinks in usr/share
       # long term, we will probably want to cache an installed Julia
       - name: Cache stdlibs
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: julia/stdlib
           key: ${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
@@ -58,10 +64,10 @@ jobs:
           cd julia
           make -j `nproc` \
               USE_BINARYBUILDER_LLVM=0 \
-              LLVM_VER=svn \
+              DEPS_GIT=1 \
               LLVM_DEBUG=0 \
               USE_MLIR=1 \
-              LLVM_GIT_VER=${{ matrix.llvm-commit }} \
+              LLVM_SHA1=${{ matrix.llvm-commit }} \
               JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
       - name: Check Julia version
@@ -75,7 +81,7 @@ jobs:
         run: echo "::set-output name=timestamp::`date -u +%Y%m%d-%H%M%S`"
 
       - name: Cache ccache files
-        uses: actions/cache@v1
+        uses: pat-s/always-upload-cache@v2
         with:
           path: .ccache
           key: ${{ matrix.os }}-ccache-${{ steps.ccache-cache-timestamp.outputs.timestamp }}
