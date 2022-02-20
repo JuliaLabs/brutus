@@ -16,7 +16,7 @@ jobs:
       matrix:
         os: [ubuntu-18.04]
         julia-repository: [JuliaLang/julia]
-        julia-commit: [6c16f717f9871401eed9350f36cd84ab51778b72] # Julia 1.8-dev
+        julia-commit: [f3e3554910a79fa38d5662d14abe04e137075e18] # Julia 1.8-dev
         llvm-commit: [4743f8ded72e15f916fa1d4cc198bdfd7bfb2193] # LLVM 13.0.1-0
 
     env:
