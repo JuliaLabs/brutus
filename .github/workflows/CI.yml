@@ -18,6 +18,7 @@ jobs:
         julia-repository: [JuliaLang/julia]
         julia-commit: [f3e3554910a79fa38d5662d14abe04e137075e18] # Julia 1.8-dev
         llvm-commit: [4743f8ded72e15f916fa1d4cc198bdfd7bfb2193] # LLVM 13.0.1-0
+        polygeist-commit: [a737f726fec233b9557cb36a5bcfdc4a0ed9054e]
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
@@ -36,7 +37,7 @@ jobs:
         uses: pat-s/always-upload-cache@v2
         with:
           path: julia/usr
-          key: ${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
+          key: ${{ matrix.os }}-julia-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}-${{ matrix.polygeist-commit }}
 
       # needed because they're just symlinks in usr/share
       # long term, we will probably want to cache an installed Julia
@@ -44,7 +45,7 @@ jobs:
         uses: pat-s/always-upload-cache@v2
         with:
           path: julia/stdlib
-          key: ${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}
+          key: ${{ matrix.os }}-stdlibs-${{ matrix.julia-commit }}-${{ matrix.llvm-commit }}-${{ matrix.polygeist-commit }}
 
       - name: Install build dependencies for Julia
         if: steps.cache-julia.outputs.cache-hit != 'true'
@@ -67,6 +68,8 @@ jobs:
               DEPS_GIT=1 \
               LLVM_DEBUG=0 \
               USE_MLIR=1 \
+              USE_POLYGEIST=1 \
+              POLYGEIST_SHA1=${{ matrix.polygeist-commit }} \
               LLVM_SHA1=${{ matrix.llvm-commit }} \
               JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
