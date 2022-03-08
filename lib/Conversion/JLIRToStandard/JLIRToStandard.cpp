@@ -1,6 +1,7 @@
 #include "brutus/Conversion/JLIRToStandard/JLIRToStandard.h"
 
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
+#include "mlir/Dialect/Arithmetic/IR/Arithmetic.h"
 #include "mlir/Dialect/Math/IR/Math.h"
 #include "mlir/Dialect/MemRef/IR/MemRef.h"
 #include "mlir/IR/AffineMap.h"
@@ -120,8 +121,7 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
                                JLIRToStandardTypeConverter &lowering)
         : OpConversionPattern<SourceOp>(lowering, ctx){}
 
-    Value 
-    convertValue(ConversionPatternRewriter &rewriter,
+    Value convertValue(ConversionPatternRewriter &rewriter,
                 Location location,
                 Value value) const {
 
@@ -156,7 +156,7 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
         //       an index, unlike most other uses, which involve a Julia type
         ConvertStdOp convertedIndex = rewriter.create<ConvertStdOp>(
             location, rewriter.getIndexType(), index);
-        SubIOp subOp = rewriter.create<SubIOp>(
+        arith::SubIOp subOp = rewriter.create<arith::SubIOp>(
             location,
             rewriter.getIndexType(),
             convertedIndex.getResult(),
@@ -168,10 +168,12 @@ struct JLIRToStdConversionPattern : OpConversionPattern<SourceOp> {
 template <typename SourceOp, typename StdOp>
 struct ToStdOpPattern : public JLIRToStdConversionPattern<SourceOp> {
     using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+    using OpAdaptor = typename SourceOp::Adaptor;
 
     LogicalResult matchAndRewrite(SourceOp op,
-                                    ArrayRef<Value> operands,
-                                    ConversionPatternRewriter &rewriter) const override {
+                                  OpAdaptor adaptor,
+                                  ConversionPatternRewriter &rewriter) const override {
+        auto operands = adaptor.getOperands();
         auto result = this->typeConverter->convertType(op.getType());
         if (!result)
             return failure();
@@ -185,37 +187,38 @@ struct ToStdOpPattern : public JLIRToStdConversionPattern<SourceOp> {
 template <typename SourceOp, typename CmpOp, typename Predicate, Predicate predicate>
 struct ToCmpOpPattern : public JLIRToStdConversionPattern<SourceOp> {
     using JLIRToStdConversionPattern<SourceOp>::JLIRToStdConversionPattern;
+    using OpAdaptor = typename SourceOp::Adaptor;
 
     LogicalResult
     matchAndRewrite(SourceOp op,
-                    ArrayRef<Value> operands,
+                    OpAdaptor adaptor,
                     ConversionPatternRewriter &rewriter) const override {
-
-
+        auto operands = adaptor.getOperands();
         rewriter.replaceOpWithNewOp<CmpOp>(op, predicate, operands[0], operands[1]);
         return success();
     }
 };
 
-template <typename SourceOp, CmpIPredicate predicate>
-struct ToCmpIOpPattern : public ToCmpOpPattern<SourceOp, CmpIOp,
-                                               CmpIPredicate, predicate> {
-    using ToCmpOpPattern<SourceOp, CmpIOp,
-                         CmpIPredicate, predicate>::ToCmpOpPattern;
+template <typename SourceOp, arith::CmpIPredicate predicate>
+struct ToCmpIOpPattern : public ToCmpOpPattern<SourceOp, arith::CmpIOp,
+                                               arith::CmpIPredicate, predicate> {
+    using ToCmpOpPattern<SourceOp, arith::CmpIOp,
+                         arith::CmpIPredicate, predicate>::ToCmpOpPattern;
 };
 
-template <typename SourceOp, CmpFPredicate predicate>
-struct ToCmpFOpPattern : public ToCmpOpPattern<SourceOp, CmpFOp,
-                                               CmpFPredicate, predicate> {
-    using ToCmpOpPattern<SourceOp, CmpFOp,
-                         CmpFPredicate, predicate>::ToCmpOpPattern;
+template <typename SourceOp, arith::CmpFPredicate predicate>
+struct ToCmpFOpPattern : public ToCmpOpPattern<SourceOp, arith::CmpFOp,
+                                               arith::CmpFPredicate, predicate> {
+    using ToCmpOpPattern<SourceOp, arith::CmpFOp,
+                         arith::CmpFPredicate, predicate>::ToCmpOpPattern;
 };
 
 struct ConstantOpLowering : public JLIRToStdConversionPattern<jlir::ConstantOp> {
     using JLIRToStdConversionPattern<jlir::ConstantOp>::JLIRToStdConversionPattern;
 
+
     LogicalResult matchAndRewrite(jlir::ConstantOp op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         JuliaType type = op.getType().cast<JuliaType>();
         jl_datatype_t *julia_type = type.getDatatype();
@@ -251,11 +254,11 @@ struct GotoOpLowering : public JLIRToStdConversionPattern<GotoOp> {
     using JLIRToStdConversionPattern<GotoOp>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(GotoOp op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
-        
+
         rewriter.replaceOpWithNewOp<BranchOp>(
-            op, op.getSuccessor(), operands);
+            op, op.getSuccessor(), adaptor.getOperands());
         return success();
     }
 };
@@ -264,15 +267,16 @@ struct GotoIfNotOpLowering : public JLIRToStdConversionPattern<GotoIfNotOp> {
     using JLIRToStdConversionPattern<GotoIfNotOp>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(GotoIfNotOp op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
+        auto operands = adaptor.getOperands();
         unsigned nBranchOperands = op.branchOperands().size();
         unsigned nFallthroughOperands = op.fallthroughOperands().size();
         assert(operands.size() == nBranchOperands + nFallthroughOperands + 1);
 
         Value cond = this->convertValue(rewriter, op.getLoc(), operands.front());
         // TODO: Go from i8 to i1
-        ValueRange branchOperands = operands.slice(1, nBranchOperands); 
+        ValueRange branchOperands = operands.slice(1, nBranchOperands);
         ValueRange fallthroughOperands = operands.slice(1 + nBranchOperands, nFallthroughOperands);
 
         rewriter.replaceOpWithNewOp<CondBranchOp>(op, cond,
@@ -286,10 +290,10 @@ struct ReturnOpLowering : public JLIRToStdConversionPattern<jlir::ReturnOp> {
     using JLIRToStdConversionPattern<jlir::ReturnOp>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(jlir::ReturnOp op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
 
-        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, operands);
+        rewriter.replaceOpWithNewOp<mlir::ReturnOp>(op, adaptor.getOperands());
         return success();
     }
 };
@@ -298,9 +302,10 @@ struct NotIntOpLowering : public JLIRToStdConversionPattern<Intrinsic_not_int> {
     using JLIRToStdConversionPattern<Intrinsic_not_int>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(Intrinsic_not_int op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
-        
+
+        auto operands = adaptor.getOperands();
         IntegerType type = operands.front().getType().cast<IntegerType>();
 
         mlir::ConstantOp maskConstantOp =
@@ -311,7 +316,7 @@ struct NotIntOpLowering : public JLIRToStdConversionPattern<Intrinsic_not_int> {
                                         APInt(type.getWidth(), -1,
                                               /*isSigned=*/true)));
 
-        rewriter.replaceOpWithNewOp<XOrOp>(
+        rewriter.replaceOpWithNewOp<arith::XOrIOp>(
             op, type, operands.front(), maskConstantOp.getResult());
         return success();
     }
@@ -321,8 +326,9 @@ struct IsOpLowering : public JLIRToStdConversionPattern<Builtin_is> {
     using JLIRToStdConversionPattern<Builtin_is>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_is op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
+        auto operands = adaptor.getOperands();
         IntegerAttr falseAttr =
             rewriter.getIntegerAttr(rewriter.getI1Type(), 0);
 
@@ -356,10 +362,11 @@ struct ArrayrefOpLowering : public JLIRToStdConversionPattern<Builtin_arrayref> 
     using JLIRToStdConversionPattern<Builtin_arrayref>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_arrayref op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
+        auto operands = adaptor.getOperands();
         Value memref = operands[1];
-        
+
         if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {
             // indices are reversed because Julia is column-major, but MLIR is
             // row-major
@@ -391,11 +398,13 @@ struct ArraysetOpLowering : public JLIRToStdConversionPattern<Builtin_arrayset> 
     using JLIRToStdConversionPattern<Builtin_arrayset>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_arrayset op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
+
+        auto operands = adaptor.getOperands();
         // arrayset(i1, Array, val, indices...)
         Value memref = operands[1];
-        
+
         if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {
             // indices are reversed because Julia is column-major, but MLIR is
             // row-major
@@ -427,13 +436,14 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
     using JLIRToStdConversionPattern<Builtin_arraysize>::JLIRToStdConversionPattern;
 
     LogicalResult matchAndRewrite(Builtin_arraysize op,
-                                  ArrayRef<Value> operands,
+                                  OpAdaptor adaptor,
                                   ConversionPatternRewriter &rewriter) const override {
         // TODO: Boundschecking
         // arraysize(array, ndim)
+        auto operands = adaptor.getOperands();
         Value memref = operands[0];
-        
-        if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {        
+
+        if (auto memrefType = memref.getType().dyn_cast<MemRefType>()) {
             // indices are reversed because Julia is column-major, but MLIR is
             // row-major
             auto rank = getIndexConstant(rewriter, op.getLoc(), memrefType.getRank());
@@ -441,7 +451,7 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
             Type indexType = rewriter.getIndexType();
 
             ConvertStdOp index = rewriter.create<ConvertStdOp>(op.getLoc(), indexType, operands[1]);
-            SubIOp subOp = rewriter.create<SubIOp>(op.getLoc(), indexType, rank, index);
+            arith::SubIOp subOp = rewriter.create<arith::SubIOp>(op.getLoc(), indexType, rank, index);
 
             rewriter.replaceOpWithNewOp<memref::DimOp>(op, memref, subOp.getResult());
             return success();
@@ -452,10 +462,10 @@ struct ArraysizeOpLowering : public JLIRToStdConversionPattern<Builtin_arraysize
 
 } // namespace
 
-void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns, 
+void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns,
                                          MLIRContext &context,
                                          JLIRToStandardTypeConverter &converter) {
-     patterns.insert<
+     patterns.add<
         // ConvertStdOp    (JLIRToLLVM)
         // UnimplementedOp (JLIRToLLVM)
         // UndefOp         (JLIRToLLVM)
@@ -468,21 +478,21 @@ void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns
         // PiOp
         // Intrinsic_bitcast
         // Intrinsic_neg_int
-        ToStdOpPattern<Intrinsic_add_int, AddIOp>,
-        ToStdOpPattern<Intrinsic_sub_int, SubIOp>,
-        ToStdOpPattern<Intrinsic_mul_int, MulIOp>,
-        ToStdOpPattern<Intrinsic_sdiv_int, SignedDivIOp>,
-        ToStdOpPattern<Intrinsic_udiv_int, UnsignedDivIOp>,
-        ToStdOpPattern<Intrinsic_srem_int, SignedRemIOp>,
-        ToStdOpPattern<Intrinsic_urem_int, UnsignedRemIOp>,
+        ToStdOpPattern<Intrinsic_add_int, arith::AddIOp>,
+        ToStdOpPattern<Intrinsic_sub_int, arith::SubIOp>,
+        ToStdOpPattern<Intrinsic_mul_int, arith::MulIOp>,
+        ToStdOpPattern<Intrinsic_sdiv_int, arith::DivSIOp>,
+        ToStdOpPattern<Intrinsic_udiv_int, arith::DivUIOp>,
+        ToStdOpPattern<Intrinsic_srem_int, arith::RemSIOp>,
+        ToStdOpPattern<Intrinsic_urem_int, arith::RemUIOp>,
         // Intrinsic_add_ptr
         // Intrinsic_sub_ptr
-        ToStdOpPattern<Intrinsic_neg_float, NegFOp>,
-        ToStdOpPattern<Intrinsic_add_float, AddFOp>,
-        ToStdOpPattern<Intrinsic_sub_float, SubFOp>,
-        ToStdOpPattern<Intrinsic_mul_float, MulFOp>,
-        ToStdOpPattern<Intrinsic_div_float, DivFOp>,
-        ToStdOpPattern<Intrinsic_rem_float, RemFOp>,
+        ToStdOpPattern<Intrinsic_neg_float, arith::NegFOp>,
+        ToStdOpPattern<Intrinsic_add_float, arith::AddFOp>,
+        ToStdOpPattern<Intrinsic_sub_float, arith::SubFOp>,
+        ToStdOpPattern<Intrinsic_mul_float, arith::MulFOp>,
+        ToStdOpPattern<Intrinsic_div_float, arith::DivFOp>,
+        ToStdOpPattern<Intrinsic_rem_float, arith::RemFOp>,
         // Intrinsic_fma_float (JLIRToLLVM)
         // Intrinsic_muladd_float
         // Intrinsic_neg_float_fast
@@ -491,38 +501,38 @@ void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns
         // Intrinsic_mul_float_fast
         // Intrinsic_div_float_fast
         // Intrinsic_rem_float_fast
-        ToCmpIOpPattern<Intrinsic_eq_int, CmpIPredicate::eq>,
-        ToCmpIOpPattern<Intrinsic_ne_int, CmpIPredicate::ne>,
-        ToCmpIOpPattern<Intrinsic_slt_int, CmpIPredicate::slt>,
-        ToCmpIOpPattern<Intrinsic_ult_int, CmpIPredicate::ult>,
-        ToCmpIOpPattern<Intrinsic_sle_int, CmpIPredicate::sle>,
-        ToCmpIOpPattern<Intrinsic_ule_int, CmpIPredicate::ule>,
-        ToCmpFOpPattern<Intrinsic_eq_float, CmpFPredicate::OEQ>,
-        ToCmpFOpPattern<Intrinsic_ne_float, CmpFPredicate::UNE>,
-        ToCmpFOpPattern<Intrinsic_lt_float, CmpFPredicate::OLT>,
-        ToCmpFOpPattern<Intrinsic_le_float, CmpFPredicate::OLE>,
+        ToCmpIOpPattern<Intrinsic_eq_int, arith::CmpIPredicate::eq>,
+        ToCmpIOpPattern<Intrinsic_ne_int, arith::CmpIPredicate::ne>,
+        ToCmpIOpPattern<Intrinsic_slt_int, arith::CmpIPredicate::slt>,
+        ToCmpIOpPattern<Intrinsic_ult_int, arith::CmpIPredicate::ult>,
+        ToCmpIOpPattern<Intrinsic_sle_int, arith::CmpIPredicate::sle>,
+        ToCmpIOpPattern<Intrinsic_ule_int, arith::CmpIPredicate::ule>,
+        ToCmpFOpPattern<Intrinsic_eq_float, arith::CmpFPredicate::OEQ>,
+        ToCmpFOpPattern<Intrinsic_ne_float, arith::CmpFPredicate::UNE>,
+        ToCmpFOpPattern<Intrinsic_lt_float, arith::CmpFPredicate::OLT>,
+        ToCmpFOpPattern<Intrinsic_le_float, arith::CmpFPredicate::OLE>,
         // Intrinsic_fpiseq
         // Intrinsic_fpislt
-        ToStdOpPattern<Intrinsic_and_int, AndOp>,
-        ToStdOpPattern<Intrinsic_or_int, OrOp>,
-        ToStdOpPattern<Intrinsic_xor_int, XOrOp>,
+        ToStdOpPattern<Intrinsic_and_int, arith::AndIOp>,
+        ToStdOpPattern<Intrinsic_or_int, arith::OrIOp>,
+        ToStdOpPattern<Intrinsic_xor_int, arith::XOrIOp>,
         NotIntOpLowering, // Intrinsic_not_int
-        ToStdOpPattern<Intrinsic_shl_int, ShiftLeftOp>,
-        ToStdOpPattern<Intrinsic_lshr_int, UnsignedShiftRightOp>,
-        ToStdOpPattern<Intrinsic_ashr_int, SignedShiftRightOp>,
+        ToStdOpPattern<Intrinsic_shl_int, arith::ShLIOp>,
+        ToStdOpPattern<Intrinsic_lshr_int, arith::ShRUIOp>,
+        ToStdOpPattern<Intrinsic_ashr_int, arith::ShRSIOp>,
         // Intrinsic_bswap_int
         // Intrinsic_ctpop_int
         // Intrinsic_ctlz_int
         // Intrinsic_cttz_int
-        ToStdOpPattern<Intrinsic_sext_int, SignExtendIOp>, // TODO: args don't match
-        ToStdOpPattern<Intrinsic_zext_int, ZeroExtendIOp>,
-        ToStdOpPattern<Intrinsic_trunc_int, TruncateIOp>,
+        ToStdOpPattern<Intrinsic_sext_int, arith::ExtSIOp>, // TODO: args don't match
+        ToStdOpPattern<Intrinsic_zext_int, arith::ExtUIOp>,
+        ToStdOpPattern<Intrinsic_trunc_int, arith::TruncIOp>,
         // Intrinsic_fptoui
         // Intrinsic_fptosi
         // Intrinsic_uitofp
-        ToStdOpPattern<Intrinsic_sitofp, SIToFPOp>,
-        ToStdOpPattern<Intrinsic_fptrunc, FPTruncOp>,
-        ToStdOpPattern<Intrinsic_fpext, FPExtOp>,
+        ToStdOpPattern<Intrinsic_sitofp,  arith::SIToFPOp>,
+        ToStdOpPattern<Intrinsic_fptrunc, arith::TruncFOp>,
+        ToStdOpPattern<Intrinsic_fpext,  arith::ExtFOp>,
         // Intrinsic_checked_sadd_int
         // Intrinsic_checked_uadd_int
         // Intrinsic_checked_ssub_int
@@ -533,10 +543,10 @@ void mlir::jlir::populateJLIRToStdConversionPatterns(RewritePatternSet &patterns
         // Intrinsic_checked_udiv_int
         // Intrinsic_checked_srem_int
         // Intrinsic_checked_urem_int
-        ToStdOpPattern<Intrinsic_abs_float, AbsFOp>,
-        ToStdOpPattern<Intrinsic_copysign_float, CopySignOp>,
+        ToStdOpPattern<Intrinsic_abs_float, math::AbsOp>,
+        ToStdOpPattern<Intrinsic_copysign_float, math::CopySignOp>,
         // Intrinsic_flipsign_int
-        ToStdOpPattern<Intrinsic_ceil_llvm, CeilFOp>,
+        ToStdOpPattern<Intrinsic_ceil_llvm, math::CeilOp>,
         // Intrinsic_floor_llvm
         // Intrinsic_trunc_llvm (JLIRToLLVM, but maybe could be here?)
         // Intrinsic_rint_llvm
@@ -625,7 +635,7 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     target.addDynamicallyLegalOp<FuncOp>([&converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
-    populateFuncOpTypeConversionPattern(patterns, converter);
+    // populateFuncOpTypeConversionPattern(patterns, converter);
 
     if (failed(applyPartialConversion(
                     module, target, std::move(patterns))))

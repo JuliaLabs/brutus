@@ -95,10 +95,10 @@ struct LowerBuiltinCallPattern : public OpRewritePattern<CallOp> {
 
 /// Register our patterns as "canonicalization" patterns on the CallOp so
 /// that they can be picked up by the Canonicalization framework.
-void CallOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void CallOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                          MLIRContext *context) {
-    results.insert<LowerIntrinsicCallPattern>(context);
-    results.insert<LowerBuiltinCallPattern>(context);
+    results.add<LowerIntrinsicCallPattern>(context);
+    results.add<LowerBuiltinCallPattern>(context);
 }
 
 namespace {
@@ -115,7 +115,7 @@ struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
             rewriter.replaceOp(op, {op.getOperand()});
             return success();
         }
-        
+
         // 2. Check if we have a chain of convert ops
         ConvertStdOp inputOp = dyn_cast_or_null<ConvertStdOp>(
             op.getOperand().getDefiningOp());
@@ -131,13 +131,13 @@ struct SimplifyRedundantConvertStdOps : public OpRewritePattern<ConvertStdOp> {
 
         // 3. Shortcut the input op.
         rewriter.replaceOpWithNewOp<ConvertStdOp>(op, resultType, inputOp.getOperand());
-        return success(); 
+        return success();
     }
 };
 
 } // namespace
 
-void ConvertStdOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
+void ConvertStdOp::getCanonicalizationPatterns(RewritePatternSet &results,
                                                MLIRContext *context) {
     results.insert<SimplifyRedundantConvertStdOps>(context);
 }
