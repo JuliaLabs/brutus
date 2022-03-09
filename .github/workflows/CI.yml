@@ -15,9 +15,8 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-18.04]
-        julia-repository: [JuliaLang/julia]
-        julia-commit: [f3e3554910a79fa38d5662d14abe04e137075e18] # Julia 1.8-dev
-        llvm-commit: [4743f8ded72e15f916fa1d4cc198bdfd7bfb2193] # LLVM 13.0.1-0
+        julia-repository: [JuliaLabs/julia-mlir]
+        julia-commit: [581269b6e2366738eab09bda2a632fce755e4e43] # Julia 1.8-dev
 
     env:
       CCACHE_DIR: ${GITHUB_WORKSPACE}/.ccache
@@ -64,10 +63,8 @@ jobs:
           cd julia
           make -j `nproc` \
               USE_BINARYBUILDER_LLVM=0 \
-              DEPS_GIT=1 \
               LLVM_DEBUG=0 \
               USE_MLIR=1 \
-              LLVM_SHA1=${{ matrix.llvm-commit }} \
               JULIA_CPU_TARGET="generic;sandybridge,-xsaveopt,clone_all;haswell,-rdrnd,base(1)"
 
       - name: Check Julia version
