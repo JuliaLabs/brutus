@@ -327,7 +327,8 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 bool found = false;
                 for (int edge = 0; edge < nedges; ++edge)
                 {
-                    int frombb = jl_unbox_long(jl_arrayref(edges, edge)); // frombb is 1-indexed
+                    // Julia 1.9 PhiNode -> Int32[]
+                    int frombb = jl_unbox_int32(jl_arrayref(edges, edge)); // frombb is 1-indexed
                     if (frombb == current_block)
                     {
                         mlir::Value value =
