@@ -7,7 +7,7 @@
 #include "mlir/IR/AffineMap.h"
 #include "mlir/IR/Types.h"
 
-#include "mlir/Dialect/StandardOps/Transforms/FuncConversions.h"
+#include "mlir/Transforms/DialectConversion.h"
 
 #include "llvm/Support/FormatVariadic.h"
 
@@ -635,7 +635,7 @@ void JLIRToStandardLoweringPass::runOnOperation() {
     target.addDynamicallyLegalOp<FuncOp>([&converter](FuncOp op) {
         return isFuncOpLegal(op, converter);
     });
-    // populateFuncOpTypeConversionPattern(patterns, converter);
+    mlir::populateFunctionOpInterfaceTypeConversionPattern<FuncOp>(patterns, converter);
 
     if (failed(applyPartialConversion(
                     module, target, std::move(patterns))))
