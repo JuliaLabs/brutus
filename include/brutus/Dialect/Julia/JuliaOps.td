@@ -8,6 +8,7 @@
 #define JULIA_MLIR_JLIR_TD
 
 include "mlir/IR/OpBase.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
 // Provide a definition of the 'JLIR' dialect in the ODS framework so that we
@@ -37,25 +38,25 @@ def JLIR_IsJLArrayTypePred : CPred<"jl_is_array_type($_self.cast<JuliaType>().ge
 //   * The parent dialect of the operation.
 //   * The mnemonic for the operation, or the name without the dialect prefix.
 //   * A list of traits for the operation.
-class JLIR_Op<string mnemonic, list<OpTrait> traits = []> :
+class JLIR_Op<string mnemonic, list<Trait> traits = []> :
     Op<JLIR_Dialect, mnemonic, traits>;
 
 // Base clase for JLIR intrinsics
-class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
+class JLIR_IntrinsicBuiltinOp<string mnemonic, list<Trait> traits = []> :
     JLIR_Op<mnemonic, traits> {
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$arguments);
     let results = (outs JLIR_JuliaType);
 }
 
-class JLIR_ArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
+class JLIR_ArithmeticOp<string mnemonic, list<Trait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
     let arguments = (ins JLIR_JuliaType:$rhs, JLIR_JuliaType:$lhs);
     let results = (outs JLIR_JuliaType);
 }
 
-class JLIR_UnaryArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
+class JLIR_UnaryArithmeticOp<string mnemonic, list<Trait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
     let arguments = (ins JLIR_JuliaType:$arg);
@@ -140,11 +141,11 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
                          JLIR_JuliaType:$callee,
                          Variadic<JLIR_JuliaType>:$arguments);
-   
+
     let results = (outs JLIR_JuliaType);
-    
+
     let builders = [
-        OpBuilder<(ins "jl_method_instance_t *":$methodInstance, 
+        OpBuilder<(ins "jl_method_instance_t *":$methodInstance,
                           "Value":$callee,
                           "ArrayRef<Value>":$arguments,
                           "jl_datatype_t *":$type)>
@@ -174,15 +175,15 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let arguments = (ins JLIR_JuliaType:$condition,
                      Variadic<JLIR_JuliaType>:$branchOperands,
                      Variadic<JLIR_JuliaType>:$fallthroughOperands);
-    
-    let successors = (successor AnySuccessor:$branchDest, 
+
+    let successors = (successor AnySuccessor:$branchDest,
                       AnySuccessor:$fallthroughDest);
 
     let builders = [
         OpBuilder<(ins "Value":$condition,
-                          "Block *":$branchDest, 
+                          "Block *":$branchDest,
                           "ValueRange":$branchOperands,
-                          "Block *":$fallthroughDest, 
+                          "Block *":$fallthroughDest,
                           "ValueRange":$fallthroughOperands),
                   [{
                       build($_builder, $_state, condition,

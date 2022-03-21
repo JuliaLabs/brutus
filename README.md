@@ -10,20 +10,16 @@ _Brutus_
 `Brutus` currently requires that you create a non-standard build of Julia.
 
 ```
-export LLVM_SHA1=4743f8ded72e15f916fa1d4cc198bdfd7bfb2193 # LLVM 13.0.1-0
-export JULIA_SHA1=6c16f717f9871401eed9350f36cd84ab51778b72 # Julia 1.8-dev
-
 git clone https://github.com/JuliaLabs/brutus
 cd brutus
-git clone https://github.com/JuliaLang/julia
+git clone https://github.com/JuliaLabs/julia-mlir
 cd julia
-git checkout ${JULIA_SHA1}
+git checkout staging
 make -j `nproc` \
     USE_BINARYBUILDER_LLVM=0 \
     DEPS_GIT=1 \
     LLVM_DEBUG=0 \
     USE_MLIR=1 \
-    LLVM_SHA1="${LLVM_SHA1}"
 cd ..
 mkdir build && cd build
 cmake .. -G Ninja \

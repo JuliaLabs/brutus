@@ -264,7 +264,7 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
             if (fname.empty())
                 fname = "macro expansion";
             assert(inlined_at <= i);
-            mlir::Location current = mlir::NameLoc::get(mlir::Identifier::get(fname, ctx.context),
+            mlir::Location current = mlir::NameLoc::get(mlir::StringAttr::get(ctx.context, fname),
                     mlir::FileLineColLoc::get(ctx.context, file, line, 0));
 
             // codegen.cpp uses a better heuristic for now just live with this
@@ -327,7 +327,8 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
                 bool found = false;
                 for (int edge = 0; edge < nedges; ++edge)
                 {
-                    int frombb = jl_unbox_long(jl_arrayref(edges, edge)); // frombb is 1-indexed
+                    // Julia 1.9 PhiNode -> Int32[]
+                    int frombb = jl_unbox_int32(jl_arrayref(edges, edge)); // frombb is 1-indexed
                     if (frombb == current_block)
                     {
                         mlir::Value value =
@@ -416,7 +417,10 @@ mlir::FuncOp emit_function(jl_mlirctx_t &ctx,
         else if (jl_is_phinode(stmt))
         {
             // add argument slot to current_block
-            auto arg = bbs[current_block]->addArgument((mlir::Type)JuliaType::get(ctx.context, type));
+            auto arg = bbs[current_block]->addArgument(
+                (mlir::Type)JuliaType::get(ctx.context, type),
+                loc
+            );
             // add argument reference to values
             ctx.values[i] = arg;
         }
@@ -619,7 +623,7 @@ extern "C"
 
         std::string cabi_name = "ciface_" + name;
         ExecutionEngine *engine = expectedEngine.get().release();
-        auto expectedFPtr = engine->lookup(cabi_name);
+        auto expectedFPtr = engine->lookupPacked(cabi_name);
         if (!expectedFPtr)
         {
             handleLLVMError(expectedFPtr.takeError());
