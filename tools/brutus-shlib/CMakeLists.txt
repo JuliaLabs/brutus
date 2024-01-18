@@ -30,3 +30,4 @@ message("Libraries included in libBrutus.so: ${brutus_libs}")
 # message("LLVM Components included in libMLIR.so: ${mlir_llvm_link_components}")
 
 mlir_check_all_link_libraries(MLIR)
+install(TARGETS brutus DESTINATION lib)

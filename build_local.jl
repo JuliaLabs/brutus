@@ -42,6 +42,8 @@ else
     using LLVM_full_jll
     LLVM_full_jll
 end
+Pkg.add(name="mlir_jl_tblgen_jll")
+
 LLVM_DIR = joinpath(LLVM.artifact_dir, "lib", "cmake", "llvm")
 MLIR_DIR = joinpath(LLVM.artifact_dir, "lib", "cmake", "mlir")
 
@@ -57,17 +59,23 @@ cmake() do cmake_path
     run(`$cmake_path --build $(build_dir) --target install`)
 end
 
-# # discover built binaries
-# built_libs = filter(readdir(joinpath(scratch_dir, "lib"))) do file
-#     endswith(file, ".$(Libdl.dlext)")
-# end
-# lib_path = joinpath(scratch_dir, "lib", only(built_libs))
-# isfile(lib_path) || error("Could not find library $lib_path in build directory")
+# discover built binaries
+built_libs = filter(readdir(joinpath(scratch_dir, "lib"))) do file
+    endswith(file, ".$(Libdl.dlext)")
+end
+lib_path = joinpath(scratch_dir, "lib", only(built_libs))
+isfile(lib_path) || error("Could not find library $lib_path in build directory")
 
-# # tell LLVM.jl to load our library instead of the default artifact one
-# set_preferences!(
-#     joinpath(dirname(@__DIR__), "LocalPreferences.toml"),
-#     "mlir_jl_tblgen_jll",
-#     "mlir_jl_tblgen" => lib_path;
-#     force=true,
-# )
+# tell Brutus.jl to load our library instead of the default artifact one
+set_preferences!(
+    joinpath(@__DIR__, "Brutus", "LocalPreferences.toml"),
+    "Brutus",
+    "libbrutus" => lib_path;
+    force=true,
+)
+
+include_dir = joinpath(LLVM.artifact_dir, "include")
+output = joinpath(@__DIR__, "Brutus", "Dialects", string(Base.libllvm_version.major), "JuliaOps.jl")
+mkpath(dirname(output))
+using mlir_jl_tblgen_jll
+run(`$(mlir_jl_tblgen()) --generator=jl-op-defs include/brutus/Dialect/Julia/JuliaOps.td -I $include_dir -o $output`)
