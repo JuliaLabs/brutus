@@ -1,7 +1,6 @@
 add_mlir_dialect_library(
   MLIRJulia
   Ops.cpp
-  CanonicalizationPatterns.cpp
   ADDITIONAL_HEADER_DIRS
   StandaloneDialect.cpp
   StandaloneOps.cpp
@@ -12,6 +11,7 @@ add_mlir_dialect_library(
   DEPENDS
   MLIRJuliaOpsIncGen
   MLIRSideEffectInterfaces
+  MLIRInferTypeOpInterface
 
   LINK_LIBS PUBLIC
   MLIR

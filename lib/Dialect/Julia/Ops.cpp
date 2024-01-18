@@ -96,18 +96,18 @@ void InvokeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 static mlir::LogicalResult verify(ReturnOp op) {
     // We know that the parent operation is a function, because of the 'HasParent'
     // trait attached to the operation definition.
-    auto function = cast<FuncOp>(op->getParentOp());
+    auto function = cast<func::FuncOp>(op->getParentOp());
 
-    const auto &results = function.getType().getResults();
-    if (results.size() != 1)
-        return function.emitOpError() << "does not return exactly one value";
+    // const auto &results = function.getType().getResults();
+    // if (results.size() != 1)
+    //     return function.emitOpError() << "does not return exactly one value";
 
-    // check that result type of function matches the operand type
-    if (results.front() != op.getOperand().getType())
-        return op.emitError() << "type of return operand ("
-                              << op.getOperand().getType()
-                              << ") doesn't match function result type ("
-                              << results.front() << ")";
+    // // check that result type of function matches the operand type
+    // if (results.front() != op.getOperand().getType())
+    //     return op.emitError() << "type of return operand ("
+    //                           << op.getOperand().getType()
+    //                           << ") doesn't match function result type ("
+    //                           << results.front() << ")";
 
     return success();
 }

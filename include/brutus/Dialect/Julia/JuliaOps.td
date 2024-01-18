@@ -129,7 +129,7 @@ def CallOp : JLIR_Op<"call"> {
                           "jl_datatype_t *":$type)>
     ];
 
-    let hasCanonicalizer = 1;
+    // let hasCanonicalizer = 1;
 }
 
 def InvokeOp : JLIR_Op<"invoke"> {
@@ -236,7 +236,7 @@ def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
     let arguments = (ins AnyType:$input);
     let results = (outs AnyType:$output);
 
-    let hasCanonicalizer = 1;
+    // let hasCanonicalizer = 1;
 }
 
 def ArrayToMemRefOp : JLIR_Op<"arraytomemref", [NoSideEffect]> {
