@@ -21,8 +21,8 @@
 #include "mlir/CAPI/Wrap.h"
 #include "mlir/CAPI/IR.h"
 
-#include "mlir/Dialect/StandardOps/IR/Ops.h"
-#include "mlir/Dialect/Linalg/IR/LinalgOps.h"
+// #include "mlir/Dialect/StandardOps/IR/Ops.h"
+// #include "mlir/Dialect/Linalg/IR/LinalgOps.h"
 
 using namespace mlir;
 using namespace mlir::jlir;

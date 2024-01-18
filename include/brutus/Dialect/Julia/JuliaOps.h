@@ -5,6 +5,9 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
 
 #include "julia.h"
 #include "brutus/brutus_internal.h"

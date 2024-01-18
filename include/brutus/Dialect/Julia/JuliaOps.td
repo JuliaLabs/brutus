@@ -9,6 +9,7 @@
 
 include "mlir/IR/OpBase.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
+include "mlir/Interfaces/InferTypeOpInterface.td"
 
 // Provide a definition of the 'JLIR' dialect in the ODS framework so that we
 // can define our operations.
@@ -37,25 +38,25 @@ def JLIR_IsJLArrayTypePred : CPred<"jl_is_array_type($_self.cast<JuliaType>().ge
 //   * The parent dialect of the operation.
 //   * The mnemonic for the operation, or the name without the dialect prefix.
 //   * A list of traits for the operation.
-class JLIR_Op<string mnemonic, list<OpTrait> traits = []> :
+class JLIR_Op<string mnemonic, list<Trait> traits = []> :
     Op<JLIR_Dialect, mnemonic, traits>;
 
 // Base clase for JLIR intrinsics
-class JLIR_IntrinsicBuiltinOp<string mnemonic, list<OpTrait> traits = []> :
+class JLIR_IntrinsicBuiltinOp<string mnemonic, list<Trait> traits = []> :
     JLIR_Op<mnemonic, traits> {
 
     let arguments = (ins Variadic<JLIR_JuliaType>:$arguments);
     let results = (outs JLIR_JuliaType);
 }
 
-class JLIR_ArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
+class JLIR_ArithmeticOp<string mnemonic, list<Trait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
     let arguments = (ins JLIR_JuliaType:$rhs, JLIR_JuliaType:$lhs);
     let results = (outs JLIR_JuliaType);
 }
 
-class JLIR_UnaryArithmeticOp<string mnemonic, list<OpTrait> traits = []>:
+class JLIR_UnaryArithmeticOp<string mnemonic, list<Trait> traits = []>:
     JLIR_IntrinsicBuiltinOp<mnemonic, !listconcat([NoSideEffect, SameOperandsAndResultType], traits)> {
 
     let arguments = (ins JLIR_JuliaType:$arg);
@@ -192,7 +193,7 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     ];
 }
 
-def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
+def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"func::FuncOp">]> {
     let summary = "return operation";
     let description = [{
         The "return" operation represents a return operation within a function.
@@ -211,8 +212,8 @@ def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"FuncOp">]> {
     // value must match the return type of the enclosing function.
     let arguments = (ins JLIR_JuliaType:$input);
 
-    // Invoke a static verify method to verify this return operation.
-    let verifier = [{ return ::verify(*this); }];
+    // // Invoke a static verify method to verify this return operation.
+    // let verifier = [{ return ::verify(*this); }];
 }
 
 def PiOp : JLIR_Op<"pi", [NoSideEffect]> {
