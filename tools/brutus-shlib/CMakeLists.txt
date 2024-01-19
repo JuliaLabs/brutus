@@ -17,7 +17,7 @@ llvm_add_library(
   SHARED
   empty.cpp
   ${_OBJECTS}
-  LINK_LIBS PRIVATE
+  LINK_LIBS
   ${_DEPS}
   LLVM
   MLIR

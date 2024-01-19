@@ -8,8 +8,8 @@
 #define JULIA_MLIR_JLIR_TD
 
 include "mlir/IR/OpBase.td"
-include "mlir/Interfaces/SideEffectInterfaces.td"
 include "mlir/Interfaces/InferTypeOpInterface.td"
+include "mlir/Interfaces/SideEffectInterfaces.td"
 
 // Provide a definition of the 'JLIR' dialect in the ODS framework so that we
 // can define our operations.
@@ -129,7 +129,7 @@ def CallOp : JLIR_Op<"call"> {
                           "jl_datatype_t *":$type)>
     ];
 
-    // let hasCanonicalizer = 1;
+    let hasCanonicalizer = 1;
 }
 
 def InvokeOp : JLIR_Op<"invoke"> {
@@ -141,11 +141,11 @@ def InvokeOp : JLIR_Op<"invoke"> {
     let arguments = (ins JLIR_JuliaValueAttr:$methodInstance,
                          JLIR_JuliaType:$callee,
                          Variadic<JLIR_JuliaType>:$arguments);
-   
+
     let results = (outs JLIR_JuliaType);
-    
+
     let builders = [
-        OpBuilder<(ins "jl_method_instance_t *":$methodInstance, 
+        OpBuilder<(ins "jl_method_instance_t *":$methodInstance,
                           "Value":$callee,
                           "ArrayRef<Value>":$arguments,
                           "jl_datatype_t *":$type)>
@@ -175,15 +175,15 @@ def GotoIfNotOp : JLIR_Op<"gotoifnot", [AttrSizedOperandSegments, Terminator]> {
     let arguments = (ins JLIR_JuliaType:$condition,
                      Variadic<JLIR_JuliaType>:$branchOperands,
                      Variadic<JLIR_JuliaType>:$fallthroughOperands);
-    
-    let successors = (successor AnySuccessor:$branchDest, 
+
+    let successors = (successor AnySuccessor:$branchDest,
                       AnySuccessor:$fallthroughDest);
 
     let builders = [
         OpBuilder<(ins "Value":$condition,
-                          "Block *":$branchDest, 
+                          "Block *":$branchDest,
                           "ValueRange":$branchOperands,
-                          "Block *":$fallthroughDest, 
+                          "Block *":$fallthroughDest,
                           "ValueRange":$fallthroughOperands),
                   [{
                       build($_builder, $_state, condition,
@@ -212,7 +212,7 @@ def ReturnOp : JLIR_Op<"return", [Terminator, HasParent<"func::FuncOp">]> {
     // value must match the return type of the enclosing function.
     let arguments = (ins JLIR_JuliaType:$input);
 
-    // // Invoke a static verify method to verify this return operation.
+    // Invoke a static verify method to verify this return operation.
     // let verifier = [{ return ::verify(*this); }];
 }
 
@@ -236,7 +236,7 @@ def ConvertStdOp : JLIR_Op<"convertstd", [NoSideEffect]> {
     let arguments = (ins AnyType:$input);
     let results = (outs AnyType:$output);
 
-    // let hasCanonicalizer = 1;
+    let hasCanonicalizer = 1;
 }
 
 def ArrayToMemRefOp : JLIR_Op<"arraytomemref", [NoSideEffect]> {

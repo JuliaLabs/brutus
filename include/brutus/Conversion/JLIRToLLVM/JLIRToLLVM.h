@@ -36,13 +36,13 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
 };
 
 struct JLIRToLLVMLoweringPass
-    : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
+    : public PassWrapper<JLIRToLLVMLoweringPass, OperationPass<func::FuncOp>> {
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<LLVM::LLVMDialect>();
     }
 
-    void runOnFunction() final;
+    void runOnOperation() final;
 };
 
 /// Create a pass to convert JLIR operations to the LLVMIR dialect.

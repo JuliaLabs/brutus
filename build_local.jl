@@ -61,21 +61,30 @@ end
 
 # discover built binaries
 built_libs = filter(readdir(joinpath(scratch_dir, "lib"))) do file
-    endswith(file, ".$(Libdl.dlext)")
+    endswith(file, "brutus.$(Libdl.dlext)")
 end
-lib_path = joinpath(scratch_dir, "lib", only(built_libs))
-isfile(lib_path) || error("Could not find library $lib_path in build directory")
+
+libbrutus_path = joinpath(scratch_dir, "lib", only(built_libs))
+isfile(libbrutus_path) || error("Could not find library $libbrutus_path in build directory")
+
+built_libs = filter(readdir(joinpath(scratch_dir, "lib"))) do file
+    endswith(file, "brutus-c.$(Libdl.dlext)")
+end
+
+libbrutus_c_path = joinpath(scratch_dir, "lib", only(built_libs))
+isfile(libbrutus_c_path) || error("Could not find library $libbrutus_c_path in build directory")
 
 # tell Brutus.jl to load our library instead of the default artifact one
 set_preferences!(
     joinpath(@__DIR__, "Brutus", "LocalPreferences.toml"),
     "Brutus",
-    "libbrutus" => lib_path;
+    "libbrutus" => libbrutus_path,
+    "libbrutus_c" => libbrutus_c_path;
     force=true,
 )
 
 include_dir = joinpath(LLVM.artifact_dir, "include")
-output = joinpath(@__DIR__, "Brutus", "Dialects", string(Base.libllvm_version.major), "JuliaOps.jl")
+output = joinpath(@__DIR__, "Brutus", "src", "Dialects", string(Base.libllvm_version.major), "JuliaOps.jl")
 mkpath(dirname(output))
 using mlir_jl_tblgen_jll
 run(`$(mlir_jl_tblgen()) --generator=jl-op-defs include/brutus/Dialect/Julia/JuliaOps.td -I $include_dir -o $output`)

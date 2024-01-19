@@ -1,7 +1,7 @@
 module jlir
 
 import ...IR: NamedAttribute, MLIRType, Value, Location, Block, Region, Attribute, create_operation, context, IndexType
-import ..Dialects: namedattribute, operandsegmentsizes
+import ...Dialects: namedattribute, operandsegmentsizes
 import ...API
 
 
@@ -851,24 +851,24 @@ function ceil_llvm(arguments::Vector{Value}; result_0::MLIRType, location=Locati
     )
 end
 
-"""
-`cglobal`
+# """
+# `cglobal`
 
-"""
-function cglobal(arguments::Vector{Value}; result_0::MLIRType, location=Location())
-    results = MLIRType[result_0, ]
-    operands = Value[arguments..., ]
-    owned_regions = Region[]
-    successors = Block[]
-    attributes = NamedAttribute[]
+# """
+# function cglobal(arguments::Vector{Value}; result_0::MLIRType, location=Location())
+#     results = MLIRType[result_0, ]
+#     operands = Value[arguments..., ]
+#     owned_regions = Region[]
+#     successors = Block[]
+#     attributes = NamedAttribute[]
     
-    create_operation(
-        "jlir.cglobal", location;
-        operands, owned_regions, successors, attributes,
-        results=results,
-        result_inference=false
-    )
-end
+#     create_operation(
+#         "jlir.cglobal", location;
+#         operands, owned_regions, successors, attributes,
+#         results=results,
+#         result_inference=false
+#     )
+# end
 
 """
 `checked_sadd_int`
