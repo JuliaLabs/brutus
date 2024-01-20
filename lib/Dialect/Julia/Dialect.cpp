@@ -19,7 +19,9 @@ void JLIRDialect::initialize() {
 #include "brutus/Dialect/Julia/JuliaOps.cpp.inc"
         >();
     addTypes<JuliaType>();
-    addAttributes<JuliaValueAttr>();
+    addAttributes<
+        JuliaValueAttr
+        >();
 }
 
 // void JLIRDialect::printType(mlir::Type type,
