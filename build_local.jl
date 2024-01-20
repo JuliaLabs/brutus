@@ -48,9 +48,10 @@ LLVM_DIR = joinpath(LLVM.artifact_dir, "lib", "cmake", "llvm")
 MLIR_DIR = joinpath(LLVM.artifact_dir, "lib", "cmake", "mlir")
 
 # build and install
-@info "Building" source_dir scratch_dir build_dir LLVM_DIR MLIR_DIR
+julia = joinpath(Sys.BINDIR, Base.julia_exename())
+@info "Building" source_dir scratch_dir build_dir LLVM_DIR MLIR_DIR julia
 cmake() do cmake_path
-    config_opts = `-DLLVM_ROOT=$(LLVM_DIR) -DMLIR_ROOT=$(MLIR_DIR) -DCMAKE_INSTALL_PREFIX=$(scratch_dir)`
+    config_opts = `-DLLVM_ROOT=$(LLVM_DIR) -DMLIR_ROOT=$(MLIR_DIR) -DCMAKE_INSTALL_PREFIX=$(scratch_dir) -DJulia_EXECUTABLE=$julia`
     if Sys.iswindows()
         # prevent picking up MSVC
         config_opts = `$config_opts -G "MSYS Makefiles"`
