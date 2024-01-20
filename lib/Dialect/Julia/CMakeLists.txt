@@ -1,10 +1,8 @@
 add_mlir_dialect_library(
   MLIRJulia
+  Dialect.cpp
   Ops.cpp
   CanonicalizationPatterns.cpp
-  ADDITIONAL_HEADER_DIRS
-  StandaloneDialect.cpp
-  StandaloneOps.cpp
 
   ADDITIONAL_HEADER_DIRS
   ${PROJECT_SOURCE_DIR}/include/Brutus/JuliaOps
@@ -12,6 +10,7 @@ add_mlir_dialect_library(
   DEPENDS
   MLIRJuliaOpsIncGen
   MLIRSideEffectInterfaces
+  MLIRInferTypeOpInterface
 
   LINK_LIBS PUBLIC
   MLIR

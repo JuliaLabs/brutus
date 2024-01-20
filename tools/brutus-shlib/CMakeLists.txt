@@ -17,7 +17,7 @@ llvm_add_library(
   SHARED
   empty.cpp
   ${_OBJECTS}
-  LINK_LIBS PRIVATE
+  LINK_LIBS
   ${_DEPS}
   LLVM
   MLIR
@@ -30,3 +30,4 @@ message("Libraries included in libBrutus.so: ${brutus_libs}")
 # message("LLVM Components included in libMLIR.so: ${mlir_llvm_link_components}")
 
 mlir_check_all_link_libraries(MLIR)
+install(TARGETS brutus DESTINATION lib)

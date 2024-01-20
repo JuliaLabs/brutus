@@ -9,41 +9,6 @@
 using namespace mlir;
 using namespace mlir::jlir;
 
-/// Dialect creation, the instance will be owned by the context. This is the
-/// point of registration of custom types and operations for the dialect.
-JLIRDialect::JLIRDialect(mlir::MLIRContext *ctx) : mlir::Dialect("jlir", ctx, TypeID::get<JLIRDialect>()) {
-    addOperations<
-#define GET_OP_LIST
-#include "brutus/Dialect/Julia/JuliaOps.cpp.inc"
-        >();
-    addTypes<JuliaType>();
-    addAttributes<JuliaValueAttr>();
-}
-
-void JLIRDialect::printType(mlir::Type type,
-                            mlir::DialectAsmPrinter &printer) const {
-    assert(type.isa<JuliaType>());
-    printer << showValue((jl_value_t*)type.cast<JuliaType>().getDatatype());
-}
-
-void JLIRDialect::printAttribute(mlir::Attribute attr,
-                                 mlir::DialectAsmPrinter &printer) const {
-    // NOTE: printing values may use illegal characters (such as quotes?)
-    assert(attr.isa<JuliaValueAttr>());
-    printer << showValue(attr.cast<JuliaValueAttr>().getValue());
-}
-
-std::string JLIRDialect::showValue(jl_value_t *value) {
-    ios_t str_;
-    ios_mem(&str_, 10);
-    JL_STREAM *str = (JL_STREAM*)&str_;
-    jl_static_show(str, value);
-    str_.buf[str_.size] = '\0';
-    std::string s = str_.buf;
-    ios_close(&str_);
-    return s;
-}
-
 void UnimplementedOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, jl_datatype_t *type) {
     state.addTypes(JuliaType::get(builder.getContext(), type));
 }
@@ -58,7 +23,7 @@ void ConstantOp::build(mlir::OpBuilder &builder, mlir::OperationState &state, jl
 }
 
 mlir::OpFoldResult ConstantOp::fold(llvm::ArrayRef<mlir::Attribute> operands) {
-    return valueAttr();
+    return getValueAttr();
 }
 
 void PiOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
@@ -96,18 +61,18 @@ void InvokeOp::build(mlir::OpBuilder &builder, mlir::OperationState &state,
 static mlir::LogicalResult verify(ReturnOp op) {
     // We know that the parent operation is a function, because of the 'HasParent'
     // trait attached to the operation definition.
-    auto function = cast<FuncOp>(op->getParentOp());
+    auto function = cast<func::FuncOp>(op->getParentOp());
 
-    const auto &results = function.getType().getResults();
-    if (results.size() != 1)
-        return function.emitOpError() << "does not return exactly one value";
+    // const auto &results = function.getType().getResults();
+    // if (results.size() != 1)
+    //     return function.emitOpError() << "does not return exactly one value";
 
-    // check that result type of function matches the operand type
-    if (results.front() != op.getOperand().getType())
-        return op.emitError() << "type of return operand ("
-                              << op.getOperand().getType()
-                              << ") doesn't match function result type ("
-                              << results.front() << ")";
+    // // check that result type of function matches the operand type
+    // if (results.front() != op.getOperand().getType())
+    //     return op.emitError() << "type of return operand ("
+    //                           << op.getOperand().getType()
+    //                           << ") doesn't match function result type ("
+    //                           << results.front() << ")";
 
     return success();
 }

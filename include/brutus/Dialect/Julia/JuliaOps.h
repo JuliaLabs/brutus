@@ -5,41 +5,45 @@
 #include "mlir/IR/Builders.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/Interfaces/SideEffectInterfaces.h"
+#include "mlir/Interfaces/InferTypeOpInterface.h"
+#include "mlir/Dialect/Func/IR/FuncOps.h"
+
 
 #include "julia.h"
 #include "brutus/brutus_internal.h"
+#include "brutus/Dialect/Julia/JuliaDialect.h"
 
 namespace mlir {
 namespace jlir {
 
-/// This is the definition of the Julia dialect. A dialect inherits from
-/// mlir::Dialect and registers custom attributes, operations, and types (in its
-/// constructor). It can also override some general behavior exposed via virtual
-/// methods.
-class JLIRDialect : public mlir::Dialect {
-public:
-    explicit JLIRDialect(mlir::MLIRContext *ctx);
+// /// This is the definition of the Julia dialect. A dialect inherits from
+// /// mlir::Dialect and registers custom attributes, operations, and types (in its
+// /// constructor). It can also override some general behavior exposed via virtual
+// /// methods.
+// class JLIRDialect : public mlir::Dialect {
+// public:
+//     explicit JLIRDialect(mlir::MLIRContext *ctx);
 
-    // /// A hook used to materialize constant values with the given type.
-    // Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
-    //                                Location loc) override;
+//     // /// A hook used to materialize constant values with the given type.
+//     // Operation *materializeConstant(OpBuilder &builder, Attribute value, Type type,
+//     //                                Location loc) override;
 
-    // /// Parse an instance of a type registered to the toy dialect.
-    // mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
+//     // /// Parse an instance of a type registered to the toy dialect.
+//     // mlir::Type parseType(mlir::DialectAsmParser &parser) const override;
 
-    /// Print an instance of a type registered to the toy dialect.
-    void printType(mlir::Type type,
-                   mlir::DialectAsmPrinter &printer) const override;
+//     /// Print an instance of a type registered to the toy dialect.
+//     void printType(mlir::Type type,
+//                    mlir::DialectAsmPrinter &printer) const override;
 
-    void printAttribute(mlir::Attribute attr,
-                        mlir::DialectAsmPrinter &printer) const override;
+//     void printAttribute(mlir::Attribute attr,
+//                         mlir::DialectAsmPrinter &printer) const override;
 
-    /// Provide a utility accessor to the dialect namespace. This is used by
-    /// several utilities for casting between dialects.
-    static llvm::StringRef getDialectNamespace() { return "jlir"; }
+//     /// Provide a utility accessor to the dialect namespace. This is used by
+//     /// several utilities for casting between dialects.
+//     static llvm::StringRef getDialectNamespace() { return "jlir"; }
 
-    static std::string showValue(jl_value_t *value);
-};
+//     static std::string showValue(jl_value_t *value);
+// };
 
 /// JLIR Types
 

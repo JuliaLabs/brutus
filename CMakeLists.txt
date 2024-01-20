@@ -5,6 +5,10 @@ if(POLICY CMP0068)
   set(CMAKE_BUILD_WITH_INSTALL_NAME_DIR ON)
 endif()
 
+if(POLICY CMP0074)
+  cmake_policy(SET CMP0074 NEW)
+endif()
+
 if(POLICY CMP0075)
   cmake_policy(SET CMP0075 NEW)
 endif()
@@ -16,6 +20,7 @@ endif()
 project(brutus)
 set(BRUTUS_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 
+find_package(LLVM REQUIRED CONFIG)
 find_package(MLIR REQUIRED CONFIG)
 
 message(STATUS "Using MLIRConfig.cmake in: ${MLIR_DIR}")
@@ -28,6 +33,7 @@ set(MLIR_BINARY_DIR ${CMAKE_BINARY_DIR})
 list(APPEND CMAKE_MODULE_PATH "${MLIR_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${LLVM_CMAKE_DIR}")
 list(APPEND CMAKE_MODULE_PATH "${BRUTUS_SOURCE_DIR}/cmake/modules")
+
 include(TableGen)
 include(AddLLVM)
 include(AddMLIR)
@@ -51,16 +57,3 @@ add_subdirectory(include)
 add_subdirectory(lib)
 add_subdirectory(test)
 add_subdirectory(tools)
-
-set(JLRUN "${CMAKE_BINARY_DIR}/jl.sh")
-file( WRITE  ${JLRUN} "#!/bin/bash\n")
-file( APPEND ${JLRUN} "export LD_LIBRARY_PATH=${CMAKE_BINARY_DIR}/lib\n")
-file( APPEND ${JLRUN} "export JULIA_PROJECT=${BRUTUS_SOURCE_DIR}/Brutus\n")
-file( APPEND ${JLRUN} "${Julia_EXECUTABLE}\n")
-execute_process( COMMAND chmod +x ${JLRUN})
-
-
-set(FISHENV "${CMAKE_BINARY_DIR}/env.fish")
-file( WRITE  ${FISHENV} "set -x -g LD_LIBRARY_PATH ${CMAKE_BINARY_DIR}/lib\n")
-file( APPEND ${FISHENV} "set -x -g JULIA_PROJECT ${BRUTUS_SOURCE_DIR}/Brutus\n")
-file( APPEND ${FISHENV} "alias julia='${Julia_EXECUTABLE}'\n")

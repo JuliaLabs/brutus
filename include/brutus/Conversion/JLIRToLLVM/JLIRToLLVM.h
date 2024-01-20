@@ -5,8 +5,8 @@
 
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Conversion/LLVMCommon/TypeConverter.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
-#include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
+// #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Pass/Pass.h"
 
 namespace mlir {
@@ -36,13 +36,13 @@ struct JLIRToLLVMTypeConverter : public LLVMTypeConverter {
 };
 
 struct JLIRToLLVMLoweringPass
-    : public PassWrapper<JLIRToLLVMLoweringPass, FunctionPass> {
+    : public PassWrapper<JLIRToLLVMLoweringPass, OperationPass<func::FuncOp>> {
 
     void getDependentDialects(DialectRegistry &registry) const override {
         registry.insert<LLVM::LLVMDialect>();
     }
 
-    void runOnFunction() final;
+    void runOnOperation() final;
 };
 
 /// Create a pass to convert JLIR operations to the LLVMIR dialect.

@@ -21,7 +21,7 @@ struct JLIRToStandardTypeConverter : public TypeConverter {
 /// conversion patterns capture the LLVMTypeConverter and the LowerToLLVMOptions
 /// by reference meaning the references have to remain alive during the entire
 /// pattern lifetime.
-void populateJLIRToStdConversionPatterns(OwningRewritePatternList &patterns,
+void populateJLIRToStdConversionPatterns(RewritePatternSet &patterns,
                                          MLIRContext &context,
                                          JLIRToStandardTypeConverter &converter);
 

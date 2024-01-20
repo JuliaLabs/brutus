@@ -152,6 +152,7 @@ namespace
     template <typename SourceOp>
     struct OpAndTypeConversionPattern : OpConversionPattern<SourceOp>
     {
+        using OpConversionPattern<SourceOp>::OpConversionPattern;
         JLIRToLLVMTypeConverter &lowering;
 
         OpAndTypeConversionPattern(MLIRContext *ctx,
@@ -261,16 +262,17 @@ namespace
     struct ToLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp>
     {
         using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+        using OpAdaptor = typename SourceOp::Adaptor;
 
         LogicalResult matchAndRewrite(SourceOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
             static_assert(
                 std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
                 "expected single result op");
             rewriter.replaceOpWithNewOp<LLVMOp>(
-                op, this->lowering.convertType(op.getType()), operands);
+                op, this->lowering.convertType(op.getType()), adaptor.getOperands());
             return success();
         }
     };
@@ -279,14 +281,16 @@ namespace
     struct ToUnaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp>
     {
         using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+        using OpAdaptor = typename SourceOp::Adaptor;
 
         LogicalResult matchAndRewrite(SourceOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
             static_assert(
                 std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
                 "expected single result op");
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 1 && "expected unary operation");
             rewriter.replaceOpWithNewOp<LLVMOp>(
                 op, this->lowering.convertType(op.getType()), operands.front());
@@ -298,14 +302,16 @@ namespace
     struct ToTernaryLLVMOpPattern : public OpAndTypeConversionPattern<SourceOp>
     {
         using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+        using OpAdaptor = typename SourceOp::Adaptor;
 
         LogicalResult matchAndRewrite(SourceOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
             static_assert(
                 std::is_base_of<OpTrait::OneResult<SourceOp>, SourceOp>::value,
                 "expected single result op");
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 3 && "expected ternary operation");
             rewriter.replaceOpWithNewOp<LLVMOp>(
                 op, this->lowering.convertType(op.getType()),
@@ -320,9 +326,10 @@ namespace
     struct ToUndefOpPattern : public OpAndTypeConversionPattern<SourceOp>
     {
         using OpAndTypeConversionPattern<SourceOp>::OpAndTypeConversionPattern;
+        using OpAdaptor = typename SourceOp::Adaptor;
 
         LogicalResult matchAndRewrite(SourceOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
             static_assert(
@@ -340,9 +347,10 @@ namespace
 
         LogicalResult
         matchAndRewrite(ConvertStdOp op,
-                        ArrayRef<Value> operands,
+                        OpAdaptor adaptor,
                         ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             // TODO: check that this conversion is valid
             rewriter.replaceOp(op, operands.front());
             return success();
@@ -354,7 +362,7 @@ namespace
         using OpAndTypeConversionPattern<ConstantOp>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(ConstantOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
             jl_value_t *value = op.value();
@@ -427,9 +435,10 @@ namespace
         using OpAndTypeConversionPattern<GotoIfNotOp>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(GotoIfNotOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             assert(operands.size() >= 1);
             rewriter.replaceOpWithNewOp<LLVM::CondBrOp>(
                 op, operands, op.getSuccessors(), op->getAttrs());
@@ -442,9 +451,10 @@ namespace
         using OpAndTypeConversionPattern<GotoOp>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(GotoOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             rewriter.replaceOpWithNewOp<LLVM::BrOp>(
                 op, operands, op.getSuccessor(), op->getAttrs());
             return success();
@@ -456,9 +466,10 @@ namespace
         using OpAndTypeConversionPattern<ReturnOp>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(ReturnOp op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             rewriter.replaceOpWithNewOp<LLVM::ReturnOp>(op, operands);
             return success();
         }
@@ -469,9 +480,10 @@ namespace
         using OpAndTypeConversionPattern<Intrinsic_not_int>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(Intrinsic_not_int op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             jl_datatype_t *operand_type =
                 op.getOperand(0).getType().dyn_cast<JuliaType>().getDatatype();
             bool is_bool = operand_type == jl_bool_type;
@@ -499,9 +511,10 @@ namespace
         using OpAndTypeConversionPattern<Builtin_is>::OpAndTypeConversionPattern;
 
         LogicalResult matchAndRewrite(Builtin_is op,
-                                      ArrayRef<Value> operands,
+                                      OpAdaptor adaptor,
                                       ConversionPatternRewriter &rewriter) const override
         {
+            auto operands = adaptor.getOperands();
             assert(operands.size() == 2);
             jl_value_t *jt1 = (jl_value_t *)op.getOperand(0).getType().cast<JuliaType>().getDatatype();
             jl_value_t *jt2 = (jl_value_t *)op.getOperand(1).getType().cast<JuliaType>().getDatatype();
@@ -545,7 +558,7 @@ namespace
 //
 //       f(x::Bool) = x ? nothing : 100
 
-void JLIRToLLVMLoweringPass::runOnFunction()
+void JLIRToLLVMLoweringPass::runOnOperation()
 {
     RewritePatternSet patterns(&getContext());
 
@@ -679,11 +692,11 @@ void JLIRToLLVMLoweringPass::runOnFunction()
         // invoke_kwsorter?
         >(&getContext(), converter);
 
-    populateStdToLLVMConversionPatterns(converter, patterns);
+    // populateStdToLLVMConversionPatterns(converter, patterns);
 
     LLVMConversionTarget target(getContext());
     if (failed(applyPartialConversion(
-            getFunction(), target, std::move(patterns))))
+            getOperation(), target, std::move(patterns))))
         signalPassFailure();
 }
 
