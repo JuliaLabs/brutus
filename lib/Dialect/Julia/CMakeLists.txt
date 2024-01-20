@@ -1,5 +1,6 @@
 add_mlir_dialect_library(
   MLIRJulia
+  Dialect.cpp
   Ops.cpp
   CanonicalizationPatterns.cpp
 

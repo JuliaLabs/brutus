@@ -19,6 +19,12 @@ module BrutusDialects
     include(joinpath("Dialects", string(Base.libllvm_version.major), "JuliaOps.jl"))
 end
 
+function load_dialect(ctx)
+    dialect = IR.DialectHandle(BrutusAPI.mlirGetDialectHandle__jlir__())
+    API.mlirDialectHandleRegisterDialect(dialect, ctx)
+    API.mlirDialectHandleLoadDialect(dialect, ctx)
+end
+
 function code_mlir(f, types)
     ctx = IR.context()
 
@@ -27,9 +33,10 @@ function code_mlir(f, types)
     for dialect in ("func", "cf")
         IR.get_or_load_dialect!(dialect)
     end
+    load_dialect(ctx)
     IR.get_or_load_dialect!(IR.DialectHandle(BrutusAPI.mlirGetDialectHandle__jlir__()))
 
-    values = Vector{Value}(undef, length(ir.stmts)) 
+    values = Vector{Value}(undef, length(ir.stmts))
 end
 
 # using GPUCompiler: GPUCompiler, CompilerJob

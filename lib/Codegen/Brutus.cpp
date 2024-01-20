@@ -1,6 +1,7 @@
 #include "brutus/brutus.h"
 #include "brutus/brutus_internal.h"
 #include "brutus/Dialect/Julia/JuliaOps.h"
+#include "brutus/Dialect/Julia/JuliaDialect.h"
 
 #include "mlir/InitAllDialects.h"
 
